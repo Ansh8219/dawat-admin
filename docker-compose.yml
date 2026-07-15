@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: daawat-admin:latest
+    container_name: daawat-admin
+    ports:
+      # Host 3012 is free on this server (3000/8080 already taken)
+      - "3012:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+    restart: unless-stopped
