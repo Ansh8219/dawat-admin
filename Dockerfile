@@ -6,8 +6,9 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (better layer caching)
+# Use npm install (not ci) so a slightly stale lockfile still builds
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source and build for Node (Nitro node-server)
 COPY . .
