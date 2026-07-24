@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { menuItems as seedMenu, categories, inr } from "@/lib/mock/data";
+import { menuItems as seedMenu, inr } from "@/lib/mock/data";
+import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { Plus, LayoutGrid, List, ImageIcon, Search, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,25 +21,37 @@ export const Route = createFileRoute("/_app/menu")({
 type MenuItem = (typeof seedMenu)[number];
 
 function MenuPage() {
-  const [items, setItems] = useState(() => [...seedMenu]);
+  const panel = usePanel();
+  const meta = usePanelMeta();
+  const panelSeed = useMemo(() => seedMenu.filter((m) => m.branch === panel), [panel]);
+  const [items, setItems] = useState<MenuItem[]>(() => panelSeed);
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [branch, setBranch] = useState<"all" | "bakery" | "restaurant">("all");
   const [category, setCategory] = useState<string>("all");
   const [q, setQ] = useState("");
-  const [avail, setAvail] = useState<Record<number, boolean>>(() => Object.fromEntries(seedMenu.map((m) => [m.code, true])));
+  const [avail, setAvail] = useState<Record<number, boolean>>(() =>
+    Object.fromEntries(panelSeed.map((m) => [m.code, true])),
+  );
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ name: "", cat: "", price: "", desc: "" });
+
+  useEffect(() => {
+    setItems(panelSeed);
+    setAvail(Object.fromEntries(panelSeed.map((m) => [m.code, true])));
+    setSelected(new Set());
+    setCategory("all");
+  }, [panelSeed]);
+
+  const categories = useMemo(() => Array.from(new Set(items.map((m) => m.cat))), [items]);
 
   const filtered = useMemo(
     () =>
       items.filter(
         (m) =>
-          (branch === "all" || m.branch === branch) &&
           (category === "all" || m.cat === category) &&
           m.name.toLowerCase().includes(q.toLowerCase()),
       ),
-    [items, branch, category, q],
+    [items, category, q],
   );
 
   const toggleSel = (code: number) =>
@@ -72,22 +84,22 @@ function MenuPage() {
       cat: form.cat.trim() || "Cakes",
       price: Number(form.price) || 0,
       unit: "pc",
-      branch: branch === "restaurant" ? "restaurant" : "bakery",
+      branch: panel === "restaurant" ? "restaurant" : "bakery",
       veg: true,
     };
     setItems((prev) => [next, ...prev]);
     setAvail((a) => ({ ...a, [code]: true }));
     setModal(false);
     setForm({ name: "", cat: "", price: "", desc: "" });
-    toast.success(`${next.name} added`);
+    toast.success(`${next.name} added to ${meta.label}`);
   }
 
   return (
     <div>
       <PageHeader
-        title="Menu & Products"
+        title={`${meta.label} Menu`}
         crumbs={["Operations", "Menu"]}
-        description="Manage your bakery and restaurant catalogue."
+        description={`Products for ${meta.label} only — GST ${meta.gst}. Other panels stay separate.`}
         action={
           <Button className="rounded-xl gap-2" onClick={() => setModal(true)}>
             <Plus className="h-4 w-4" /> Add Product
@@ -125,13 +137,9 @@ function MenuPage() {
 
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs value={branch} onValueChange={(v) => setBranch(v as typeof branch)}>
-              <TabsList className="rounded-xl">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="bakery">Bakery</TabsTrigger>
-                <TabsTrigger value="restaurant">Restaurant</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="text-sm text-muted-foreground">
+              Showing <b className="text-foreground">{filtered.length}</b> {meta.label.toLowerCase()} items
+            </div>
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

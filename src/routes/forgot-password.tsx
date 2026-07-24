@@ -10,7 +10,7 @@ import { isAuthenticated, useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/forgot-password")({
   beforeLoad: () => {
     if (isAuthenticated()) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/select-panel" });
     }
   },
   component: ForgotPasswordPage,

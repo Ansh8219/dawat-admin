@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { branches, inr } from "@/lib/mock/data";
+import { inr } from "@/lib/mock/data";
 import { useApp } from "@/lib/store";
+import { usePanelMeta } from "@/lib/use-panel";
 import { MapPin, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,12 +19,13 @@ export const Route = createFileRoute("/_app/settings")({
 
 function SettingsPage() {
   const { dark, toggleDark } = useApp();
+  const meta = usePanelMeta();
   return (
     <div>
       <PageHeader
-        title="Settings"
+        title={`${meta.label} Settings`}
         crumbs={["Admin", "Settings"]}
-        description="Business, tax, printer, payment, and delivery configuration."
+        description={`Configuration for ${meta.label} · GST ${meta.gst}`}
       />
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="business">
@@ -42,9 +44,13 @@ function SettingsPage() {
                 <div className="text-sm font-semibold">Business Details</div>
                 <div className="mt-3 space-y-3">
                   <div>
+                    <Label>Panel / Unit</Label>
+                    <Input value={meta.label} readOnly className="mt-1 rounded-xl" />
+                  </div>
+                  <div>
                     <Label>Business Name</Label>
                     <Input
-                      defaultValue="Daawat Baker's — A Designer Bakery Studio"
+                      defaultValue={`Daawat Baker's — ${meta.label}`}
                       className="mt-1 rounded-xl"
                     />
                   </div>
@@ -84,34 +90,31 @@ function SettingsPage() {
                 </div>
               </div>
               <div className="card-elevated p-4">
-                <div className="text-sm font-semibold">Branches & GST</div>
-                <div className="mt-3 space-y-3">
-                  {branches.map((b) => (
-                    <div key={b.id} className="rounded-xl border p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold">{b.label}</div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="mt-2">
-                        <Label className="text-xs">GST Number</Label>
-                        <Input defaultValue={b.gst} className="mt-1 rounded-lg font-mono text-xs" />
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    className="rounded-xl"
-                    onClick={() => toast.success("Branch settings saved")}
-                  >
-                    Save Branches
-                  </Button>
+                <div className="text-sm font-semibold">GST for this panel</div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Each panel (Bakery / Restaurant / Banquet) has its own GSTIN — they never mix.
+                </p>
+                <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                  <div className="text-sm font-semibold">{meta.label}</div>
+                  <div className="mt-2">
+                    <Label className="text-xs">GST Number</Label>
+                    <Input defaultValue={meta.gst} className="mt-1 rounded-lg font-mono text-xs" />
+                  </div>
                 </div>
+                <Button
+                  className="mt-3 rounded-xl"
+                  onClick={() => toast.success(`${meta.label} GST saved`)}
+                >
+                  Save GST
+                </Button>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="tax" className="mt-4">
             <div className="card-elevated max-w-lg p-4 space-y-3">
-              <div className="text-sm font-semibold">GST Configuration</div>
+              <div className="text-sm font-semibold">GST Configuration — {meta.label}</div>
+              <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs">GSTIN · {meta.gst}</div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>CGST %</Label>

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, Search, Menu, Moon, Sun, ChevronDown, LogOut, UserCircle, Store } from "lucide-react";
+import { Bell, Search, Menu, Moon, Sun, LogOut, UserCircle, ArrowLeftRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog,
@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { branches, notifications } from "@/lib/mock/data";
+import { usePanelMeta } from "@/lib/use-panel";
+import { notifications } from "@/lib/mock/data";
 import { StatusBadge } from "./status-badge";
 import { toast } from "sonner";
 
@@ -33,12 +34,13 @@ function initials(name: string) {
 
 export function TopBar({ onMenu }: { onMenu?: () => void }) {
   const navigate = useNavigate();
-  const { branch, setBranch, dark, toggleDark } = useApp();
+  const { dark, toggleDark } = useApp();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
+  const clearPanel = useAuth((s) => s.clearPanel);
+  const meta = usePanelMeta();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
-  const currentBranch = branches.find((b) => b.id === branch);
   const unread = notifications.filter((n) => !n.read).length;
   const displayName = user?.name ?? "Admin";
   const displayRole = user?.role ?? "Admin";
@@ -47,6 +49,11 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
     logout();
     setSignOutOpen(false);
     void navigate({ to: "/login" });
+  };
+
+  const switchPanel = () => {
+    clearPanel();
+    void navigate({ to: "/select-panel" });
   };
 
   return (
@@ -61,7 +68,7 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
       <div className="relative hidden min-w-0 max-w-md flex-1 md:block">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search orders, customers, items…"
+          placeholder={`Search ${meta.label.toLowerCase()}…`}
           className="w-full rounded-xl border-border/70 bg-muted/40 pl-9"
           value={searchQ}
           onChange={(e) => setSearchQ(e.target.value)}
@@ -74,31 +81,20 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-      {/* Branch switcher */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="rounded-xl gap-2">
-            <Store className="h-4 w-4 text-primary" />
-            <span className="hidden sm:inline text-sm">
-              {currentBranch ? currentBranch.label : "All Branches"}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Business Branch</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setBranch("all")}>All Branches</DropdownMenuItem>
-          {branches.map((b) => (
-            <DropdownMenuItem key={b.id} onClick={() => setBranch(b.id)}>
-              <div>
-                <div>{b.label}</div>
-                <div className="text-[10px] text-muted-foreground">GST · {b.gst}</div>
-              </div>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-3 py-1.5 sm:flex">
+        <div>
+          <div className="text-xs font-semibold leading-tight">{meta.label}</div>
+          <div className="font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
+        </div>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 rounded-lg px-2 text-xs" onClick={switchPanel}>
+          <ArrowLeftRight className="h-3.5 w-3.5" />
+          Switch
+        </Button>
+      </div>
+      <Button variant="outline" size="sm" className="rounded-xl gap-1.5 sm:hidden" onClick={switchPanel}>
+        <ArrowLeftRight className="h-3.5 w-3.5" />
+        {meta.label}
+      </Button>
 
       <Button variant="ghost" size="icon" onClick={toggleDark} title="Toggle theme">
         {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -171,6 +167,9 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuItem onSelect={() => void navigate({ to: "/settings" })}>
             <UserCircle className="mr-2 h-4 w-4" /> My Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={switchPanel}>
+            <ArrowLeftRight className="mr-2 h-4 w-4" /> Switch panel
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"

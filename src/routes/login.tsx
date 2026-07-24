@@ -11,7 +11,7 @@ import { DEMO_ADMIN } from "@/lib/brand";
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
     if (isAuthenticated()) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/select-panel" });
     }
   },
   component: LoginPage,
@@ -39,7 +39,7 @@ function LoginPage() {
         setError(result.error);
         return;
       }
-      void navigate({ to: "/" });
+      void navigate({ to: "/select-panel" });
     }, 350);
   };
 

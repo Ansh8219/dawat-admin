@@ -7,6 +7,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { LOGO_SRC } from "@/lib/brand";
+import { usePanel, usePanelMeta } from "@/lib/use-panel";
+import { isRouteAllowed } from "@/lib/panel";
 
 const nav = [
   { section: "Overview", items: [
@@ -33,30 +35,67 @@ const nav = [
   ]},
 ] as const;
 
+const bookingLabels: Record<string, string> = {
+  bakery: "Bookings",
+  restaurant: "Tables & Bookings",
+  banquet: "Banquet Bookings",
+};
+
+const menuLabels: Record<string, string> = {
+  bakery: "Bakery Menu",
+  restaurant: "Restaurant Menu",
+  banquet: "Packages",
+};
+
 export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
   const collapsed = useApp((s) => s.sidebarCollapsed) && !mobile;
   const toggle = useApp((s) => s.toggleSidebar);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const panel = usePanel();
+  const meta = usePanelMeta();
+
+  const filteredNav = nav
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter((item) => isRouteAllowed(panel, item.to))
+        .map((item) => {
+          if (item.to === "/bookings") {
+            return { ...item, label: bookingLabels[panel] ?? item.label };
+          }
+          if (item.to === "/menu") {
+            return { ...item, label: menuLabels[panel] ?? item.label };
+          }
+          return item;
+        }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside className={cn(
       "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
       collapsed ? "w-[72px]" : "w-64",
     )}>
-      {/* Logo */}
-      <div className={cn("flex items-center justify-center border-b border-sidebar-border px-3 py-4", collapsed && "px-2")}>
+      <div className={cn("flex flex-col items-center border-b border-sidebar-border px-3 py-4", collapsed && "px-2")}>
         <img
           src={LOGO_SRC}
           alt="Daawat Baker's — A Designer Bakery Studio"
           className={cn(
             "shrink-0 object-contain",
-            collapsed ? "h-11 w-11 object-top" : "h-20 w-full max-w-[220px]",
+            collapsed ? "h-11 w-11 object-top" : "h-16 w-full max-w-[200px]",
           )}
         />
+        {!collapsed && (
+          <div className="mt-2 w-full rounded-xl bg-primary/10 px-2.5 py-1.5 text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active panel</div>
+            <div className="text-sm font-bold text-primary">{meta.label}</div>
+            <div className="truncate font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-        {nav.map((group) => (
+        {filteredNav.map((group) => (
           <div key={group.section}>
             {!collapsed && (
               <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

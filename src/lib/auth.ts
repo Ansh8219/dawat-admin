@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEMO_ADMIN } from "./brand";
+import type { Panel } from "./panel";
 
 export interface AuthUser {
   email: string;
@@ -10,8 +11,11 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;
+  panel: Panel | null;
   login: (email: string, password: string) => { ok: true } | { ok: false; error: string };
   logout: () => void;
+  setPanel: (panel: Panel) => void;
+  clearPanel: () => void;
   requestPasswordReset: (email: string) => { ok: true } | { ok: false; error: string };
 }
 
@@ -31,10 +35,25 @@ export function isAuthenticated(): boolean {
   }
 }
 
+export function getSelectedPanel(): Panel | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = localStorage.getItem("daawat-auth");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: { panel?: Panel | null } };
+    const panel = parsed?.state?.panel;
+    if (panel === "bakery" || panel === "restaurant" || panel === "banquet") return panel;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
+      panel: null,
       login: (email, password) => {
         const normalized = email.trim().toLowerCase();
         if (!normalized || !password) {
@@ -49,10 +68,14 @@ export const useAuth = create<AuthState>()(
             name: DEMO_ADMIN.name,
             role: DEMO_ADMIN.role,
           },
+          // Force panel pick after every login
+          panel: null,
         });
         return { ok: true };
       },
-      logout: () => set({ user: null }),
+      logout: () => set({ user: null, panel: null }),
+      setPanel: (panel) => set({ panel }),
+      clearPanel: () => set({ panel: null }),
       requestPasswordReset: (email) => {
         const normalized = email.trim().toLowerCase();
         if (!normalized || !normalized.includes("@")) {

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SelectPanelRouteImport } from './routes/select-panel'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/_app'
@@ -27,6 +28,11 @@ import { Route as AppDriversRouteImport } from './routes/_app.drivers'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 
+const SelectPanelRoute = SelectPanelRouteImport.update({
+  id: '/select-panel',
+  path: '/select-panel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/select-panel': typeof SelectPanelRoute
   '/bookings': typeof AppBookingsRoute
   '/customers': typeof AppCustomersRoute
   '/drivers': typeof AppDriversRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/select-panel': typeof SelectPanelRoute
   '/bookings': typeof AppBookingsRoute
   '/customers': typeof AppCustomersRoute
   '/drivers': typeof AppDriversRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/select-panel': typeof SelectPanelRoute
   '/_app/bookings': typeof AppBookingsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/drivers': typeof AppDriversRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/select-panel'
     | '/bookings'
     | '/customers'
     | '/drivers'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
   to:
     | '/forgot-password'
     | '/login'
+    | '/select-panel'
     | '/bookings'
     | '/customers'
     | '/drivers'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/forgot-password'
     | '/login'
+    | '/select-panel'
     | '/_app/bookings'
     | '/_app/customers'
     | '/_app/drivers'
@@ -230,10 +242,18 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  SelectPanelRoute: typeof SelectPanelRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/select-panel': {
+      id: '/select-panel'
+      path: '/select-panel'
+      fullPath: '/select-panel'
+      preLoaderRoute: typeof SelectPanelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -396,6 +416,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  SelectPanelRoute: SelectPanelRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

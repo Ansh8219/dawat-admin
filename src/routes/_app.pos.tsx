@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { menuItems, categories, inr } from "@/lib/mock/data";
+import { inr } from "@/lib/mock/data";
+import { usePanelMenu, usePanelMeta } from "@/lib/use-panel";
 import { Search, Plus, Minus, Trash2, Receipt, Smartphone, Wallet, CreditCard, Landmark, Truck, History, Info } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -28,9 +29,14 @@ const pastBills = [
 ];
 
 function POSPage() {
+  const meta = usePanelMeta();
   return (
     <div>
-      <PageHeader title="POS / Billing" crumbs={["Operations", "POS"]} description="Punch orders fast with item codes and print a bill." />
+      <PageHeader
+        title={`${meta.label} POS`}
+        crumbs={["Operations", "POS"]}
+        description={`Billing for ${meta.label} only · GSTIN ${meta.gst}`}
+      />
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="new">
           <TabsList className="rounded-xl">
@@ -46,6 +52,12 @@ function POSPage() {
 }
 
 function POSCounter() {
+  const meta = usePanelMeta();
+  const menuItems = usePanelMenu();
+  const categories = useMemo(
+    () => ["All", ...Array.from(new Set(menuItems.map((m) => m.cat)))],
+    [menuItems],
+  );
   const [cat, setCat] = useState<string>("All");
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -58,7 +70,7 @@ function POSCounter() {
 
   const filtered = useMemo(
     () => menuItems.filter(m => (cat === "All" || m.cat === cat) && m.name.toLowerCase().includes(q.toLowerCase())),
-    [cat, q],
+    [cat, q, menuItems],
   );
 
   function addToCart(code: number) {
@@ -104,7 +116,7 @@ function POSCounter() {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {["All", ...categories].map(c => (
+            {categories.map(c => (
               <button key={c} onClick={() => setCat(c)}
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${cat === c ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
                 {c}
@@ -212,7 +224,7 @@ function POSCounter() {
             <div className="text-center">
               <div className="text-base font-bold">DAAWAT BAKER'S</div>
               <div className="text-[10px] text-muted-foreground">A Designer Bakery Studio</div>
-              <div className="text-[10px] text-muted-foreground">GSTIN: 07AABCU9603R1Z2</div>
+              <div className="text-[10px] text-muted-foreground">GSTIN: {meta.gst}</div>
             </div>
             <div className="my-2 border-t border-dashed" />
             <div>Bill No: <b>{receipt?.id}</b></div>

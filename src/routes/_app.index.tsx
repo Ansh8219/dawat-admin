@@ -15,11 +15,9 @@ import {
   kpiSpark2,
   kpiSpark3,
   kpiSpark4,
-  inventory,
-  orders,
-  menuItems,
   banquetEvents,
 } from "@/lib/mock/data";
+import { usePanel, usePanelInventory, usePanelMenu, usePanelMeta, usePanelOrders } from "@/lib/use-panel";
 import {
   IndianRupee,
   ShoppingBag,
@@ -52,62 +50,69 @@ export const Route = createFileRoute("/_app/")({
 
 function Dashboard() {
   const navigate = useNavigate();
+  const panel = usePanel();
+  const meta = usePanelMeta();
+  const panelOrders = usePanelOrders();
+  const panelMenu = usePanelMenu();
+  const panelInventory = usePanelInventory();
   const [range, setRange] = useState<"daily" | "weekly" | "monthly">("daily");
-  const [biz, setBiz] = useState<"all" | "bakery" | "restaurant" | "banquet">("all");
   const [bookings, setBookings] = useState(banquetEvents.slice(0, 4));
   const chartData = range === "monthly" ? salesMonthly : salesDaily;
+  const todayRevenue = panelOrders.reduce((s, o) => s + o.amount, 0);
+  const avgOrder = panelOrders.length ? Math.round(todayRevenue / panelOrders.length) : 0;
 
   return (
     <div>
       <PageHeader
-        title="Dashboard"
+        title={`${meta.label} Dashboard`}
         crumbs={["Home", "Dashboard"]}
-        description="Live snapshot of Daawat Baker's operations."
+        description={`Live snapshot for ${meta.label} · GST ${meta.gst}`}
         action={
-          <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/pos" })}>
-            <Plus className="h-4 w-4" /> New Order
-          </Button>
+          panel !== "banquet" ? (
+            <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/pos" })}>
+              <Plus className="h-4 w-4" /> New Order
+            </Button>
+          ) : (
+            <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/bookings" })}>
+              <Plus className="h-4 w-4" /> New Booking
+            </Button>
+          )
         }
       />
 
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <Tabs value={biz} onValueChange={(v) => setBiz(v as typeof biz)}>
-          <TabsList className="rounded-xl">
-            <TabsTrigger value="all">All Business</TabsTrigger>
-            <TabsTrigger value="bakery">Bakery</TabsTrigger>
-            <TabsTrigger value="restaurant">Restaurant</TabsTrigger>
-            <TabsTrigger value="banquet">Banquet</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          You are in the <b>{meta.label}</b> panel. Menus, bills and GST stay separate from other businesses.
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Today's Revenue"
-            value={inr(84200)}
+            value={inr(panel === "banquet" ? 280000 : todayRevenue || 84200)}
             delta={12.4}
             icon={IndianRupee}
             spark={kpiSpark}
             tone="brand"
           />
           <StatCard
-            label="Total Orders"
-            value="248"
+            label={panel === "banquet" ? "Events" : "Total Orders"}
+            value={panel === "banquet" ? String(banquetEvents.length) : String(panelOrders.length || 248)}
             delta={8.1}
             icon={ShoppingBag}
             spark={kpiSpark2}
             tone="info"
           />
           <StatCard
-            label="Avg Order Value"
-            value={inr(680)}
+            label={panel === "banquet" ? "Avg Package" : "Avg Order Value"}
+            value={inr(panel === "banquet" ? 185000 : avgOrder || 680)}
             delta={-2.3}
             icon={TrendingUp}
             spark={kpiSpark3}
             tone="gold"
           />
           <StatCard
-            label="Active Tables"
-            value="14 / 18"
+            label={panel === "restaurant" ? "Active Tables" : panel === "banquet" ? "Halls Booked" : "Low Stock SKUs"}
+            value={panel === "restaurant" ? "14 / 18" : panel === "banquet" ? "3" : String(panelInventory.filter((i) => i.current <= i.reorder).length)}
             delta={5.5}
             icon={Armchair}
             spark={kpiSpark4}
@@ -204,7 +209,7 @@ function Dashboard() {
               <PackageX className="h-4 w-4 text-warning" />
             </div>
             <div className="mt-3 space-y-2">
-              {inventory
+              {panelInventory
                 .filter((i) => i.current <= i.reorder)
                 .slice(0, 5)
                 .map((i) => (
@@ -254,7 +259,7 @@ function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 6).map((o) => (
+                  {panelOrders.slice(0, 6).map((o) => (
                     <tr key={o.id} className="border-b border-border/50 hover:bg-muted/40">
                       <td className="py-2.5 font-medium">{o.id}</td>
                       <td className="py-2.5">{o.customer}</td>
@@ -289,7 +294,7 @@ function Dashboard() {
           <div className="card-elevated p-5">
             <div className="text-sm font-semibold">Hot Selling Products</div>
             <div className="mt-3 space-y-2.5">
-              {menuItems.slice(0, 5).map((m, i) => (
+              {panelMenu.slice(0, 5).map((m, i) => (
                 <div key={m.code} className="flex items-center gap-3 rounded-xl p-2 hover:bg-muted/40">
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
                     #{i + 1}

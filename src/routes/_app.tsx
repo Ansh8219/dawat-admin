@@ -4,12 +4,20 @@ import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
-import { isAuthenticated } from "@/lib/auth";
+import { getSelectedPanel, isAuthenticated } from "@/lib/auth";
+import { isRouteAllowed } from "@/lib/panel";
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: () => {
+  beforeLoad: ({ location }) => {
     if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
+    }
+    const panel = getSelectedPanel();
+    if (!panel) {
+      throw redirect({ to: "/select-panel" });
+    }
+    if (!isRouteAllowed(panel, location.pathname)) {
+      throw redirect({ to: "/" });
     }
   },
   component: AppLayout,

@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { inventory, menuItems, inr } from "@/lib/mock/data";
+import { inr } from "@/lib/mock/data";
+import { usePanelInventory, usePanelMenu, usePanelMeta } from "@/lib/use-panel";
 import { Boxes, PackageX, Package, ShoppingCart, Plus, Filter, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,6 +57,9 @@ function statusOf(cur: number, ro: number) {
 }
 
 function InventoryPage() {
+  const meta = usePanelMeta();
+  const inventory = usePanelInventory();
+  const menuItems = usePanelMenu();
   const [add, setAdd] = useState(false);
   const [search, setSearch] = useState("");
   const [entryType, setEntryType] = useState<(typeof entryTypes)[number]>("Purchase");
@@ -73,9 +77,9 @@ function InventoryPage() {
   return (
     <div>
       <PageHeader
-        title="Inventory & Store"
+        title={`${meta.label} Inventory`}
         crumbs={["Operations", "Inventory"]}
-        description="Track stock, orders, wastage, recipes, and production planning."
+        description={`Stock for ${meta.label} only · GST ${meta.gst}`}
         action={
           <Button className="rounded-xl gap-2" onClick={() => setAdd(true)}>
             <Plus className="h-4 w-4" /> Add Stock Entry

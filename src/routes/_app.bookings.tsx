@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { tables as seedTables, banquetEvents, decorationPackages, inr } from "@/lib/mock/data";
+import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { Plus, Users, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,10 +25,14 @@ const seedReservations = [
 ];
 
 function BookingsPage() {
+  const panel = usePanel();
+  const meta = usePanelMeta();
   const [open, setOpen] = useState(false);
   const [reservations, setReservations] = useState(seedReservations);
   const [floorTables, setFloorTables] = useState(seedTables);
   const [pkg, setPkg] = useState(decorationPackages[0]?.name ?? "");
+  const showTables = panel === "restaurant";
+  const showBanquet = panel === "banquet";
 
   const approve = (id: number, name: string) => {
     setReservations((prev) => prev.filter((r) => r.id !== id));
@@ -54,9 +59,13 @@ function BookingsPage() {
   return (
     <div>
       <PageHeader
-        title="Tables & Bookings"
+        title={showBanquet ? "Banquet Bookings" : "Tables & Bookings"}
         crumbs={["Operations", "Bookings"]}
-        description="Restaurant table floor plan and banquet hall event calendar."
+        description={
+          showBanquet
+            ? `Banquet hall calendar & contracts · GST ${meta.gst}`
+            : `Restaurant floor plan only · GST ${meta.gst}`
+        }
         action={
           <Button className="rounded-xl gap-2" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" /> New Booking
@@ -64,14 +73,9 @@ function BookingsPage() {
         }
       />
 
-      <div className="p-4 sm:p-6 lg:p-8">
-        <Tabs defaultValue="tables">
-          <TabsList className="rounded-xl">
-            <TabsTrigger value="tables">Restaurant Tables</TabsTrigger>
-            <TabsTrigger value="banquet">Banquet Hall</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="tables" className="mt-4 space-y-4">
+      <div className="space-y-4 p-4 sm:p-6 lg:p-8">
+        {showTables && (
+          <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
               <Legend color="bg-success" label="Available" />
               <Legend color="bg-destructive" label="Occupied" />
@@ -194,9 +198,10 @@ function BookingsPage() {
                 </table>
               )}
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="banquet" className="mt-4">
+        {showBanquet && (
             <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
               <div className="card-elevated p-4">
                 <div className="mb-3 flex items-center justify-between">
@@ -282,8 +287,7 @@ function BookingsPage() {
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+        )}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

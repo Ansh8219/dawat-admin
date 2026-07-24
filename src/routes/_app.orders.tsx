@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { orders as seedOrders, inr, menuItems, type Order, type OrderStatus } from "@/lib/mock/data";
+import { orders as seedOrders, inr, type Order, type OrderStatus } from "@/lib/mock/data";
+import { usePanel, usePanelMenu, usePanelMeta } from "@/lib/use-panel";
 import { Search, LayoutGrid, List, Timer, MapPin, Phone, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,13 +28,21 @@ function nextStatus(s: OrderStatus): OrderStatus | null {
 
 function OrdersPage() {
   const navigate = useNavigate();
+  const panel = usePanel();
+  const meta = usePanelMeta();
+  const panelOrders = useMemo(() => seedOrders.filter((o) => o.branch === panel), [panel]);
+  const panelMenu = usePanelMenu();
   const [tab, setTab] = useState<(typeof tabs)[number]>("All");
   const [view, setView] = useState<"table" | "kanban">("table");
   const [q, setQ] = useState("");
-  const [orders, setOrders] = useState<Order[]>(() => [...seedOrders]);
+  const [orders, setOrders] = useState<Order[]>(() => panelOrders);
   const [selected, setSelected] = useState<Order | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [extraItems, setExtraItems] = useState<{ name: string; qty: number }[]>([]);
+
+  useEffect(() => {
+    setOrders(panelOrders);
+  }, [panelOrders]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -52,9 +61,9 @@ function OrdersPage() {
 
   function addByCode(input: string) {
     const codes = input.split("+").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
-    const items = codes.map((c) => menuItems.find((m) => m.code === c)).filter(Boolean);
+    const items = codes.map((c) => panelMenu.find((m) => m.code === c)).filter(Boolean);
     if (items.length === 0) {
-      toast.error("No matching item codes");
+      toast.error("No matching item codes in this panel");
       return;
     }
     setExtraItems((prev) => [...prev, ...items.map((m) => ({ name: m!.name, qty: 1 }))]);
@@ -93,9 +102,9 @@ function OrdersPage() {
   return (
     <div>
       <PageHeader
-        title="Orders"
+        title={`${meta.label} Orders`}
         crumbs={["Operations", "Orders"]}
-        description="All orders across dine-in, takeaway, delivery, and online channels."
+        description={`${meta.label} orders only — separate bills & GST (${meta.gst}).`}
         action={
           <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/pos" })}>
             <Plus className="h-4 w-4" />

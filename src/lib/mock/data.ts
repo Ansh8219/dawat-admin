@@ -43,6 +43,7 @@ export interface Order {
   id: string;
   customer: string;
   channel: Channel;
+  branch: Branch;
   items: { name: string; qty: number; price: number; code: number }[];
   amount: number;
   pay: PayMode;
@@ -84,18 +85,23 @@ export const orders: Order[] = Array.from({ length: 28 }).map((_, i) => {
   const channels: Channel[] = ["Dine-In", "Takeaway", "Delivery", "Online", "Zomato"];
   const statuses: OrderStatus[] = ["Pending", "Preparing", "Ready", "Out for Delivery", "Completed", "Cancelled"];
   const pays: PayMode[] = ["UPI", "Cash", "Card", "NetBanking", "COD"];
+  // Alternate bakery / restaurant so each panel has its own bills
+  const branch: Branch = i % 2 === 0 ? "bakery" : "restaurant";
+  const pool = menuItems.filter((m) => m.branch === branch);
   const itemCount = 1 + Math.floor(Math.random() * 4);
   const items = Array.from({ length: itemCount }).map(() => {
-    const m = menuItems[Math.floor(Math.random() * menuItems.length)];
+    const m = pool[Math.floor(Math.random() * pool.length)];
     const qty = 1 + Math.floor(Math.random() * 3);
     return { name: m.name, qty, price: m.price, code: m.code };
   });
   const amount = items.reduce((s, it) => s + it.qty * it.price, 0);
-  const ch = channels[i % channels.length];
+  const bakeryChannels: Channel[] = ["Takeaway", "Delivery", "Online"];
+  const ch = branch === "bakery" ? bakeryChannels[i % bakeryChannels.length] : channels[i % channels.length];
   return {
     id: "DB-" + String(1024 + orderCounter++).padStart(4, "0"),
     customer: customerNames[i % customerNames.length],
     channel: ch,
+    branch,
     items,
     amount,
     pay: pays[i % pays.length],
