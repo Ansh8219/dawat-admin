@@ -80,37 +80,307 @@ export const menuItems = [
 
 export const categories = Array.from(new Set(menuItems.map(m => m.cat)));
 
-let orderCounter = 1;
-export const orders: Order[] = Array.from({ length: 28 }).map((_, i) => {
-  const channels: Channel[] = ["Dine-In", "Takeaway", "Delivery", "Online", "Zomato"];
-  const statuses: OrderStatus[] = ["Pending", "Preparing", "Ready", "Out for Delivery", "Completed", "Cancelled"];
-  const pays: PayMode[] = ["UPI", "Cash", "Card", "NetBanking", "COD"];
-  // Alternate bakery / restaurant so each panel has its own bills
-  const branch: Branch = i % 2 === 0 ? "bakery" : "restaurant";
-  const pool = menuItems.filter((m) => m.branch === branch);
-  const itemCount = 1 + Math.floor(Math.random() * 4);
-  const items = Array.from({ length: itemCount }).map(() => {
-    const m = pool[Math.floor(Math.random() * pool.length)];
-    const qty = 1 + Math.floor(Math.random() * 3);
-    return { name: m.name, qty, price: m.price, code: m.code };
-  });
-  const amount = items.reduce((s, it) => s + it.qty * it.price, 0);
-  const bakeryChannels: Channel[] = ["Takeaway", "Delivery", "Online"];
-  const ch = branch === "bakery" ? bakeryChannels[i % bakeryChannels.length] : channels[i % channels.length];
-  return {
-    id: "DB-" + String(1024 + orderCounter++).padStart(4, "0"),
-    customer: customerNames[i % customerNames.length],
-    channel: ch,
-    branch,
-    items,
-    amount,
-    pay: pays[i % pays.length],
-    status: statuses[i % statuses.length],
-    time: `${Math.floor(Math.random() * 12) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2,"0")} PM`,
-    address: ch === "Delivery" || ch === "Online" ? `${100 + i} MG Road, Sector ${i % 40 + 1}, Gurugram` : undefined,
-    phone: `+91 98${String(10000000 + i * 1234).slice(0, 8)}`,
-  };
-});
+/** Deterministic static orders so New / Preparing / Ready always have kitchen-board content. */
+export const orders: Order[] = [
+  // —— Restaurant: New (Pending) ——
+  {
+    id: "DB-2101",
+    customer: "Aarav Sharma",
+    channel: "Zomato",
+    branch: "restaurant",
+    items: [
+      { name: "Butter Chapati", qty: 4, price: 45, code: 67 },
+      { name: "Daal Makhni", qty: 1, price: 320, code: 22 },
+      { name: "Paneer Tikka Masala", qty: 1, price: 380, code: 14 },
+    ],
+    amount: 880,
+    pay: "UPI",
+    status: "Pending",
+    time: "1:12 PM",
+    address: "214 MG Road, Sector 14, Gurugram",
+    phone: "+91 9812340101",
+  },
+  {
+    id: "DB-2102",
+    customer: "Priya Kapoor",
+    channel: "Delivery",
+    branch: "restaurant",
+    items: [
+      { name: "Chicken Biryani", qty: 2, price: 420, code: 31 },
+      { name: "Garlic Naan", qty: 2, price: 80, code: 8 },
+    ],
+    amount: 1000,
+    pay: "COD",
+    status: "Pending",
+    time: "1:18 PM",
+    address: "88 Cyber Hub, DLF Phase 2, Gurugram",
+    phone: "+91 9823450202",
+  },
+  {
+    id: "DB-2103",
+    customer: "Rohan Mehta",
+    channel: "Takeaway",
+    branch: "restaurant",
+    items: [
+      { name: "Veg Hakka Noodles", qty: 1, price: 260, code: 45 },
+      { name: "Masala Chai", qty: 2, price: 40, code: 71 },
+    ],
+    amount: 340,
+    pay: "Cash",
+    status: "Pending",
+    time: "1:21 PM",
+    phone: "+91 9834560303",
+  },
+  {
+    id: "DB-2104",
+    customer: "Ananya Iyer",
+    channel: "Dine-In",
+    branch: "restaurant",
+    items: [
+      { name: "Paneer Tikka Masala", qty: 1, price: 380, code: 14 },
+      { name: "Garlic Naan", qty: 3, price: 80, code: 8 },
+      { name: "Gulab Jamun", qty: 2, price: 90, code: 81 },
+    ],
+    amount: 800,
+    pay: "Card",
+    status: "Pending",
+    time: "1:24 PM",
+    phone: "+91 9845670404",
+  },
+  {
+    id: "DB-2105",
+    customer: "Neha Reddy",
+    channel: "Online",
+    branch: "restaurant",
+    items: [
+      { name: "Daal Makhni", qty: 2, price: 320, code: 22 },
+      { name: "Butter Chapati", qty: 6, price: 45, code: 67 },
+      { name: "Rasmalai", qty: 2, price: 140, code: 82 },
+    ],
+    amount: 1210,
+    pay: "UPI",
+    status: "Pending",
+    time: "1:27 PM",
+    address: "12 Golf Course Road, Sector 42, Gurugram",
+    phone: "+91 9856780505",
+  },
+  // —— Restaurant: Preparing ——
+  {
+    id: "DB-2088",
+    customer: "Vikram Singh",
+    channel: "Zomato",
+    branch: "restaurant",
+    items: [
+      { name: "Chicken Biryani", qty: 1, price: 420, code: 31 },
+      { name: "Masala Chai", qty: 1, price: 40, code: 71 },
+    ],
+    amount: 460,
+    pay: "UPI",
+    status: "Preparing",
+    time: "12:58 PM",
+    address: "55 Sohna Road, Sector 48, Gurugram",
+    phone: "+91 9867890606",
+  },
+  {
+    id: "DB-2089",
+    customer: "Aditya Verma",
+    channel: "Delivery",
+    branch: "restaurant",
+    items: [
+      { name: "Daal Makhni", qty: 1, price: 320, code: 22 },
+      { name: "Butter Chapati", qty: 4, price: 45, code: 67 },
+      { name: "Garlic Naan", qty: 2, price: 80, code: 8 },
+    ],
+    amount: 660,
+    pay: "Card",
+    status: "Preparing",
+    time: "1:02 PM",
+    address: "9 Palam Vihar, Gurugram",
+    phone: "+91 9878900707",
+  },
+  {
+    id: "DB-2090",
+    customer: "Kavya Nair",
+    channel: "Dine-In",
+    branch: "restaurant",
+    items: [
+      { name: "Veg Hakka Noodles", qty: 2, price: 260, code: 45 },
+      { name: "Cold Coffee", qty: 2, price: 160, code: 72 },
+    ],
+    amount: 840,
+    pay: "UPI",
+    status: "Preparing",
+    time: "1:05 PM",
+    phone: "+91 9889010808",
+  },
+  // —— Restaurant: Ready ——
+  {
+    id: "DB-2071",
+    customer: "Arjun Malhotra",
+    channel: "Zomato",
+    branch: "restaurant",
+    items: [
+      { name: "Paneer Tikka Masala", qty: 1, price: 380, code: 14 },
+      { name: "Butter Chapati", qty: 3, price: 45, code: 67 },
+    ],
+    amount: 515,
+    pay: "UPI",
+    status: "Ready",
+    time: "12:40 PM",
+    address: "301 Nirvana Country, Gurugram",
+    phone: "+91 9890120909",
+  },
+  {
+    id: "DB-2072",
+    customer: "Isha Choudhary",
+    channel: "Takeaway",
+    branch: "restaurant",
+    items: [
+      { name: "Chicken Biryani", qty: 1, price: 420, code: 31 },
+      { name: "Gulab Jamun", qty: 2, price: 90, code: 81 },
+    ],
+    amount: 600,
+    pay: "Cash",
+    status: "Ready",
+    time: "12:45 PM",
+    phone: "+91 9901231010",
+  },
+  // —— Restaurant: Completed / Cancelled ——
+  {
+    id: "DB-2050",
+    customer: "Rahul Bhatia",
+    channel: "Online",
+    branch: "restaurant",
+    items: [
+      { name: "Daal Makhni", qty: 1, price: 320, code: 22 },
+      { name: "Garlic Naan", qty: 2, price: 80, code: 8 },
+    ],
+    amount: 480,
+    pay: "NetBanking",
+    status: "Completed",
+    time: "11:55 AM",
+    address: "77 Sector 29, Gurugram",
+    phone: "+91 9912341111",
+  },
+  {
+    id: "DB-2051",
+    customer: "Meera Joshi",
+    channel: "Zomato",
+    branch: "restaurant",
+    items: [{ name: "Veg Hakka Noodles", qty: 1, price: 260, code: 45 }],
+    amount: 260,
+    pay: "UPI",
+    status: "Cancelled",
+    time: "12:10 PM",
+    address: "18 Galleria Market, Gurugram",
+    phone: "+91 9923451212",
+  },
+  {
+    id: "DB-2052",
+    customer: "Aarav Sharma",
+    channel: "Delivery",
+    branch: "restaurant",
+    items: [
+      { name: "Butter Chapati", qty: 8, price: 45, code: 67 },
+      { name: "Daal Makhni", qty: 2, price: 320, code: 22 },
+    ],
+    amount: 1000,
+    pay: "COD",
+    status: "Out for Delivery",
+    time: "12:30 PM",
+    address: "42 Sector 56, Gurugram",
+    phone: "+91 9934561313",
+  },
+  // —— Bakery: New (Pending) ——
+  {
+    id: "DB-3101",
+    customer: "Priya Kapoor",
+    channel: "Online",
+    branch: "bakery",
+    items: [
+      { name: "Chocolate Truffle Cake", qty: 1, price: 890, code: 51 },
+      { name: "Macaron Box (6)", qty: 1, price: 480, code: 56 },
+    ],
+    amount: 1370,
+    pay: "UPI",
+    status: "Pending",
+    time: "1:15 PM",
+    address: "5 Ambience Mall, Gurugram",
+    phone: "+91 9945671414",
+  },
+  {
+    id: "DB-3102",
+    customer: "Rohan Mehta",
+    channel: "Takeaway",
+    branch: "bakery",
+    items: [
+      { name: "Almond Croissant", qty: 4, price: 90, code: 53 },
+      { name: "Cold Coffee", qty: 2, price: 160, code: 72 },
+    ],
+    amount: 680,
+    pay: "Cash",
+    status: "Pending",
+    time: "1:20 PM",
+    phone: "+91 9956781515",
+  },
+  {
+    id: "DB-3103",
+    customer: "Ananya Iyer",
+    channel: "Delivery",
+    branch: "bakery",
+    items: [
+      { name: "Red Velvet Pastry", qty: 6, price: 120, code: 52 },
+      { name: "Sourdough Loaf", qty: 1, price: 220, code: 55 },
+    ],
+    amount: 940,
+    pay: "Card",
+    status: "Pending",
+    time: "1:26 PM",
+    address: "120 Sector 15, Gurugram",
+    phone: "+91 9967891616",
+  },
+  {
+    id: "DB-3080",
+    customer: "Vikram Singh",
+    channel: "Online",
+    branch: "bakery",
+    items: [{ name: "Blueberry Cheesecake", qty: 1, price: 1250, code: 54 }],
+    amount: 1250,
+    pay: "UPI",
+    status: "Preparing",
+    time: "12:50 PM",
+    address: "66 DLF Phase 1, Gurugram",
+    phone: "+91 9978901717",
+  },
+  {
+    id: "DB-3060",
+    customer: "Neha Reddy",
+    channel: "Takeaway",
+    branch: "bakery",
+    items: [
+      { name: "Macaron Box (6)", qty: 2, price: 480, code: 56 },
+      { name: "Almond Croissant", qty: 2, price: 90, code: 53 },
+    ],
+    amount: 1140,
+    pay: "UPI",
+    status: "Ready",
+    time: "12:35 PM",
+    phone: "+91 9989011818",
+  },
+  {
+    id: "DB-3040",
+    customer: "Aditya Verma",
+    channel: "Delivery",
+    branch: "bakery",
+    items: [{ name: "Chocolate Truffle Cake", qty: 1, price: 890, code: 51 }],
+    amount: 890,
+    pay: "COD",
+    status: "Completed",
+    time: "11:40 AM",
+    address: "3 HUDA City Centre, Gurugram",
+    phone: "+91 9990121919",
+  },
+];
 
 export const inventory = [
   { name: "Wheat Flour",      cat: "Bakery",     unit: "Kg",     opening: 200, current: 42,   reorder: 50 },
