@@ -31,8 +31,71 @@ function BookingsPage() {
   const [reservations, setReservations] = useState(seedReservations);
   const [floorTables, setFloorTables] = useState(seedTables);
   const [pkg, setPkg] = useState(decorationPackages[0]?.name ?? "");
+  const [tableForm, setTableForm] = useState({
+    name: "",
+    phone: "",
+    party: "2",
+    datetime: "",
+    tableId: "",
+    notes: "",
+  });
   const showTables = panel === "restaurant";
   const showBanquet = panel === "banquet";
+
+  const availableTables = floorTables.filter((t) => t.status === "Available");
+
+  const resetTableForm = () =>
+    setTableForm({ name: "", phone: "", party: "2", datetime: "", tableId: "", notes: "" });
+
+  const submitTableBooking = () => {
+    const name = tableForm.name.trim();
+    const party = Number(tableForm.party);
+    if (!name) {
+      toast.error("Guest name is required");
+      return;
+    }
+    if (!tableForm.datetime) {
+      toast.error("Date & time is required");
+      return;
+    }
+    if (!party || party < 1) {
+      toast.error("Party size must be at least 1");
+      return;
+    }
+
+    const when = new Date(tableForm.datetime);
+    const timeLabel = Number.isNaN(when.getTime())
+      ? tableForm.datetime
+      : when.toLocaleString(undefined, {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+
+    const id = Date.now();
+    setReservations((prev) => [
+      { id, name, time: timeLabel, party },
+      ...prev,
+    ]);
+
+    if (tableForm.tableId) {
+      setFloorTables((prev) =>
+        prev.map((t) =>
+          t.id === tableForm.tableId ? { ...t, status: "Reserved" as const } : t,
+        ),
+      );
+    }
+
+    toast.success(
+      tableForm.tableId
+        ? `Table booking for ${name} · ${tableForm.tableId}`
+        : `Table booking for ${name} · party of ${party}`,
+    );
+    resetTableForm();
+    setOpen(false);
+  };
 
   const approve = (id: number, name: string) => {
     setReservations((prev) => prev.filter((r) => r.id !== id));
@@ -290,71 +353,181 @@ function BookingsPage() {
         )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) resetTableForm();
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New Banquet Booking</DialogTitle>
+            <DialogTitle>{showBanquet ? "New Banquet Booking" : "New Table Booking"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Event Type</Label>
-              <Input placeholder="Wedding / Birthday…" className="mt-1 rounded-xl" />
-            </div>
-            <div>
-              <Label>Date & Time</Label>
-              <Input type="datetime-local" className="mt-1 rounded-xl" />
-            </div>
-            <div>
-              <Label>Guest Count</Label>
-              <Input type="number" placeholder="150" className="mt-1 rounded-xl" />
-            </div>
-            <div>
-              <Label>Contact</Label>
-              <Input placeholder="+91 98…" className="mt-1 rounded-xl" />
-            </div>
-          </div>
-          <div>
-            <Label>Decoration Package</Label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {decorationPackages.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => setPkg(p.name)}
-                  className={`rounded-xl border p-3 text-left hover:border-primary hover:bg-primary/5 ${
-                    pkg === p.name ? "border-primary bg-primary/10" : ""
-                  }`}
+
+          {showTables && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Guest Name</Label>
+                  <Input
+                    placeholder="Aarav Sharma"
+                    className="mt-1 rounded-xl"
+                    value={tableForm.name}
+                    onChange={(e) => setTableForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    placeholder="+91 98…"
+                    className="mt-1 rounded-xl"
+                    value={tableForm.phone}
+                    onChange={(e) => setTableForm((f) => ({ ...f, phone: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Party Size</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="4"
+                    className="mt-1 rounded-xl"
+                    value={tableForm.party}
+                    onChange={(e) => setTableForm((f) => ({ ...f, party: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    className="mt-1 rounded-xl"
+                    value={tableForm.datetime}
+                    onChange={(e) => setTableForm((f) => ({ ...f, datetime: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Preferred Table</Label>
+                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  <button
+                    type="button"
+                    onClick={() => setTableForm((f) => ({ ...f, tableId: "" }))}
+                    className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${
+                      !tableForm.tableId
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "hover:border-primary/40 hover:bg-primary/5"
+                    }`}
+                  >
+                    Any
+                  </button>
+                  {availableTables.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTableForm((f) => ({ ...f, tableId: t.id }))}
+                      className={`rounded-xl border p-2.5 text-center transition-colors ${
+                        tableForm.tableId === t.id
+                          ? "border-primary bg-primary/10"
+                          : "hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      <div className="text-sm font-semibold">{t.id}</div>
+                      <div className="text-[10px] text-muted-foreground">{t.seats} seats</div>
+                    </button>
+                  ))}
+                </div>
+                {availableTables.length === 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No tables available right now — booking will stay in pending reservations.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label>Notes</Label>
+                <Input
+                  placeholder="Window seat, birthday, allergy…"
+                  className="mt-1 rounded-xl"
+                  value={tableForm.notes}
+                  onChange={(e) => setTableForm((f) => ({ ...f, notes: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitTableBooking}>Create Booking</Button>
+              </div>
+            </>
+          )}
+
+          {showBanquet && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Event Type</Label>
+                  <Input placeholder="Wedding / Birthday…" className="mt-1 rounded-xl" />
+                </div>
+                <div>
+                  <Label>Date & Time</Label>
+                  <Input type="datetime-local" className="mt-1 rounded-xl" />
+                </div>
+                <div>
+                  <Label>Guest Count</Label>
+                  <Input type="number" placeholder="150" className="mt-1 rounded-xl" />
+                </div>
+                <div>
+                  <Label>Contact</Label>
+                  <Input placeholder="+91 98…" className="mt-1 rounded-xl" />
+                </div>
+              </div>
+              <div>
+                <Label>Decoration Package</Label>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {decorationPackages.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => setPkg(p.name)}
+                      className={`rounded-xl border p-3 text-left hover:border-primary hover:bg-primary/5 ${
+                        pkg === p.name ? "border-primary bg-primary/10" : ""
+                      }`}
+                    >
+                      <div className="text-sm font-semibold">{p.name}</div>
+                      <div className="mt-0.5 text-xs text-primary font-bold">{inr(p.price)}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">{p.features.join(" · ")}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl bg-primary/5 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span>Estimated Total</span>
+                  <span className="font-bold text-primary">{inr(280000)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Advance (25%) required</span>
+                  <span className="font-semibold">{inr(70000)}</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast.success(`Contract generated · ${pkg || "package"}`);
+                    setOpen(false);
+                  }}
                 >
-                  <div className="text-sm font-semibold">{p.name}</div>
-                  <div className="mt-0.5 text-xs text-primary font-bold">{inr(p.price)}</div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">{p.features.join(" · ")}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-xl bg-primary/5 p-3 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Estimated Total</span>
-              <span className="font-bold text-primary">{inr(280000)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Advance (25%) required</span>
-              <span className="font-semibold">{inr(70000)}</span>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                toast.success(`Contract generated · ${pkg || "package"}`);
-                setOpen(false);
-              }}
-            >
-              Generate Contract
-            </Button>
-          </div>
+                  Generate Contract
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
