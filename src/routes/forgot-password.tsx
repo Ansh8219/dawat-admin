@@ -41,6 +41,7 @@ function ForgotPasswordPage() {
 
   return (
     <AuthShell
+      badge="Password Reset"
       title={sent ? "Check your email" : "Forgot password"}
       subtitle={
         sent
