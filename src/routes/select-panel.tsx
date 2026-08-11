@@ -7,7 +7,6 @@ import {
   Calendar,
   CalendarCheck,
   ChevronDown,
-  Clock3,
   CloudSun,
   FileText,
   Headset,
@@ -104,14 +103,6 @@ function greetingForNow(date = new Date()) {
   return { text: "Good Evening", Icon: MoonStar };
 }
 
-function formatLastLogin(date = new Date()) {
-  return `Today, ${date.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  })}`;
-}
-
 const FOOTER_TIPS = [
   {
     title: "Business Tip",
@@ -178,60 +169,44 @@ function SelectPanelPage() {
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-5 sm:px-6 sm:py-6">
         {/* Top nav */}
         <header className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <img
-              src={LOGO_SRC}
-              alt={`${BRAND_NAME} — ${BRAND_TAGLINE}`}
-              className="h-12 w-auto max-w-[170px] object-contain sm:h-14"
-            />
-            <div className="hidden h-8 w-px bg-border sm:block" />
-            <div className="hidden sm:block">
-              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">
-                Business Suite
-              </div>
-              <div className="text-[10px] text-muted-foreground">Owner Console</div>
-            </div>
-          </div>
+          <img
+            src={LOGO_SRC}
+            alt={`${BRAND_NAME} — ${BRAND_TAGLINE}`}
+            className="h-14 w-auto max-w-[200px] object-contain sm:h-16"
+          />
 
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card py-1.5 pl-1.5 pr-3 shadow-[var(--shadow-soft)] transition-colors hover:bg-muted/50"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden max-w-[140px] truncate text-sm font-medium text-foreground sm:inline">
-                    {user?.name ?? "Admin"}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem
-                  onClick={() => {
-                    logout();
-                    void navigate({ to: "/login" });
-                  }}
-                >
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <p className="flex items-center gap-1.5 whitespace-nowrap pr-0.5 text-[11px] text-muted-foreground">
-              <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
-              Last login:{" "}
-              <span className="font-medium text-foreground/70">{formatLastLogin()}</span>
-            </p>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card py-1.5 pl-1.5 pr-3 shadow-[var(--shadow-soft)] transition-colors hover:bg-muted/50"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden max-w-[140px] truncate text-sm font-medium text-foreground sm:inline">
+                  {user?.name ?? "Admin"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={() => {
+                  logout();
+                  void navigate({ to: "/login" });
+                }}
+              >
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         {/* Greeting */}
-        <section className="mt-10 mb-8 text-center sm:mt-12 sm:mb-10">
+        <section className="mt-4 mb-8 text-center sm:mt-5 sm:mb-10">
           <p className="inline-flex items-center justify-center gap-2 text-sm text-muted-foreground sm:text-[15px]">
             <GreetingIcon className="h-4 w-4 text-primary" strokeWidth={2.25} />
             <span>
@@ -241,9 +216,6 @@ function SelectPanelPage() {
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-[1.85rem]">
             Select Business to Manage
           </h1>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            Each business has separate menu, bills, inventory, GST and reports.
-          </p>
         </section>
 
         {/* Cards */}
