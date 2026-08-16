@@ -635,36 +635,12 @@ function MenuPage() {
 
             <Separator />
 
-            {/* Dietary — mandatory like Zomato */}
+            {/* Dietary — veg only */}
             <section className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dietary type *</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: "veg" as const, label: "Veg", color: "border-emerald-500 text-emerald-700 data-[active=true]:bg-emerald-50" },
-                    { value: "egg" as const, label: "Egg", color: "border-amber-500 text-amber-700 data-[active=true]:bg-amber-50" },
-                    { value: "non-veg" as const, label: "Non-veg", color: "border-rose-500 text-rose-700 data-[active=true]:bg-rose-50" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    data-active={form.dietary === opt.value}
-                    onClick={() => setForm((f) => ({ ...f, dietary: opt.value }))}
-                    className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-colors ${opt.color} ${form.dietary === opt.value ? "ring-1 ring-current" : "border-border text-muted-foreground hover:bg-muted/40"}`}
-                  >
-                    <span
-                      className={`h-3 w-3 rounded-sm border-2 ${
-                        opt.value === "veg"
-                          ? "border-emerald-600 bg-emerald-500"
-                          : opt.value === "egg"
-                            ? "border-amber-600 bg-amber-500"
-                            : "border-rose-600 bg-rose-500"
-                      }`}
-                    />
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">
+                <span className="h-3 w-3 rounded-sm border-2 border-emerald-600 bg-emerald-500" />
+                Veg
               </div>
             </section>
 
