@@ -1,6 +1,6 @@
 import { ApiError, type ApiEnvelope } from "./types";
 
-const DEFAULT_BASE = "https://pdwkvrlk-8000.inc1.devtunnels.ms";
+const DEFAULT_BASE = "https://api-dawat.northvaultstudios.com";
 
 export function getApiBaseUrl(): string {
   const fromEnv = import.meta.env.VITE_API_BASE_URL as string | undefined;
