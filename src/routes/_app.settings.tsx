@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { formatRoleLabel, isSuperAdmin, useAuth } from "@/lib/auth";
 import { inr } from "@/lib/mock/data";
 import { useApp } from "@/lib/store";
 import { usePanelMeta } from "@/lib/use-panel";
-import { MapPin, Moon, Sun } from "lucide-react";
+import { Loader2, MapPin, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -20,6 +22,9 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsPage() {
   const { dark, toggleDark } = useApp();
   const meta = usePanelMeta();
+  const user = useAuth((s) => s.user);
+  const canChangePassword = isSuperAdmin(user);
+
   return (
     <div>
       <PageHeader
@@ -36,6 +41,7 @@ function SettingsPage() {
             <TabsTrigger value="payment">Payment</TabsTrigger>
             <TabsTrigger value="delivery">Delivery</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="business" className="mt-4">
@@ -270,8 +276,126 @@ function SettingsPage() {
               </Button>
             </div>
           </TabsContent>
+
+          <TabsContent value="security" className="mt-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="card-elevated p-4">
+                <div className="text-sm font-semibold">Account</div>
+                <div className="mt-3 space-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Email</div>
+                    <div className="font-medium">{user?.email ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Role</div>
+                    <div className="font-medium">{formatRoleLabel(user?.role)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card-elevated p-4">
+                <div className="text-sm font-semibold">Change password</div>
+                {canChangePassword ? (
+                  <>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Only super admins can change their password here.
+                    </p>
+                    <ChangePasswordForm />
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Password changes for your role must be done by a super admin, or via the forgot
+                    password flow.
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
+  );
+}
+
+function ChangePasswordForm() {
+  const changePassword = useAuth((s) => s.changePassword);
+  const [oldPassword, setOldPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const result = await changePassword(oldPassword, password, passwordConfirm);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setOldPassword("");
+      setPassword("");
+      setPasswordConfirm("");
+      toast.success(result.detail || "Password has been changed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="mt-3 space-y-3">
+      <div>
+        <Label htmlFor="old-password">Current password</Label>
+        <Input
+          id="old-password"
+          type="password"
+          autoComplete="current-password"
+          value={oldPassword}
+          onChange={(e) => setOldPassword(e.target.value)}
+          className="mt-1 rounded-xl"
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="settings-new-password">New password</Label>
+        <Input
+          id="settings-new-password"
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="mt-1 rounded-xl"
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="settings-confirm-password">Confirm new password</Label>
+        <Input
+          id="settings-confirm-password"
+          type="password"
+          autoComplete="new-password"
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+          className="mt-1 rounded-xl"
+          required
+        />
+      </div>
+      {error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+      <Button type="submit" className="rounded-xl" disabled={loading}>
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating…
+          </>
+        ) : (
+          "Update password"
+        )}
+      </Button>
+    </form>
   );
 }

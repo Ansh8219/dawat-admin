@@ -1,7 +1,20 @@
 import type { Branch } from "./mock/data";
 import { branches } from "./mock/data";
+import type { BusinessType } from "./api/types";
 
 export type Panel = Branch;
+
+/** Map API business `type` → local panel id used across the app. */
+export function businessTypeToPanel(type: string): Panel | null {
+  if (type === "restaurant" || type === "bakery") return type;
+  if (type === "banquet_hall" || type === "banquet") return "banquet";
+  return null;
+}
+
+export function panelToBusinessType(panel: Panel): BusinessType {
+  if (panel === "banquet") return "banquet_hall";
+  return panel;
+}
 
 export const PANELS = branches;
 

@@ -20,7 +20,12 @@ export function usePanel(): Panel {
 
 export function usePanelMeta() {
   const panel = usePanel();
-  return getPanelMeta(panel);
+  const business = useAuth((s) => s.business);
+  const meta = getPanelMeta(panel);
+  if (business?.name) {
+    return { ...meta, label: business.name };
+  }
+  return meta;
 }
 
 export function usePanelMenu() {

@@ -7,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isAuthenticated, useAuth } from "@/lib/auth";
-import { DEMO_ADMIN } from "@/lib/brand";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -22,26 +21,27 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const login = useAuth((s) => s.login);
-  const [email, setEmail] = useState<string>(DEMO_ADMIN.email);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    window.setTimeout(() => {
-      const result = login(email, password);
-      setLoading(false);
+    try {
+      const result = await login(email, password);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       void navigate({ to: "/select-panel" });
-    }, 350);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,25 +49,19 @@ function LoginPage() {
       title="Welcome Back"
       subtitle="Sign in to continue managing your business."
       footer={
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-            <button type="button" className="hover:text-foreground">
-              Need help?
-            </button>
-            <button type="button" className="hover:text-foreground">
-              Contact Support
-            </button>
-            <button type="button" className="hover:text-foreground">
-              Privacy Policy
-            </button>
-            <button type="button" className="hover:text-foreground">
-              Terms & Conditions
-            </button>
-          </div>
-          <p className="text-xs">
-            Demo: <span className="font-medium text-foreground">{DEMO_ADMIN.email}</span> /{" "}
-            <span className="font-medium text-foreground">{DEMO_ADMIN.password}</span>
-          </p>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+          <button type="button" className="hover:text-foreground">
+            Need help?
+          </button>
+          <button type="button" className="hover:text-foreground">
+            Contact Support
+          </button>
+          <button type="button" className="hover:text-foreground">
+            Privacy Policy
+          </button>
+          <button type="button" className="hover:text-foreground">
+            Terms & Conditions
+          </button>
         </div>
       }
     >
@@ -100,7 +94,7 @@ function LoginPage() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
+              autoComplete={remember ? "current-password" : "off"}
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

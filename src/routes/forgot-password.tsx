@@ -24,19 +24,20 @@ function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    window.setTimeout(() => {
-      const result = requestPasswordReset(email);
-      setLoading(false);
+    try {
+      const result = await requestPasswordReset(email);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setSent(true);
-    }, 400);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,7 +46,7 @@ function ForgotPasswordPage() {
       title={sent ? "Check your email" : "Forgot password"}
       subtitle={
         sent
-          ? `If an account exists for ${email.trim()}, you’ll receive reset instructions shortly.`
+          ? "If an account exists for this email, a password reset link has been sent."
           : "Enter your admin email and we’ll send a password reset link."
       }
       footer={
@@ -63,7 +64,7 @@ function ForgotPasswordPage() {
             <CheckCircle2 className="h-6 w-6" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Didn’t get the email? Check spam, or try again with a different address.
+            Didn’t get the email? Check spam, or wait a minute before requesting another link.
           </p>
           <Button
             type="button"
@@ -71,7 +72,6 @@ function ForgotPasswordPage() {
             className="w-full rounded-xl"
             onClick={() => {
               setSent(false);
-              setEmail("");
             }}
           >
             Send another link

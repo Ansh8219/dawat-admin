@@ -1,33 +1,34 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
-  Armchair,
   ArrowRight,
   Bell,
   Cake,
-  Calendar,
-  CalendarCheck,
   ChevronDown,
   CloudSun,
   FileText,
   Headset,
-  IndianRupee,
   Lightbulb,
+  Loader2,
   MoonStar,
   PartyPopper,
-  ShoppingBag,
   Sun,
   UtensilsCrossed,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { listBusinesses } from "@/lib/api/businesses";
+import type { Business } from "@/lib/api/types";
+import { ApiError } from "@/lib/api/types";
 import { LOGO_SRC, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 import { getSelectedPanel, isAuthenticated, useAuth } from "@/lib/auth";
-import { PANEL_META, PANEL_ORDER, type Panel, type PanelStat } from "@/lib/panel";
+import { PANEL_META, businessTypeToPanel, type Panel } from "@/lib/panel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/select-panel")({
@@ -50,51 +51,19 @@ const themeStyles = {
   primary: {
     button: "bg-primary text-primary-foreground hover:bg-primary/90",
     iconWrap: "bg-primary/10 text-primary",
-    metricIcon: "bg-primary/10 text-primary",
-    alert: "bg-primary/10 text-primary",
     ring: "hover:border-primary/40",
   },
   amber: {
     button: "bg-amber-500 text-white hover:bg-amber-600",
     iconWrap: "bg-amber-500/15 text-amber-600",
-    metricIcon: "bg-amber-500/15 text-amber-600",
-    alert: "bg-amber-500/15 text-amber-700",
     ring: "hover:border-amber-400/50",
   },
   violet: {
     button: "bg-violet-600 text-white hover:bg-violet-700",
     iconWrap: "bg-violet-500/15 text-violet-600",
-    metricIcon: "bg-violet-500/15 text-violet-600",
-    alert: "bg-violet-500/15 text-violet-700",
     ring: "hover:border-violet-400/50",
   },
 } as const;
-
-const hintToneClass = {
-  up: "text-emerald-600",
-  warn: "text-amber-600",
-  info: "text-sky-600",
-  neutral: "text-muted-foreground",
-} as const;
-
-function StatIcon({ icon }: { icon: PanelStat["icon"] }) {
-  const props = { className: "h-3.5 w-3.5", strokeWidth: 2.25 as const };
-  switch (icon) {
-    case "sales":
-    case "revenue":
-      return <IndianRupee {...props} />;
-    case "orders":
-      return <ShoppingBag {...props} />;
-    case "tables":
-      return <Armchair {...props} />;
-    case "pending":
-      return <Cake {...props} />;
-    case "events":
-      return <Calendar {...props} />;
-    case "bookings":
-      return <CalendarCheck {...props} />;
-  }
-}
 
 function greetingForNow(date = new Date()) {
   const h = date.getHours();
@@ -132,16 +101,82 @@ const FOOTER_TIPS = [
 
 function SelectPanelPage() {
   const navigate = useNavigate();
-  const setPanel = useAuth((s) => s.setPanel);
+  const selectBusiness = useAuth((s) => s.selectBusiness);
   const logout = useAuth((s) => s.logout);
   const user = useAuth((s) => s.user);
-  const current = useAuth((s) => s.panel) ?? getSelectedPanel();
+  const accessToken = useAuth((s) => s.tokens?.access ?? null);
+  const refreshSession = useAuth((s) => s.refreshSession);
+  const current = useAuth((s) => s.business?.publicId ?? null);
+  const currentPanel = useAuth((s) => s.panel) ?? getSelectedPanel();
+
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const greeting = greetingForNow();
   const GreetingIcon = greeting.Icon;
 
-  const pick = (panel: Panel) => {
-    setPanel(panel);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!accessToken) {
+        setError("Please sign in again.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      const fetchList = (token: string) => listBusinesses(token);
+
+      try {
+        let data: Business[];
+        try {
+          data = await fetchList(accessToken);
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) {
+            const refreshed = await refreshSession();
+            const nextToken = useAuth.getState().tokens?.access;
+            if (!refreshed || !nextToken) {
+              logout();
+              void navigate({ to: "/login" });
+              return;
+            }
+            data = await fetchList(nextToken);
+          } else {
+            throw err;
+          }
+        }
+        if (!cancelled) setBusinesses(data);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.code === "staff_access_denied") {
+          setError("This account does not have staff access.");
+        } else if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError("Unable to load businesses.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, logout, navigate, refreshSession]);
+
+  const pick = (biz: Business) => {
+    const result = selectBusiness(biz);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     void navigate({ to: "/" });
   };
 
@@ -167,7 +202,6 @@ function SelectPanelPage() {
       />
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-5 sm:px-6 sm:py-6">
-        {/* Top nav */}
         <header className="flex items-center justify-between gap-4">
           <img
             src={LOGO_SRC}
@@ -205,7 +239,6 @@ function SelectPanelPage() {
           </DropdownMenu>
         </header>
 
-        {/* Greeting */}
         <section className="mt-4 mb-8 text-center sm:mt-5 sm:mb-10">
           <p className="inline-flex items-center justify-center gap-2 text-sm text-muted-foreground sm:text-[15px]">
             <GreetingIcon className="h-4 w-4 text-primary" strokeWidth={2.25} />
@@ -218,117 +251,98 @@ function SelectPanelPage() {
           </h1>
         </section>
 
-        {/* Cards */}
-        <div className="grid flex-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {PANEL_ORDER.map((id) => {
-            const meta = PANEL_META[id];
-            const Icon = panelIcons[id];
-            const theme = themeStyles[meta.theme];
-            const selected = current === id;
+        {loading ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm">Loading businesses…</p>
+          </div>
+        ) : error ? (
+          <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-4 py-16 text-center">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : businesses.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-20 text-sm text-muted-foreground">
+            No active businesses available.
+          </div>
+        ) : (
+          <div className="grid flex-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {businesses.map((biz) => {
+              const panel = businessTypeToPanel(biz.type);
+              const meta = panel ? PANEL_META[panel] : null;
+              const Icon = panel ? panelIcons[panel] : Cake;
+              const theme = themeStyles[meta?.theme ?? "primary"];
+              const selected =
+                current === biz.public_id || (!current && currentPanel === panel);
+              const imageSrc = biz.image || meta?.image || "/panels/restaurant.jpg";
+              const imageAlt = meta?.imageAlt ?? biz.name;
 
-            return (
-              <article
-                key={id}
-                className={cn(
-                  "group relative flex flex-col rounded-[1.35rem] border bg-card shadow-[var(--shadow-soft)] transition-all duration-300",
-                  "hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]",
-                  theme.ring,
-                  selected ? "border-primary/55 ring-2 ring-primary/20" : "border-border/80",
-                )}
-              >
-                <div className="relative">
-                  <div className="relative h-40 overflow-hidden rounded-t-[1.3rem] bg-muted sm:h-44">
-                    <img
-                      src={meta.image}
-                      alt={meta.imageAlt}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="eager"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
-                    {meta.active && (
-                      <span className="absolute left-3 top-3 inline-flex items-center rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
-                        Active
-                      </span>
-                    )}
-                  </div>
-
-                  <div
-                    className={cn(
-                      "absolute -bottom-6 right-4 z-20 grid h-12 w-12 place-items-center rounded-full border-[3px] border-white bg-white shadow-md",
-                      theme.iconWrap,
-                    )}
-                  >
-                    <Icon className="h-5 w-5" strokeWidth={2.25} />
-                  </div>
-                </div>
-
-                <div className="flex flex-1 flex-col rounded-b-[1.3rem] px-5 pb-5 pt-8">
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">{meta.label}</h2>
-                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">{meta.tagline}</p>
-
-                  <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl border border-border/70 bg-muted/30 p-2.5">
-                    {meta.stats.map((stat) => (
-                      <div key={stat.label} className="min-w-0 px-0.5 text-center">
-                        <div
-                          className={cn(
-                            "mx-auto mb-1.5 grid h-7 w-7 place-items-center rounded-full",
-                            theme.metricIcon,
-                          )}
-                        >
-                          <StatIcon icon={stat.icon} />
-                        </div>
-                        <div className="line-clamp-2 text-[10px] leading-tight text-muted-foreground">
-                          {stat.label}
-                        </div>
-                        <div className="mt-1 truncate text-[13px] font-bold tracking-tight text-foreground">
-                          {stat.value}
-                        </div>
-                        <div
-                          className={cn(
-                            "mt-0.5 truncate text-[10px] font-semibold",
-                            hintToneClass[stat.hintTone],
-                          )}
-                        >
-                          {stat.hint}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/70 pt-3">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-medium text-muted-foreground">GST No.</div>
-                      <div className="truncate font-mono text-[11px] text-foreground/90">
-                        {meta.gst}
-                      </div>
+              return (
+                <article
+                  key={biz.public_id}
+                  className={cn(
+                    "group relative flex flex-col rounded-[1.35rem] border bg-card shadow-[var(--shadow-soft)] transition-all duration-300",
+                    "hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]",
+                    theme.ring,
+                    selected ? "border-primary/55 ring-2 ring-primary/20" : "border-border/80",
+                  )}
+                >
+                  <div className="relative">
+                    <div className="relative h-40 overflow-hidden rounded-t-[1.3rem] bg-muted sm:h-44">
+                      <img
+                        src={imageSrc}
+                        alt={imageAlt}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="eager"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
                     </div>
-                    <span
+
+                    <div
                       className={cn(
-                        "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                        theme.alert,
+                        "absolute -bottom-6 right-4 z-20 grid h-12 w-12 place-items-center rounded-full border-[3px] border-white bg-white shadow-md",
+                        theme.iconWrap,
                       )}
                     >
-                      {meta.alert}
-                    </span>
+                      <Icon className="h-5 w-5" strokeWidth={2.25} />
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => pick(id)}
-                    className={cn(
-                      "mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                      theme.button,
-                    )}
-                  >
-                    Open Dashboard
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                  <div className="flex flex-1 flex-col rounded-b-[1.3rem] px-5 pb-5 pt-8">
+                    <h2 className="text-xl font-bold tracking-tight text-foreground">{biz.name}</h2>
+                    {meta?.tagline ? (
+                      <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                        {meta.tagline}
+                      </p>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => pick(biz)}
+                      className={cn(
+                        "mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        theme.button,
+                      )}
+                    >
+                      Open Dashboard
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
         <footer className="mt-8 grid gap-2 rounded-2xl border border-border/80 bg-card p-3 shadow-[var(--shadow-soft)] sm:grid-cols-2 lg:grid-cols-4">
           {FOOTER_TIPS.map((tip) => (

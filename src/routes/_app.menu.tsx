@@ -88,6 +88,33 @@ const TAX_OPTIONS = [
 
 const UNIT_OPTIONS = ["plate", "pcs", "pc", "kg", "box", "cup", "glass", "portion"];
 
+const SERVE_OPTIONS = [
+  "Serves 1",
+  "Serves 1–2",
+  "Serves 2",
+  "Serves 2–3",
+  "Serves 3–4",
+  "Serves 4+",
+];
+
+const VARIANT_NAME_OPTIONS = ["Half", "Full", "Regular", "Large", "Small", "Medium", "Quarter"];
+
+const ADDON_GROUP_OPTIONS = [
+  "Beverages",
+  "Extra Toppings",
+  "Sides",
+  "Breads",
+  "Dips & Sauces",
+  "Add Cheese",
+  "Make it a combo",
+];
+
+const DEFAULT_CATEGORIES: Record<"restaurant" | "bakery" | "banquet", string[]> = {
+  restaurant: ["Starters", "Main Course", "Breads", "Rice", "Chinese", "Beverages", "Desserts", "Soups"],
+  bakery: ["Cakes", "Pastries", "Breads", "Confectionery", "Beverages", "Cookies"],
+  banquet: ["Packages", "Catering", "Decor", "Beverages"],
+};
+
 const DISH_TAGS = [
   "New",
   "Chef's Special",
@@ -98,6 +125,8 @@ const DISH_TAGS = [
   "Vegan",
   "Best Seller",
 ];
+
+const CREATE_NEW = "__create_new__";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -111,7 +140,7 @@ const emptyForm = (): ProductForm => ({
   tax: TAX_OPTIONS[0],
   packagingCharge: "0",
   tags: [],
-  serves: "",
+  serves: SERVE_OPTIONS[1],
   variants: [],
   addons: [],
 });
@@ -140,6 +169,10 @@ function MenuPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<ProductForm>(emptyForm);
+  const [customCategory, setCustomCategory] = useState(false);
+  const [customServes, setCustomServes] = useState(false);
+  const [customVariantIds, setCustomVariantIds] = useState<Set<string>>(new Set());
+  const [customAddonIds, setCustomAddonIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setItems(panelSeed);
@@ -148,7 +181,21 @@ function MenuPage() {
     setCategory("all");
   }, [panelSeed]);
 
-  const categories = useMemo(() => Array.from(new Set(items.map((m) => m.cat))), [items]);
+  const categories = useMemo(() => {
+    const fromItems = items.map((m) => m.cat);
+    const defaults = DEFAULT_CATEGORIES[panel] ?? [];
+    return Array.from(new Set([...defaults, ...fromItems])).sort((a, b) => a.localeCompare(b));
+  }, [items, panel]);
+
+  const variantNameOptions = useMemo(() => {
+    const fromItems = items.flatMap((m) => m.variants?.map((v) => v.name) ?? []);
+    return Array.from(new Set([...VARIANT_NAME_OPTIONS, ...fromItems]));
+  }, [items]);
+
+  const addonGroupOptions = useMemo(() => {
+    const fromItems = items.flatMap((m) => m.addons?.map((g) => g.name) ?? []);
+    return Array.from(new Set([...ADDON_GROUP_OPTIONS, ...fromItems]));
+  }, [items]);
 
   const filtered = useMemo(
     () =>
@@ -180,7 +227,31 @@ function MenuPage() {
 
   function openAdd() {
     setForm(emptyForm());
+    setCustomCategory(false);
+    setCustomServes(false);
+    setCustomVariantIds(new Set());
+    setCustomAddonIds(new Set());
     setModal(true);
+  }
+
+  function onCategorySelect(value: string) {
+    if (value === CREATE_NEW) {
+      setCustomCategory(true);
+      setForm((f) => ({ ...f, cat: "" }));
+      return;
+    }
+    setCustomCategory(false);
+    setForm((f) => ({ ...f, cat: value }));
+  }
+
+  function onServesSelect(value: string) {
+    if (value === CREATE_NEW) {
+      setCustomServes(true);
+      setForm((f) => ({ ...f, serves: "" }));
+      return;
+    }
+    setCustomServes(false);
+    setForm((f) => ({ ...f, serves: value }));
   }
 
   function toggleTag(tag: string) {
@@ -191,9 +262,10 @@ function MenuPage() {
   }
 
   function addVariant() {
+    const id = uid();
     setForm((f) => ({
       ...f,
-      variants: [...f.variants, { id: uid(), name: "", price: "" }],
+      variants: [...f.variants, { id, name: "", price: "" }],
     }));
   }
 
@@ -206,15 +278,21 @@ function MenuPage() {
 
   function removeVariant(id: string) {
     setForm((f) => ({ ...f, variants: f.variants.filter((v) => v.id !== id) }));
+    setCustomVariantIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   function addAddonGroup() {
+    const id = uid();
     setForm((f) => ({
       ...f,
       addons: [
         ...f.addons,
         {
-          id: uid(),
+          id,
           name: "",
           min: 0,
           max: 1,
@@ -233,6 +311,11 @@ function MenuPage() {
 
   function removeAddonGroup(id: string) {
     setForm((f) => ({ ...f, addons: f.addons.filter((g) => g.id !== id) }));
+    setCustomAddonIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   function addAddonOption(groupId: string) {
@@ -586,27 +669,81 @@ function MenuPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Category *</Label>
-                  <Input
-                    value={form.cat}
-                    onChange={(e) => setForm((f) => ({ ...f, cat: e.target.value }))}
-                    placeholder="Main Course"
-                    list="menu-categories"
-                    className="mt-1 rounded-xl"
-                  />
-                  <datalist id="menu-categories">
-                    {categories.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
+                  {customCategory ? (
+                    <div className="mt-1 flex gap-2">
+                      <Input
+                        value={form.cat}
+                        onChange={(e) => setForm((f) => ({ ...f, cat: e.target.value }))}
+                        placeholder="New category name"
+                        className="rounded-xl"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0 rounded-xl"
+                        onClick={() => {
+                          setCustomCategory(false);
+                          setForm((f) => ({ ...f, cat: categories[0] ?? "" }));
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select value={form.cat || undefined} onValueChange={onCategorySelect}>
+                      <SelectTrigger className="mt-1 rounded-xl">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CREATE_NEW}>+ Create new category</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div>
                   <Label>Serving info</Label>
-                  <Input
-                    value={form.serves}
-                    onChange={(e) => setForm((f) => ({ ...f, serves: e.target.value }))}
-                    placeholder="Serves 1–2"
-                    className="mt-1 rounded-xl"
-                  />
+                  {customServes ? (
+                    <div className="mt-1 flex gap-2">
+                      <Input
+                        value={form.serves}
+                        onChange={(e) => setForm((f) => ({ ...f, serves: e.target.value }))}
+                        placeholder="e.g. Serves 1–2"
+                        className="rounded-xl"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0 rounded-xl"
+                        onClick={() => {
+                          setCustomServes(false);
+                          setForm((f) => ({ ...f, serves: SERVE_OPTIONS[1] }));
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select value={form.serves || undefined} onValueChange={onServesSelect}>
+                      <SelectTrigger className="mt-1 rounded-xl">
+                        <SelectValue placeholder="Select serving size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SERVE_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CREATE_NEW}>+ Custom serving info</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
               <div>
@@ -635,12 +772,44 @@ function MenuPage() {
 
             <Separator />
 
-            {/* Dietary — veg only */}
+            {/* Dietary */}
             <section className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dietary type *</h3>
-              <div className="flex items-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">
-                <span className="h-3 w-3 rounded-sm border-2 border-emerald-600 bg-emerald-500" />
-                Veg
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Dietary type *
+              </h3>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { id: "veg" as const, label: "Veg", mark: "border-emerald-600 bg-emerald-500" },
+                    { id: "egg" as const, label: "Egg", mark: "border-amber-600 bg-amber-500" },
+                    {
+                      id: "non-veg" as const,
+                      label: "Non-veg",
+                      mark: "border-rose-600 bg-rose-500",
+                    },
+                  ] as const
+                ).map((opt) => {
+                  const active = form.dietary === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, dietary: opt.id }))}
+                      className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                        active
+                          ? opt.id === "veg"
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : opt.id === "egg"
+                              ? "border-amber-500 bg-amber-50 text-amber-700"
+                              : "border-rose-500 bg-rose-50 text-rose-700"
+                          : "border-border text-muted-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      <span className={`h-3 w-3 rounded-sm border-2 ${opt.mark}`} />
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </section>
 
@@ -766,27 +935,63 @@ function MenuPage() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {form.variants.map((v) => (
-                    <div key={v.id} className="flex items-center gap-2">
-                      <Input
-                        value={v.name}
-                        onChange={(e) => updateVariant(v.id, { name: e.target.value })}
-                        placeholder="Half"
-                        className="rounded-xl"
-                      />
-                      <Input
-                        type="number"
-                        min={0}
-                        value={v.price}
-                        onChange={(e) => updateVariant(v.id, { price: e.target.value })}
-                        placeholder="₹"
-                        className="w-28 rounded-xl"
-                      />
-                      <Button type="button" size="icon" variant="ghost" className="shrink-0" onClick={() => removeVariant(v.id)}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  ))}
+                  {form.variants.map((v) => {
+                    const isCustom = customVariantIds.has(v.id);
+                    return (
+                      <div key={v.id} className="flex items-center gap-2">
+                        {isCustom ? (
+                          <Input
+                            value={v.name}
+                            onChange={(e) => updateVariant(v.id, { name: e.target.value })}
+                            placeholder="Custom variant"
+                            className="rounded-xl"
+                            autoFocus
+                          />
+                        ) : (
+                          <Select
+                            value={v.name || undefined}
+                            onValueChange={(value) => {
+                              if (value === CREATE_NEW) {
+                                setCustomVariantIds((prev) => new Set(prev).add(v.id));
+                                updateVariant(v.id, { name: "" });
+                                return;
+                              }
+                              updateVariant(v.id, { name: value });
+                            }}
+                          >
+                            <SelectTrigger className="rounded-xl">
+                              <SelectValue placeholder="Select variant" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {variantNameOptions.map((name) => (
+                                <SelectItem key={name} value={name}>
+                                  {name}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value={CREATE_NEW}>+ Custom name</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <Input
+                          type="number"
+                          min={0}
+                          value={v.price}
+                          onChange={(e) => updateVariant(v.id, { price: e.target.value })}
+                          placeholder="₹"
+                          className="w-28 shrink-0 rounded-xl"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="shrink-0"
+                          onClick={() => removeVariant(v.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -814,12 +1019,57 @@ function MenuPage() {
                     <div key={group.id} className="space-y-3 rounded-xl border bg-muted/20 p-3">
                       <div className="flex items-start gap-2">
                         <div className="min-w-0 flex-1 space-y-2">
-                          <Input
-                            value={group.name}
-                            onChange={(e) => updateAddonGroup(group.id, { name: e.target.value })}
-                            placeholder="Group name — e.g. Beverages"
-                            className="rounded-xl bg-background"
-                          />
+                          {customAddonIds.has(group.id) ? (
+                            <div className="space-y-1">
+                              <Input
+                                value={group.name}
+                                onChange={(e) => updateAddonGroup(group.id, { name: e.target.value })}
+                                placeholder="Group name — e.g. Beverages"
+                                className="rounded-xl bg-background"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                className="text-xs text-primary hover:underline"
+                                onClick={() => {
+                                  setCustomAddonIds((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(group.id);
+                                    return next;
+                                  });
+                                  updateAddonGroup(group.id, {
+                                    name: addonGroupOptions[0] ?? "",
+                                  });
+                                }}
+                              >
+                                Pick from existing groups
+                              </button>
+                            </div>
+                          ) : (
+                            <Select
+                              value={group.name || undefined}
+                              onValueChange={(value) => {
+                                if (value === CREATE_NEW) {
+                                  setCustomAddonIds((prev) => new Set(prev).add(group.id));
+                                  updateAddonGroup(group.id, { name: "" });
+                                  return;
+                                }
+                                updateAddonGroup(group.id, { name: value });
+                              }}
+                            >
+                              <SelectTrigger className="rounded-xl bg-background">
+                                <SelectValue placeholder="Select add-on group" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {addonGroupOptions.map((name) => (
+                                  <SelectItem key={name} value={name}>
+                                    {name}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value={CREATE_NEW}>+ Create new group</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <Label className="text-xs">Min select</Label>
@@ -828,7 +1078,9 @@ function MenuPage() {
                                 min={0}
                                 value={group.min}
                                 onChange={(e) =>
-                                  updateAddonGroup(group.id, { min: Math.max(0, Number(e.target.value) || 0) })
+                                  updateAddonGroup(group.id, {
+                                    min: Math.max(0, Number(e.target.value) || 0),
+                                  })
                                 }
                                 className="mt-1 rounded-xl bg-background"
                               />
@@ -840,7 +1092,9 @@ function MenuPage() {
                                 min={0}
                                 value={group.max}
                                 onChange={(e) =>
-                                  updateAddonGroup(group.id, { max: Math.max(0, Number(e.target.value) || 0) })
+                                  updateAddonGroup(group.id, {
+                                    max: Math.max(0, Number(e.target.value) || 0),
+                                  })
                                 }
                                 className="mt-1 rounded-xl bg-background"
                               />
