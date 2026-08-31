@@ -24,13 +24,18 @@ const map: Record<string, string> = {
   "On Delivery":     "bg-info/15 text-info border-info/30",
   "Offline":         "bg-muted text-muted-foreground border-border",
   // loyalty
-  "Silver":          "bg-muted text-muted-foreground border-border",
-  "Gold":            "bg-gold/20 text-gold-foreground border-gold/40",
-  "Platinum":        "bg-primary/15 text-primary border-primary/30",
+  Silver: "bg-muted text-muted-foreground border-border",
+  Gold: "bg-gold/20 text-gold-foreground border-gold/40",
+  Platinum: "bg-primary/15 text-primary border-primary/30",
+  silver: "bg-muted text-muted-foreground border-border",
+  gold: "bg-gold/20 text-gold-foreground border-gold/40",
+  platinum: "bg-primary/15 text-primary border-primary/30",
+  // account
+  Inactive: "bg-destructive/15 text-destructive border-destructive/30",
   // vendor
-  "Upcoming":        "bg-info/15 text-info border-info/30",
-  "Overdue":         "bg-destructive/15 text-destructive border-destructive/30",
-  "Paid":            "bg-success/15 text-success border-success/30",
+  Upcoming: "bg-info/15 text-info border-info/30",
+  Overdue: "bg-destructive/15 text-destructive border-destructive/30",
+  Paid: "bg-success/15 text-success border-success/30",
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

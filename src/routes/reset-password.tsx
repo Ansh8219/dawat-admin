@@ -5,7 +5,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isAuthenticated, useAuth } from "@/lib/auth";
+import { canCheckPersistedAuth, isAuthenticated, useAuth } from "@/lib/auth";
 import { z } from "zod";
 
 const searchSchema = z.object({
@@ -15,6 +15,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/reset-password")({
   validateSearch: searchSchema,
   beforeLoad: () => {
+    if (!canCheckPersistedAuth()) return;
     if (isAuthenticated()) {
       throw redirect({ to: "/select-panel" });
     }

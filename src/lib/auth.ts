@@ -66,6 +66,30 @@ function isBrowser() {
   return typeof window !== "undefined";
 }
 
+/** Auth lives in localStorage — route guards must not run during SSR. */
+export function canCheckPersistedAuth(): boolean {
+  return isBrowser();
+}
+
+type PersistedAuthState = {
+  user?: AuthUser | null;
+  tokens?: AuthTokens | null;
+  panel?: Panel | null;
+  business?: SelectedBusiness | null;
+};
+
+function readPersistedAuthState(): PersistedAuthState | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = localStorage.getItem("daawat-auth");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: PersistedAuthState };
+    return parsed?.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function displayNameFromEmail(email: string): string {
   const local = email.split("@")[0] ?? email;
   return local
@@ -96,37 +120,20 @@ function clearSession() {
 }
 
 export function isAuthenticated(): boolean {
-  if (!isBrowser()) return false;
-  try {
-    const raw = localStorage.getItem("daawat-auth");
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as {
-      state?: { user?: AuthUser | null; tokens?: AuthTokens | null };
-    };
-    return Boolean(parsed?.state?.user && parsed?.state?.tokens?.access);
-  } catch {
-    return false;
-  }
+  const state = readPersistedAuthState();
+  return Boolean(state?.user && state?.tokens?.access);
 }
 
 export function getSelectedPanel(): Panel | null {
-  if (!isBrowser()) return null;
-  try {
-    const raw = localStorage.getItem("daawat-auth");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as {
-      state?: { panel?: Panel | null; business?: SelectedBusiness | null };
-    };
-    const fromBusiness = parsed?.state?.business?.panel;
-    if (fromBusiness === "bakery" || fromBusiness === "restaurant" || fromBusiness === "banquet") {
-      return fromBusiness;
-    }
-    const panel = parsed?.state?.panel;
-    if (panel === "bakery" || panel === "restaurant" || panel === "banquet") return panel;
-    return null;
-  } catch {
-    return null;
+  const state = readPersistedAuthState();
+  if (!state) return null;
+  const fromBusiness = state.business?.panel;
+  if (fromBusiness === "bakery" || fromBusiness === "restaurant" || fromBusiness === "banquet") {
+    return fromBusiness;
   }
+  const panel = state.panel;
+  if (panel === "bakery" || panel === "restaurant" || panel === "banquet") return panel;
+  return null;
 }
 
 export const useAuth = create<AuthState>()(
@@ -267,7 +274,8 @@ export const useAuth = create<AuthState>()(
         }
       },
 
-      getAccessToken: () => get().tokens?.access ?? null,
+      getAccessToken: () =>
+        get().tokens?.access ?? readPersistedAuthState()?.tokens?.access ?? null,
     }),
     {
       name: "daawat-auth",

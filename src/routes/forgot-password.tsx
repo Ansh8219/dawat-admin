@@ -5,10 +5,11 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isAuthenticated, useAuth } from "@/lib/auth";
+import { canCheckPersistedAuth, isAuthenticated, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/forgot-password")({
   beforeLoad: () => {
+    if (!canCheckPersistedAuth()) return;
     if (isAuthenticated()) {
       throw redirect({ to: "/select-panel" });
     }

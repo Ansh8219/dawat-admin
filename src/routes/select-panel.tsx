@@ -27,12 +27,13 @@ import { listBusinesses } from "@/lib/api/businesses";
 import type { Business } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/types";
 import { LOGO_SRC, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
-import { getSelectedPanel, isAuthenticated, useAuth } from "@/lib/auth";
+import { canCheckPersistedAuth, getSelectedPanel, isAuthenticated, useAuth } from "@/lib/auth";
 import { PANEL_META, businessTypeToPanel, type Panel } from "@/lib/panel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/select-panel")({
   beforeLoad: () => {
+    if (!canCheckPersistedAuth()) return;
     if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
     }
@@ -104,7 +105,7 @@ function SelectPanelPage() {
   const selectBusiness = useAuth((s) => s.selectBusiness);
   const logout = useAuth((s) => s.logout);
   const user = useAuth((s) => s.user);
-  const accessToken = useAuth((s) => s.tokens?.access ?? null);
+  const getAccessToken = useAuth((s) => s.getAccessToken);
   const refreshSession = useAuth((s) => s.refreshSession);
   const current = useAuth((s) => s.business?.publicId ?? null);
   const currentPanel = useAuth((s) => s.panel) ?? getSelectedPanel();
@@ -121,6 +122,7 @@ function SelectPanelPage() {
     let cancelled = false;
 
     async function load() {
+      const accessToken = getAccessToken();
       if (!accessToken) {
         setError("Please sign in again.");
         setLoading(false);
@@ -169,7 +171,7 @@ function SelectPanelPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, logout, navigate, refreshSession]);
+  }, [getAccessToken, logout, navigate, refreshSession]);
 
   const pick = (biz: Business) => {
     const result = selectBusiness(biz);

@@ -4,11 +4,12 @@ import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
-import { getSelectedPanel, isAuthenticated } from "@/lib/auth";
+import { canCheckPersistedAuth, getSelectedPanel, isAuthenticated } from "@/lib/auth";
 import { isRouteAllowed } from "@/lib/panel";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ location }) => {
+    if (!canCheckPersistedAuth()) return;
     if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
     }

@@ -14,6 +14,46 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+type FormRequestOptions = {
+  method?: "POST" | "PUT" | "PATCH";
+  body: FormData;
+  accessToken?: string | null;
+  signal?: AbortSignal;
+};
+
+async function parseEnvelope<T>(response: Response): Promise<T> {
+  let envelope: ApiEnvelope<T> | null = null;
+  try {
+    envelope = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiError(
+      response.status,
+      "invalid_response",
+      `Unexpected response (${response.status}).`,
+    );
+  }
+
+  if (envelope.success && envelope.data !== null) {
+    return envelope.data;
+  }
+
+  const code = envelope.error?.code ?? "request_failed";
+  const fromDetails = formatValidationDetails(envelope.error?.details);
+  const message =
+    (code === "validation_error" && fromDetails) ||
+    humanizeErrorCode(code) ||
+    fromDetails ||
+    envelope.message ||
+    "Something went wrong. Please try again.";
+
+  throw new ApiError(
+    envelope.status_code || response.status,
+    code,
+    message,
+    envelope.error?.details ?? null,
+  );
+}
+
 function humanizeErrorCode(code: string): string {
   switch (code) {
     case "invalid_credentials":
@@ -33,6 +73,16 @@ function humanizeErrorCode(code: string): string {
     case "token_not_valid":
     case "token_expired":
       return "Your session has expired. Please sign in again.";
+    case "business_not_found":
+      return "Business not found. Please select a business again.";
+    case "menu_type_unsupported":
+      return "Menu management is not available for this business type.";
+    case "menu_item_not_found":
+      return "Menu item not found.";
+    case "invalid_payload":
+      return "Invalid request data. Please check your input and try again.";
+    case "customer_not_found":
+      return "Customer not found.";
     default:
       return "Something went wrong. Please try again.";
   }
@@ -85,34 +135,34 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");
   }
 
-  let envelope: ApiEnvelope<T> | null = null;
+  return parseEnvelope<T>(response);
+}
+
+export async function apiFormRequest<T>(
+  path: string,
+  options: FormRequestOptions,
+): Promise<T> {
+  const { method = "POST", body, accessToken, signal } = options;
+  const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  let response: Response;
   try {
-    envelope = (await response.json()) as ApiEnvelope<T>;
+    response = await fetch(url, {
+      method,
+      headers,
+      body,
+      signal,
+    });
   } catch {
-    throw new ApiError(
-      response.status,
-      "invalid_response",
-      `Unexpected response (${response.status}).`,
-    );
+    throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");
   }
 
-  if (envelope.success && envelope.data !== null) {
-    return envelope.data;
-  }
-
-  const code = envelope.error?.code ?? "request_failed";
-  const fromDetails = formatValidationDetails(envelope.error?.details);
-  const message =
-    (code === "validation_error" && fromDetails) ||
-    humanizeErrorCode(code) ||
-    fromDetails ||
-    envelope.message ||
-    "Something went wrong. Please try again.";
-
-  throw new ApiError(
-    envelope.status_code || response.status,
-    code,
-    message,
-    envelope.error?.details ?? null,
-  );
+  return parseEnvelope<T>(response);
 }
