@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useAuth } from "@/lib/auth";
+import { can } from "@/lib/rbac";
 import { inr } from "@/lib/mock/data";
 import { useApp } from "@/lib/store";
 import { usePanelMeta } from "@/lib/use-panel";
@@ -20,24 +22,38 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsPage() {
   const { dark, toggleDark } = useApp();
   const meta = usePanelMeta();
+  const role = useAuth((s) => s.user?.role);
+  const canManageSettings = can(role, "settings.manage");
+  const defaultTab = canManageSettings ? "business" : "appearance";
+
   return (
     <div>
       <PageHeader
         title={`${meta.label} Settings`}
         crumbs={["Admin", "Settings"]}
-        description={`Configuration for ${meta.label} · GST ${meta.gst}`}
+        description={
+          canManageSettings
+            ? `Configuration for ${meta.label} · GST ${meta.gst}`
+            : `Your profile & preferences · ${meta.label}`
+        }
       />
       <div className="p-4 sm:p-6 lg:p-8">
-        <Tabs defaultValue="business">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="rounded-xl flex-wrap h-auto">
-            <TabsTrigger value="business">Business</TabsTrigger>
-            <TabsTrigger value="tax">Tax</TabsTrigger>
-            <TabsTrigger value="printer">Printer</TabsTrigger>
-            <TabsTrigger value="payment">Payment</TabsTrigger>
-            <TabsTrigger value="delivery">Delivery</TabsTrigger>
+            {canManageSettings && (
+              <>
+                <TabsTrigger value="business">Business</TabsTrigger>
+                <TabsTrigger value="tax">Tax</TabsTrigger>
+                <TabsTrigger value="printer">Printer</TabsTrigger>
+                <TabsTrigger value="payment">Payment</TabsTrigger>
+                <TabsTrigger value="delivery">Delivery</TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
 
+          {canManageSettings && (
+            <>
           <TabsContent value="business" className="mt-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="card-elevated p-4">
@@ -251,6 +267,8 @@ function SettingsPage() {
               </div>
             </div>
           </TabsContent>
+            </>
+          )}
 
           <TabsContent value="appearance" className="mt-4">
             <div className="card-elevated max-w-lg p-4">

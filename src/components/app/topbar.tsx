@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/lib/store";
-import { useAuth } from "@/lib/auth";
+import { formatRoleLabel, useAuth } from "@/lib/auth";
 import { usePanelMeta } from "@/lib/use-panel";
 import { notifications } from "@/lib/mock/data";
 import { StatusBadge } from "./status-badge";
@@ -43,7 +43,7 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
   const [searchQ, setSearchQ] = useState("");
   const unread = notifications.filter((n) => !n.read).length;
   const displayName = user?.name ?? "Admin";
-  const displayRole = user?.role ?? "Admin";
+  const displayRole = formatRoleLabel(user?.role);
 
   const confirmSignOut = () => {
     logout();

@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isAuthenticated, useAuth } from "@/lib/auth";
-import { DEMO_ADMIN } from "@/lib/brand";
+import { DEMO_ADMIN, DEMO_MANAGER } from "@/lib/brand";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const login = useAuth((s) => s.login);
-  const [email, setEmail] = useState<string>(DEMO_ADMIN.email);
+  const [email, setEmail] = useState<string>(DEMO_MANAGER.email);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -42,6 +42,18 @@ function LoginPage() {
       }
       void navigate({ to: "/select-panel" });
     }, 350);
+  };
+
+  const fillManager = () => {
+    setEmail(DEMO_MANAGER.email);
+    setPassword(DEMO_MANAGER.password);
+    setError("");
+  };
+
+  const fillAdmin = () => {
+    setEmail(DEMO_ADMIN.email);
+    setPassword(DEMO_ADMIN.password);
+    setError("");
   };
 
   return (
@@ -64,10 +76,20 @@ function LoginPage() {
               Terms & Conditions
             </button>
           </div>
-          <p className="text-xs">
-            Demo: <span className="font-medium text-foreground">{DEMO_ADMIN.email}</span> /{" "}
-            <span className="font-medium text-foreground">{DEMO_ADMIN.password}</span>
-          </p>
+          <div className="space-y-1 text-xs">
+            <p>
+              Manager:{" "}
+              <button type="button" onClick={fillManager} className="font-medium text-foreground hover:underline">
+                {DEMO_MANAGER.email} / {DEMO_MANAGER.password}
+              </button>
+            </p>
+            <p>
+              Admin:{" "}
+              <button type="button" onClick={fillAdmin} className="font-medium text-foreground hover:underline">
+                {DEMO_ADMIN.email} / {DEMO_ADMIN.password}
+              </button>
+            </p>
+          </div>
         </div>
       }
     >

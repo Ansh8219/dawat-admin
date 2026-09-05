@@ -4,8 +4,9 @@ import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
-import { getSelectedPanel, isAuthenticated } from "@/lib/auth";
+import { getAuthRole, getSelectedPanel, isAuthenticated } from "@/lib/auth";
 import { isRouteAllowed } from "@/lib/panel";
+import { fallbackRouteForRole, isRoutePermitted } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ location }) => {
@@ -18,6 +19,14 @@ export const Route = createFileRoute("/_app")({
     }
     if (!isRouteAllowed(panel, location.pathname)) {
       throw redirect({ to: "/" });
+    }
+    const role = getAuthRole();
+    if (!isRoutePermitted(role, location.pathname)) {
+      const fallback = fallbackRouteForRole(role, (path) => isRouteAllowed(panel, path));
+      if (fallback === location.pathname) {
+        throw redirect({ to: "/select-panel" });
+      }
+      throw redirect({ to: fallback });
     }
   },
   component: AppLayout,

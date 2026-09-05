@@ -7,8 +7,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { LOGO_SRC } from "@/lib/brand";
+import { useAuth } from "@/lib/auth";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { isRouteAllowed } from "@/lib/panel";
+import { isRoutePermitted } from "@/lib/rbac";
 
 const nav = [
   { section: "Overview", items: [
@@ -53,12 +55,13 @@ export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; o
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const panel = usePanel();
   const meta = usePanelMeta();
+  const role = useAuth((s) => s.user?.role);
 
   const filteredNav = nav
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => isRouteAllowed(panel, item.to))
+        .filter((item) => isRouteAllowed(panel, item.to) && isRoutePermitted(role, item.to))
         .map((item) => {
           if (item.to === "/bookings") {
             return { ...item, label: bookingLabels[panel] ?? item.label };
