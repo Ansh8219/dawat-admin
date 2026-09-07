@@ -24,7 +24,7 @@ const nav = [
   { section: "Growth", items: [
     { to: "/customers",    label: "Customers",     icon: Users },
     { to: "/marketing",    label: "Marketing",     icon: Megaphone },
-    { to: "/drivers",      label: "Drivers",       icon: Bike },
+    { to: "/partners",     label: "Partners",      icon: Bike },
   ]},
   { section: "Admin", items: [
     { to: "/staff",        label: "Staff & Roles", icon: UserCog },

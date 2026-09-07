@@ -19,10 +19,16 @@ const map: Record<string, string> = {
   // staff
   "Active":          "bg-success/15 text-success border-success/30",
   "Pending Approval":"bg-warning/15 text-warning border-warning/40",
-  // driver
+  // driver / partner
   "Online":          "bg-success/15 text-success border-success/30",
   "On Delivery":     "bg-info/15 text-info border-info/30",
   "Offline":         "bg-muted text-muted-foreground border-border",
+  Pending: "bg-warning/15 text-warning border-warning/40",
+  pending: "bg-warning/15 text-warning border-warning/40",
+  Approved: "bg-success/15 text-success border-success/30",
+  approved: "bg-success/15 text-success border-success/30",
+  Rejected: "bg-destructive/15 text-destructive border-destructive/30",
+  rejected: "bg-destructive/15 text-destructive border-destructive/30",
   // loyalty
   Silver: "bg-muted text-muted-foreground border-border",
   Gold: "bg-gold/20 text-gold-foreground border-gold/40",

@@ -180,6 +180,147 @@ export type UpdateCustomerPayload = {
   is_active?: boolean;
 };
 
+/** Partner onboarding / delivery-partner review */
+export type PartnerStatus = "pending" | "approved" | "rejected" | string;
+
+export type PartnerRejectField =
+  | "full_name"
+  | "email"
+  | "date_of_birth"
+  | "gender"
+  | "profile_picture"
+  | "aadhaar_front"
+  | "aadhaar_back"
+  | "house_flat"
+  | "street"
+  | "city"
+  | "state"
+  | "pincode"
+  | "licence_number"
+  | "licence_front"
+  | "licence_back"
+  | "vehicle_type"
+  | "vehicle_model"
+  | "vehicle_number"
+  | "color"
+  | "insurance_expiry_date"
+  | "rc_front"
+  | "rc_back"
+  | "insurance_image"
+  | "account_holder_name"
+  | "account_number"
+  | "ifsc_code"
+  | "upi_id";
+
+export interface PartnerListItem {
+  public_id: string;
+  full_name: string;
+  phone_number: string;
+  country_code: string;
+  email: string;
+  partner_status: PartnerStatus;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export interface PartnerListParams {
+  status?: PartnerStatus | "";
+  page?: number;
+  page_size?: number;
+}
+
+export interface PartnerListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: PartnerListItem[];
+}
+
+export interface PartnerUser {
+  country_code: string;
+  phone_number: string;
+  email: string;
+  role: string;
+}
+
+export interface PartnerProfile {
+  full_name: string;
+  date_of_birth: string | null;
+  gender: string | null;
+  profile_picture_url: string | null;
+}
+
+export interface PartnerDocuments {
+  aadhaar_front_url: string | null;
+  aadhaar_back_url: string | null;
+  licence_front_url: string | null;
+  licence_back_url: string | null;
+  rc_front_url: string | null;
+  rc_back_url: string | null;
+  insurance_image_url: string | null;
+}
+
+export interface PartnerAddress {
+  house_flat: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+}
+
+export interface PartnerLicence {
+  licence_number: string | null;
+}
+
+export interface PartnerVehicle {
+  vehicle_type: string | null;
+  vehicle_model: string | null;
+  vehicle_number: string | null;
+  color: string | null;
+  insurance_expiry_date: string | null;
+}
+
+export interface PartnerBank {
+  account_holder_name: string | null;
+  account_number: string | null;
+  ifsc_code: string | null;
+  upi_id: string | null;
+}
+
+export interface PartnerDetail {
+  public_id: string;
+  partner_status: PartnerStatus;
+  rejection_reason: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  user: PartnerUser;
+  profile: PartnerProfile;
+  documents: PartnerDocuments;
+  address: PartnerAddress;
+  licence: PartnerLicence;
+  vehicle: PartnerVehicle;
+  bank: PartnerBank;
+  rejected_fields?: PartnerRejectField[] | string[];
+  rejected_steps?: string[];
+}
+
+export type PartnerReviewPayload =
+  | { action: "approve" }
+  | {
+      action: "reject";
+      reason: string;
+      rejected_fields: PartnerRejectField[];
+    };
+
+export interface PartnerReviewResult {
+  public_id: string;
+  partner_status: PartnerStatus;
+  rejection_reason?: string | null;
+  rejected_fields?: PartnerRejectField[] | string[];
+  rejected_steps?: string[];
+  reviewed_at?: string | null;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;

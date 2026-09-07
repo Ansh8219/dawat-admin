@@ -323,8 +323,9 @@ function MenuPage() {
 
     try {
       const data = await withAuthRetry((token) => listMenuItems(token, businessPublicId));
-      setItems(data);
-      setAvail(Object.fromEntries(data.map((m) => [m.public_id, m.is_available])));
+      const nextItems = Array.isArray(data) ? data : [];
+      setItems(nextItems);
+      setAvail(Object.fromEntries(nextItems.map((m) => [m.public_id, m.is_available])));
       if (options?.resetFilters) {
         setSelected(new Set());
         setCategory("all");

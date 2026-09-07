@@ -439,7 +439,7 @@ export const staff = [
 ];
 
 export const roles = ["Admin","Manager","Store Keeper","Cashier","Driver","Chef"];
-export const modules = ["Dashboard","Orders","POS","Menu","Inventory","Bookings","Customers","Marketing","Drivers","Staff","Finance","Reports","Settings"];
+export const modules = ["Dashboard","Orders","POS","Menu","Inventory","Bookings","Customers","Marketing","Partners","Staff","Finance","Reports","Settings"];
 
 export const offers = [
   { code: "WELCOME20",    type: "Percentage", value: 20, expiry: "31 Aug 2026", used: 142, active: true,  audience: "New Customers" },

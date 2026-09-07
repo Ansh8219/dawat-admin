@@ -83,6 +83,10 @@ function humanizeErrorCode(code: string): string {
       return "Invalid request data. Please check your input and try again.";
     case "customer_not_found":
       return "Customer not found.";
+    case "partner_not_found":
+      return "Partner not found.";
+    case "partner_not_pending":
+      return "Only pending partners can be reviewed.";
     default:
       return "Something went wrong. Please try again.";
   }

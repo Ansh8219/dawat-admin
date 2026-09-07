@@ -49,9 +49,16 @@ export function menuItemToSummary(item: MenuItemDetail): MenuItemSummary {
 
 export function listMenuItems(accessToken: string, businessPublicId: string) {
   const params = new URLSearchParams({ business_public_id: businessPublicId });
-  return apiRequest<MenuItemSummary[]>(`/api/admin/menu-items/?${params.toString()}`, {
-    method: "GET",
-    accessToken,
+  return apiRequest<MenuItemSummary[] | { results?: MenuItemSummary[] }>(
+    `/api/admin/menu-items/?${params.toString()}`,
+    {
+      method: "GET",
+      accessToken,
+    },
+  ).then((data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
   });
 }
 
