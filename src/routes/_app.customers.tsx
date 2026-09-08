@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   deleteCustomer,
   formatCustomerPhone,
@@ -390,6 +390,9 @@ function CustomersPage() {
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
+                                  {c.profile_picture_url ? (
+                                    <AvatarImage src={c.profile_picture_url} alt={c.full_name} />
+                                  ) : null}
                                   <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                     {initials(c.full_name)}
                                   </AvatarFallback>
@@ -546,6 +549,9 @@ function CustomersPage() {
               <div className="mt-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-14 w-14">
+                    {sel.profile_picture_url ? (
+                      <AvatarImage src={sel.profile_picture_url} alt={sel.full_name} />
+                    ) : null}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       {initials(sel.full_name)}
                     </AvatarFallback>

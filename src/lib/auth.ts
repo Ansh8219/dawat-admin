@@ -4,6 +4,7 @@ import {
   adminLogin,
   changePassword as changePasswordApi,
   forgotPassword,
+  getMe,
   refreshAccessToken,
   resetPassword as resetPasswordApi,
 } from "./api/auth";
@@ -90,7 +91,8 @@ function readPersistedAuthState(): PersistedAuthState | null {
   }
 }
 
-function displayNameFromEmail(email: string): string {
+function displayNameFromEmail(email: string | undefined | null): string {
+  if (!email) return "Admin";
   const local = email.split("@")[0] ?? email;
   return local
     .split(/[._-]+/)
@@ -100,12 +102,13 @@ function displayNameFromEmail(email: string): string {
 }
 
 function mapUser(user: ApiAuthUser): AuthUser {
+  const email = user.email ?? "";
   return {
     publicId: user.public_id,
-    email: user.email,
+    email,
     role: user.role,
-    isStaff: user.is_staff,
-    name: displayNameFromEmail(user.email),
+    isStaff: Boolean(user.is_staff),
+    name: displayNameFromEmail(email),
   };
 }
 
@@ -151,13 +154,25 @@ export const useAuth = create<AuthState>()(
         }
         try {
           const data = await adminLogin(normalized, password);
-          set({
-            user: mapUser(data.user),
-            tokens: { access: data.access, refresh: data.refresh },
-            panel: null,
-            business: null,
-          });
-          return { ok: true };
+          try {
+            const me = await getMe(data.access);
+            if (!me?.user) {
+              throw new Error("Admin profile response was incomplete.");
+            }
+            set({
+              user: mapUser(me.user),
+              tokens: { access: data.access, refresh: data.refresh },
+              panel: null,
+              business: null,
+            });
+            return { ok: true };
+          } catch (meErr) {
+            set(clearSession());
+            return {
+              ok: false,
+              error: toErrorMessage(meErr, "Unable to load admin profile."),
+            };
+          }
         } catch (err) {
           return { ok: false, error: toErrorMessage(err, "Unable to sign in.") };
         }

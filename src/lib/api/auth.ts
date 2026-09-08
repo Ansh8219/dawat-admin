@@ -1,10 +1,18 @@
 import { apiRequest } from "./client";
-import type { DetailData, LoginData, RefreshData } from "./types";
+import type { DetailData, LoginData, MeData, RefreshData } from "./types";
 
 export function adminLogin(email: string, password: string) {
   return apiRequest<LoginData>("/api/auth/admin/login/", {
     method: "POST",
     body: { email, password },
+  });
+}
+
+/** Current session profile — same access token from login. Staff: `{ user }`. */
+export function getMe(accessToken: string) {
+  return apiRequest<MeData>("/api/auth/me/", {
+    method: "GET",
+    accessToken,
   });
 }
 

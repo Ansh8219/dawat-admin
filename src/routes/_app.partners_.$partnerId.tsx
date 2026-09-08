@@ -1,5 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import {
@@ -22,6 +29,8 @@ import {
   formatPartnerPhone,
   getPartner,
   PARTNER_REJECT_FIELDS,
+  partnerRejectFieldLabel,
+  partnerRejectStepLabel,
   partnerStatusLabel,
   reviewPartner,
 } from "@/lib/api/partners";
@@ -38,6 +47,7 @@ import {
   IdCard,
   Loader2,
   MapPin,
+  RefreshCw,
   ShieldAlert,
   UserRound,
   Wallet,
@@ -89,6 +99,12 @@ function buildDocuments(docs: PartnerDocuments): DocItem[] {
   ];
 }
 
+const DOC_GROUP_STEP: Record<string, string> = {
+  Identity: "identity",
+  Licence: "licence",
+  Vehicle: "vehicle",
+};
+
 function PartnerDetailPage() {
   const { partnerId } = Route.useParams();
   const navigate = useNavigate();
@@ -134,6 +150,47 @@ function PartnerDetailPage() {
   }, [load]);
 
   const canReview = partner?.partner_status === "pending";
+
+  const lastRejectedFields = useMemo(
+    () => (partner?.last_rejected_fields ?? []).map(String),
+    [partner],
+  );
+
+  const lastRejectedFieldSet = useMemo(
+    () => new Set(lastRejectedFields),
+    [lastRejectedFields],
+  );
+
+  const lastRejectedSteps = useMemo(
+    () => (partner?.last_rejected_steps ?? []).map(String),
+    [partner],
+  );
+
+  const isResubmitReview =
+    partner?.partner_status === "pending" && lastRejectedFields.length > 0;
+
+  const needsRecheck = useCallback(
+    (field: string) => isResubmitReview && lastRejectedFieldSet.has(field),
+    [isResubmitReview, lastRejectedFieldSet],
+  );
+
+  const stepNeedsRecheck = useCallback(
+    (step: string) => isResubmitReview && lastRejectedSteps.includes(step),
+    [isResubmitReview, lastRejectedSteps],
+  );
+
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  useEffect(() => {
+    if (!isResubmitReview || lastRejectedSteps.length === 0) return;
+    const first = lastRejectedSteps[0];
+    const el = sectionRefs.current[first];
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [isResubmitReview, lastRejectedSteps, partner?.public_id]);
 
   const documents = useMemo(
     () => (partner ? buildDocuments(partner.documents) : []),
@@ -251,7 +308,13 @@ function PartnerDetailPage() {
             <div className="sticky top-0 z-10 rounded-2xl border bg-card/95 p-4 shadow-soft backdrop-blur supports-[backdrop-filter]:bg-card/90">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar className="h-12 w-12 shrink-0">
+                  <Avatar
+                    className={cn(
+                      "h-12 w-12 shrink-0",
+                      needsRecheck("profile_picture") &&
+                        "ring-2 ring-amber-500 ring-offset-2 ring-offset-card",
+                    )}
+                  >
                     {partner.profile.profile_picture_url ? (
                       <AvatarImage
                         src={partner.profile.profile_picture_url}
@@ -306,6 +369,33 @@ function PartnerDetailPage() {
               </div>
             </div>
 
+            {isResubmitReview && (
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
+                <div className="flex items-start gap-2">
+                  <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                  <div className="space-y-1.5 text-sm">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">
+                      Resubmitted for re-verification
+                    </p>
+                    <p className="text-muted-foreground">
+                      Previously rejected:{" "}
+                      {partner.last_rejection_reason || "No reason provided."}
+                    </p>
+                    {lastRejectedSteps.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Re-check:{" "}
+                        {lastRejectedSteps.map(partnerRejectStepLabel).join(" · ")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Fields:{" "}
+                      {lastRejectedFields.map(partnerRejectFieldLabel).join(", ")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {partner.partner_status === "rejected" && (
               <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
                 <div className="flex items-start gap-2">
@@ -317,12 +407,14 @@ function PartnerDetailPage() {
                     </p>
                     {partner.rejected_fields && partner.rejected_fields.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Fields: {partner.rejected_fields.join(", ")}
+                        Fields:{" "}
+                        {partner.rejected_fields.map((f) => partnerRejectFieldLabel(String(f))).join(", ")}
                       </p>
                     )}
                     {partner.rejected_steps && partner.rejected_steps.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Steps: {partner.rejected_steps.join(", ")}
+                        Steps:{" "}
+                        {partner.rejected_steps.map((s) => partnerRejectStepLabel(String(s))).join(" · ")}
                       </p>
                     )}
                   </div>
@@ -339,40 +431,152 @@ function PartnerDetailPage() {
                   <h3 className="text-sm font-bold">Application details</h3>
                 </div>
 
-                <DetailCard title="Personal" icon={UserRound}>
-                  <Field label="Full name" value={partner.profile.full_name} />
-                  <Field label="Email" value={partner.user.email} />
+                <DetailCard
+                  title="Personal"
+                  icon={UserRound}
+                  highlight={stepNeedsRecheck("profile") || stepNeedsRecheck("personal")}
+                  sectionRef={(el) => {
+                    sectionRefs.current.profile = el;
+                    sectionRefs.current.personal = el;
+                  }}
+                >
+                  <Field
+                    label="Full name"
+                    value={partner.profile.full_name}
+                    needsRecheck={needsRecheck("full_name")}
+                  />
+                  <Field
+                    label="Email"
+                    value={partner.user.email}
+                    needsRecheck={needsRecheck("email")}
+                  />
                   <Field label="Phone" value={formatPartnerPhone(partner.user)} />
-                  <Field label="Date of birth" value={partner.profile.date_of_birth} />
-                  <Field label="Gender" value={partner.profile.gender} />
+                  <Field
+                    label="Date of birth"
+                    value={partner.profile.date_of_birth}
+                    needsRecheck={needsRecheck("date_of_birth")}
+                  />
+                  <Field
+                    label="Gender"
+                    value={partner.profile.gender}
+                    needsRecheck={needsRecheck("gender")}
+                  />
                   <Field label="Role" value={partner.user.role} />
                 </DetailCard>
 
-                <DetailCard title="Address" icon={MapPin}>
-                  <Field label="House / flat" value={partner.address.house_flat} />
-                  <Field label="Street" value={partner.address.street} />
-                  <Field label="City" value={partner.address.city} />
-                  <Field label="State" value={partner.address.state} />
-                  <Field label="Pincode" value={partner.address.pincode} />
+                <DetailCard
+                  title="Address"
+                  icon={MapPin}
+                  highlight={stepNeedsRecheck("address")}
+                  sectionRef={(el) => {
+                    sectionRefs.current.address = el;
+                  }}
+                >
+                  <Field
+                    label="House / flat"
+                    value={partner.address.house_flat}
+                    needsRecheck={needsRecheck("house_flat")}
+                  />
+                  <Field
+                    label="Street"
+                    value={partner.address.street}
+                    needsRecheck={needsRecheck("street")}
+                  />
+                  <Field
+                    label="City"
+                    value={partner.address.city}
+                    needsRecheck={needsRecheck("city")}
+                  />
+                  <Field
+                    label="State"
+                    value={partner.address.state}
+                    needsRecheck={needsRecheck("state")}
+                  />
+                  <Field
+                    label="Pincode"
+                    value={partner.address.pincode}
+                    needsRecheck={needsRecheck("pincode")}
+                  />
                 </DetailCard>
 
-                <DetailCard title="Licence" icon={IdCard}>
-                  <Field label="Licence number" value={partner.licence.licence_number} />
+                <DetailCard
+                  title="Licence"
+                  icon={IdCard}
+                  highlight={stepNeedsRecheck("licence")}
+                  sectionRef={(el) => {
+                    sectionRefs.current.licence = el;
+                  }}
+                >
+                  <Field
+                    label="Licence number"
+                    value={partner.licence.licence_number}
+                    needsRecheck={needsRecheck("licence_number")}
+                  />
                 </DetailCard>
 
-                <DetailCard title="Vehicle" icon={FileImage}>
-                  <Field label="Type" value={partner.vehicle.vehicle_type} />
-                  <Field label="Model" value={partner.vehicle.vehicle_model} />
-                  <Field label="Number" value={partner.vehicle.vehicle_number} />
-                  <Field label="Color" value={partner.vehicle.color} />
-                  <Field label="Insurance expiry" value={partner.vehicle.insurance_expiry_date} />
+                <DetailCard
+                  title="Vehicle"
+                  icon={FileImage}
+                  highlight={stepNeedsRecheck("vehicle")}
+                  sectionRef={(el) => {
+                    sectionRefs.current.vehicle = el;
+                  }}
+                >
+                  <Field
+                    label="Type"
+                    value={partner.vehicle.vehicle_type}
+                    needsRecheck={needsRecheck("vehicle_type")}
+                  />
+                  <Field
+                    label="Model"
+                    value={partner.vehicle.vehicle_model}
+                    needsRecheck={needsRecheck("vehicle_model")}
+                  />
+                  <Field
+                    label="Number"
+                    value={partner.vehicle.vehicle_number}
+                    needsRecheck={needsRecheck("vehicle_number")}
+                  />
+                  <Field
+                    label="Color"
+                    value={partner.vehicle.color}
+                    needsRecheck={needsRecheck("color")}
+                  />
+                  <Field
+                    label="Insurance expiry"
+                    value={partner.vehicle.insurance_expiry_date}
+                    needsRecheck={needsRecheck("insurance_expiry_date")}
+                  />
                 </DetailCard>
 
-                <DetailCard title="Bank" icon={Wallet}>
-                  <Field label="Account holder" value={partner.bank.account_holder_name} />
-                  <Field label="Account number" value={partner.bank.account_number} />
-                  <Field label="IFSC" value={partner.bank.ifsc_code} />
-                  <Field label="UPI ID" value={partner.bank.upi_id} />
+                <DetailCard
+                  title="Bank"
+                  icon={Wallet}
+                  highlight={stepNeedsRecheck("bank")}
+                  sectionRef={(el) => {
+                    sectionRefs.current.bank = el;
+                  }}
+                >
+                  <Field
+                    label="Account holder"
+                    value={partner.bank.account_holder_name}
+                    needsRecheck={needsRecheck("account_holder_name")}
+                  />
+                  <Field
+                    label="Account number"
+                    value={partner.bank.account_number}
+                    needsRecheck={needsRecheck("account_number")}
+                  />
+                  <Field
+                    label="IFSC"
+                    value={partner.bank.ifsc_code}
+                    needsRecheck={needsRecheck("ifsc_code")}
+                  />
+                  <Field
+                    label="UPI ID"
+                    value={partner.bank.upi_id}
+                    needsRecheck={needsRecheck("upi_id")}
+                  />
                 </DetailCard>
               </div>
 
@@ -391,28 +595,55 @@ function PartnerDetailPage() {
                 <div className="rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
                   <p className="mb-4 text-xs text-muted-foreground">
                     Open each image with Preview to check clarity before approving.
+                    {isResubmitReview
+                      ? " Highlighted documents were previously rejected — re-check those first."
+                      : ""}
                   </p>
 
                   <div className="space-y-5">
-                    {documentGroups.map(([group, docs]) => (
-                      <div key={group}>
-                        <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {group}
+                    {documentGroups.map(([group, docs]) => {
+                      const stepKey = DOC_GROUP_STEP[group] ?? group.toLowerCase();
+                      const groupHighlight = stepNeedsRecheck(stepKey);
+                      return (
+                        <div
+                          key={group}
+                          className="scroll-mt-28"
+                          ref={(el) => {
+                            if (stepKey === "identity") {
+                              sectionRefs.current.identity = el;
+                              sectionRefs.current.documents = el;
+                            }
+                          }}
+                        >
+                          <div
+                            className={cn(
+                              "mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+                              groupHighlight && "text-amber-800 dark:text-amber-300",
+                            )}
+                          >
+                            {group}
+                            {groupHighlight ? (
+                              <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-800 dark:text-amber-300">
+                                Needs re-check
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {docs.map((doc) => (
+                              <DocCard
+                                key={doc.key}
+                                label={doc.label}
+                                src={doc.src}
+                                needsRecheck={needsRecheck(doc.key)}
+                                onPreview={() => {
+                                  if (doc.src) setLightbox({ src: doc.src, label: doc.label });
+                                }}
+                              />
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {docs.map((doc) => (
-                            <DocCard
-                              key={doc.key}
-                              label={doc.label}
-                              src={doc.src}
-                              onPreview={() => {
-                                if (doc.src) setLightbox({ src: doc.src, label: doc.label });
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -575,27 +806,62 @@ function DetailCard({
   title,
   icon: Icon,
   children,
+  highlight = false,
+  sectionRef,
 }: {
   title: string;
   icon?: typeof MapPin;
   children: ReactNode;
+  highlight?: boolean;
+  sectionRef?: (el: HTMLElement | null) => void;
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-4 shadow-soft">
+    <section
+      ref={sectionRef}
+      className={cn(
+        "rounded-2xl border bg-card p-4 shadow-soft scroll-mt-28",
+        highlight && "border-amber-500/50 ring-1 ring-amber-500/30",
+      )}
+    >
       <div className="mb-3 flex items-center gap-2 border-b border-border/60 pb-2.5">
         {Icon ? <Icon className="h-3.5 w-3.5 text-muted-foreground" /> : null}
         <h4 className="text-sm font-semibold">{title}</h4>
+        {highlight ? (
+          <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+            Needs re-check
+          </span>
+        ) : null}
       </div>
       <div className="divide-y divide-border/50">{children}</div>
     </section>
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label,
+  value,
+  needsRecheck = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  needsRecheck?: boolean;
+}) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="max-w-[65%] break-all text-right font-medium text-foreground">
+    <div
+      className={cn(
+        "flex items-start justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0",
+        needsRecheck && "-mx-2 rounded-lg bg-amber-500/10 px-2",
+      )}
+    >
+      <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+        {label}
+        {needsRecheck ? (
+          <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+            Needs re-check
+          </span>
+        ) : null}
+      </span>
+      <span className="max-w-[55%] break-all text-right font-medium text-foreground">
         {display(value)}
       </span>
     </div>
@@ -606,16 +872,30 @@ function DocCard({
   label,
   src,
   onPreview,
+  needsRecheck = false,
 }: {
   label: string;
   src: string | null | undefined;
   onPreview: () => void;
+  needsRecheck?: boolean;
 }) {
   if (!src) {
     return (
-      <div className="flex flex-col justify-between rounded-xl border border-dashed bg-muted/20 p-3">
+      <div
+        className={cn(
+          "flex flex-col justify-between rounded-xl border border-dashed bg-muted/20 p-3",
+          needsRecheck && "border-amber-500/50 bg-amber-500/5",
+        )}
+      >
         <div>
-          <p className="text-sm font-medium">{label}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-sm font-medium">{label}</p>
+            {needsRecheck ? (
+              <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                Needs re-check
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">Not uploaded</p>
         </div>
         <Button size="sm" variant="outline" className="mt-3 h-8 rounded-lg text-xs" disabled>
@@ -626,9 +906,19 @@ function DocCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-background">
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border bg-background",
+        needsRecheck && "border-amber-500/60 ring-1 ring-amber-500/30",
+      )}
+    >
       <div className="relative aspect-[4/3] bg-muted/40">
         <img src={src} alt={label} className="h-full w-full object-cover" />
+        {needsRecheck ? (
+          <span className="absolute left-2 top-2 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+            Needs re-check
+          </span>
+        ) : null}
       </div>
       <div className="flex items-center justify-between gap-2 border-t px-3 py-2.5">
         <p className="truncate text-sm font-medium">{label}</p>

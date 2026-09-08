@@ -27,6 +27,11 @@ export interface LoginData {
   user: AuthUser;
 }
 
+/** GET /api/auth/me/ — staff shape is `{ user }`; other roles add extra flags. */
+export interface MeData {
+  user: AuthUser;
+}
+
 export interface DetailData {
   detail: string;
 }
@@ -154,6 +159,7 @@ export interface Customer {
   country_code: string;
   phone_number: string;
   tier: CustomerTier | string;
+  profile_picture_url: string | null;
   orders_count: number | null;
   ltv: number | null;
   last_order_date: string | null;
@@ -302,6 +308,10 @@ export interface PartnerDetail {
   bank: PartnerBank;
   rejected_fields?: PartnerRejectField[] | string[];
   rejected_steps?: string[];
+  /** Previous reject reason after partner resubmits (status back to pending). */
+  last_rejection_reason?: string | null;
+  last_rejected_fields?: PartnerRejectField[] | string[];
+  last_rejected_steps?: string[];
 }
 
 export type PartnerReviewPayload =
@@ -318,6 +328,9 @@ export interface PartnerReviewResult {
   rejection_reason?: string | null;
   rejected_fields?: PartnerRejectField[] | string[];
   rejected_steps?: string[];
+  last_rejection_reason?: string | null;
+  last_rejected_fields?: PartnerRejectField[] | string[];
+  last_rejected_steps?: string[];
   reviewed_at?: string | null;
 }
 

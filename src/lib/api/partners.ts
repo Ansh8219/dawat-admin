@@ -102,3 +102,26 @@ export function formatPartnerDate(value: string | null | undefined): string {
     minute: "2-digit",
   });
 }
+
+const REJECT_FIELD_LABELS = Object.fromEntries(
+  PARTNER_REJECT_FIELDS.map((f) => [f.value, f.label]),
+) as Record<string, string>;
+
+const REJECT_STEP_LABELS: Record<string, string> = {
+  profile: "Profile",
+  personal: "Personal",
+  identity: "Identity",
+  documents: "Documents",
+  address: "Address",
+  licence: "Licence",
+  vehicle: "Vehicle",
+  bank: "Bank",
+};
+
+export function partnerRejectFieldLabel(field: string): string {
+  return REJECT_FIELD_LABELS[field] ?? field.replace(/_/g, " ");
+}
+
+export function partnerRejectStepLabel(step: string): string {
+  return REJECT_STEP_LABELS[step] ?? step.charAt(0).toUpperCase() + step.slice(1);
+}

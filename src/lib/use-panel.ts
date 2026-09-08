@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useAuth } from "./auth";
 import { getPanelMeta, type Panel } from "./panel";
 import {
@@ -22,29 +23,37 @@ export function usePanelMeta() {
   const panel = usePanel();
   const business = useAuth((s) => s.business);
   const meta = getPanelMeta(panel);
-  if (business?.name) {
-    return { ...meta, label: business.name };
-  }
-  return meta;
+  return useMemo(() => {
+    if (business?.name) {
+      return { ...meta, label: business.name };
+    }
+    return meta;
+  }, [business?.name, meta]);
 }
 
 export function usePanelMenu() {
   const panel = usePanel();
-  if (panel === "banquet") return [];
-  return menuItems.filter((m) => m.branch === panel);
+  return useMemo(() => {
+    if (panel === "banquet") return [];
+    return menuItems.filter((m) => m.branch === panel);
+  }, [panel]);
 }
 
 export function usePanelOrders(): Order[] {
   const panel = usePanel();
-  if (panel === "banquet") return [];
-  return orders.filter((o) => o.branch === panel);
+  return useMemo(() => {
+    if (panel === "banquet") return [];
+    return orders.filter((o) => o.branch === panel);
+  }, [panel]);
 }
 
 export function usePanelInventory() {
   const panel = usePanel();
-  if (panel === "banquet") return [];
-  const label = panel === "bakery" ? "Bakery" : "Restaurant";
-  return inventory.filter((i) => i.cat === label);
+  return useMemo(() => {
+    if (panel === "banquet") return [];
+    const label = panel === "bakery" ? "Bakery" : "Restaurant";
+    return inventory.filter((i) => i.cat === label);
+  }, [panel]);
 }
 
 export function panelLabel(panel: Panel | Branch) {
