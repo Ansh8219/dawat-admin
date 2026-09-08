@@ -25,6 +25,7 @@ import { Route as AppNotificationsRouteImport } from './routes/_app.notification
 import { Route as AppMenuRouteImport } from './routes/_app.menu'
 import { Route as AppMarketingRouteImport } from './routes/_app.marketing'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
+import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
@@ -109,6 +110,11 @@ const AppInventoryRoute = AppInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHomeServicesRoute = AppHomeServicesRouteImport.update({
+  id: '/home-services',
+  path: '/home-services',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFinanceRoute = AppFinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/bookings': typeof AppBookingsRoute
   '/customers': typeof AppCustomersRoute
   '/finance': typeof AppFinanceRoute
+  '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/bookings': typeof AppBookingsRoute
   '/customers': typeof AppCustomersRoute
   '/finance': typeof AppFinanceRoute
+  '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/_app/bookings': typeof AppBookingsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/finance': typeof AppFinanceRoute
+  '/_app/home-services': typeof AppHomeServicesRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/marketing': typeof AppMarketingRoute
   '/_app/menu': typeof AppMenuRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/finance'
+    | '/home-services'
     | '/inventory'
     | '/marketing'
     | '/menu'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/finance'
+    | '/home-services'
     | '/inventory'
     | '/marketing'
     | '/menu'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/_app/bookings'
     | '/_app/customers'
     | '/_app/finance'
+    | '/_app/home-services'
     | '/_app/inventory'
     | '/_app/marketing'
     | '/_app/menu'
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/home-services': {
+      id: '/_app/home-services'
+      path: '/home-services'
+      fullPath: '/home-services'
+      preLoaderRoute: typeof AppHomeServicesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/finance': {
       id: '/_app/finance'
       path: '/finance'
@@ -419,6 +438,7 @@ interface AppRouteChildren {
   AppBookingsRoute: typeof AppBookingsRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppFinanceRoute: typeof AppFinanceRoute
+  AppHomeServicesRoute: typeof AppHomeServicesRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppMarketingRoute: typeof AppMarketingRoute
   AppMenuRoute: typeof AppMenuRoute
@@ -437,6 +457,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBookingsRoute: AppBookingsRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppFinanceRoute: AppFinanceRoute,
+  AppHomeServicesRoute: AppHomeServicesRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppMarketingRoute: AppMarketingRoute,
   AppMenuRoute: AppMenuRoute,

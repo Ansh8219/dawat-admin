@@ -334,6 +334,43 @@ export interface PartnerReviewResult {
   reviewed_at?: string | null;
 }
 
+/** Home Services tiles on the customer app (admin CRUD). */
+export interface HomeService {
+  public_id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  image: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface HomeServiceListParams {
+  is_active?: boolean;
+}
+
+export interface HomeServiceListData {
+  count: number;
+  results: HomeService[];
+}
+
+export interface CreateHomeServiceFields {
+  key: string;
+  name: string;
+  description?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export type UpdateHomeServiceFields = Partial<{
+  key: string;
+  name: string;
+  /** Pass empty string to clear. */
+  description: string;
+  sort_order: number;
+  is_active: boolean;
+}>;
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;

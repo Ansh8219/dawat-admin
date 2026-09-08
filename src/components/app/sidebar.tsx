@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingBag, Calculator, UtensilsCrossed, Boxes,
   CalendarDays, Users, Megaphone, Bike, UserCog, Wallet, BarChart3, Bell, Settings,
-  ChevronsLeft, ChevronsRight,
+  ChevronsLeft, ChevronsRight, LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -27,6 +27,7 @@ const nav = [
     { to: "/partners",     label: "Partners",      icon: Bike },
   ]},
   { section: "Admin", items: [
+    { to: "/home-services", label: "Home Services", icon: LayoutGrid },
     { to: "/staff",        label: "Staff & Roles", icon: UserCog },
     { to: "/finance",      label: "Finance",       icon: Wallet },
     { to: "/reports",      label: "Reports",       icon: BarChart3 },

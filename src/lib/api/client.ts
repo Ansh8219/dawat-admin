@@ -1,10 +1,10 @@
 import { ApiError, type ApiEnvelope } from "./types";
 
-const DEFAULT_BASE = "https://api-dawat.northvaultstudios.com";
+const DEFAULT_BASE = "http://localhost:8000";
 
 export function getApiBaseUrl(): string {
-  const fromEnv = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  return (fromEnv?.replace(/\/$/, "") || DEFAULT_BASE).replace(/\/$/, "");
+  const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim();
+  return (fromEnv || DEFAULT_BASE).replace(/\/$/, "");
 }
 
 type RequestOptions = {
@@ -87,6 +87,10 @@ function humanizeErrorCode(code: string): string {
       return "Partner not found.";
     case "partner_not_pending":
       return "Only pending partners can be reviewed.";
+    case "home_service_key_taken":
+      return "That service key is already in use.";
+    case "home_service_not_found":
+      return "Home service not found.";
     default:
       return "Something went wrong. Please try again.";
   }
