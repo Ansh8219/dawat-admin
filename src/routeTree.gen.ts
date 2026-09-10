@@ -22,6 +22,7 @@ import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPartnersRouteImport } from './routes/_app.partners'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
+import { Route as AppMenuCategoriesRouteImport } from './routes/_app.menu-categories'
 import { Route as AppMenuRouteImport } from './routes/_app.menu'
 import { Route as AppMarketingRouteImport } from './routes/_app.marketing'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
@@ -95,6 +96,11 @@ const AppNotificationsRoute = AppNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMenuCategoriesRoute = AppMenuCategoriesRouteImport.update({
+  id: '/menu-categories',
+  path: '/menu-categories',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMenuRoute = AppMenuRouteImport.update({
   id: '/menu',
   path: '/menu',
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof AppInventoryRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
+  '/menu-categories': typeof AppMenuCategoriesRoute
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
   '/partners': typeof AppPartnersRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/inventory': typeof AppInventoryRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
+  '/menu-categories': typeof AppMenuCategoriesRoute
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
   '/partners': typeof AppPartnersRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/marketing': typeof AppMarketingRoute
   '/_app/menu': typeof AppMenuRoute
+  '/_app/menu-categories': typeof AppMenuCategoriesRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/partners': typeof AppPartnersRoute
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/marketing'
     | '/menu'
+    | '/menu-categories'
     | '/notifications'
     | '/orders'
     | '/partners'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/marketing'
     | '/menu'
+    | '/menu-categories'
     | '/notifications'
     | '/orders'
     | '/partners'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/_app/inventory'
     | '/_app/marketing'
     | '/_app/menu'
+    | '/_app/menu-categories'
     | '/_app/notifications'
     | '/_app/orders'
     | '/_app/partners'
@@ -375,6 +387,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNotificationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/menu-categories': {
+      id: '/_app/menu-categories'
+      path: '/menu-categories'
+      fullPath: '/menu-categories'
+      preLoaderRoute: typeof AppMenuCategoriesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/menu': {
       id: '/_app/menu'
       path: '/menu'
@@ -442,6 +461,7 @@ interface AppRouteChildren {
   AppInventoryRoute: typeof AppInventoryRoute
   AppMarketingRoute: typeof AppMarketingRoute
   AppMenuRoute: typeof AppMenuRoute
+  AppMenuCategoriesRoute: typeof AppMenuCategoriesRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPartnersRoute: typeof AppPartnersRoute
@@ -461,6 +481,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInventoryRoute: AppInventoryRoute,
   AppMarketingRoute: AppMarketingRoute,
   AppMenuRoute: AppMenuRoute,
+  AppMenuCategoriesRoute: AppMenuCategoriesRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPartnersRoute: AppPartnersRoute,

@@ -79,6 +79,10 @@ function humanizeErrorCode(code: string): string {
       return "Menu management is not available for this business type.";
     case "menu_item_not_found":
       return "Menu item not found.";
+    case "menu_category_not_found":
+      return "Menu category not found.";
+    case "menu_category_in_use":
+      return "This category still has menu items. Move or delete those items first.";
     case "invalid_payload":
       return "Invalid request data. Please check your input and try again.";
     case "customer_not_found":
@@ -146,10 +150,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return parseEnvelope<T>(response);
 }
 
-export async function apiFormRequest<T>(
-  path: string,
-  options: FormRequestOptions,
-): Promise<T> {
+export async function apiFormRequest<T>(path: string, options: FormRequestOptions): Promise<T> {
   const { method = "POST", body, accessToken, signal } = options;
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 

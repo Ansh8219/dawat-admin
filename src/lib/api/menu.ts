@@ -35,6 +35,7 @@ export function menuItemToSummary(item: MenuItemDetail): MenuItemSummary {
     public_id: item.public_id,
     name: item.name,
     category: item.category,
+    category_public_id: item.category_public_id,
     dietary: item.dietary,
     price: item.price,
     unit: item.unit,
@@ -62,11 +63,7 @@ export function listMenuItems(accessToken: string, businessPublicId: string) {
   });
 }
 
-export function getMenuItem(
-  accessToken: string,
-  publicId: string,
-  businessPublicId?: string,
-) {
+export function getMenuItem(accessToken: string, publicId: string, businessPublicId?: string) {
   return apiRequest<MenuItemDetail>(
     `/api/admin/menu-items/${publicId}/${scopedQuery(businessPublicId)}`,
     {
@@ -98,22 +95,24 @@ export function updateMenuItem(
   publicId: string,
   payload: UpdateMenuItemPayload,
   businessPublicId?: string,
+  images: File[] = [],
 ) {
-  return apiRequest<MenuItemDetail>(
+  const form = new FormData();
+  form.append("payload", JSON.stringify(payload));
+  for (const file of images) {
+    form.append("images", file);
+  }
+  return apiFormRequest<MenuItemDetail>(
     `/api/admin/menu-items/${publicId}/${scopedQuery(businessPublicId)}`,
     {
       method: "PATCH",
       accessToken,
-      body: payload,
+      body: form,
     },
   );
 }
 
-export function deleteMenuItem(
-  accessToken: string,
-  publicId: string,
-  businessPublicId?: string,
-) {
+export function deleteMenuItem(accessToken: string, publicId: string, businessPublicId?: string) {
   return apiRequest<{ detail: string }>(
     `/api/admin/menu-items/${publicId}/${scopedQuery(businessPublicId)}`,
     {

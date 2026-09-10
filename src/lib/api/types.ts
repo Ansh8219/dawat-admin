@@ -77,11 +77,57 @@ export interface MenuItemImage {
   sort_order?: number;
 }
 
+/** Admin menu category entity from /api/admin/menu-categories/. */
+export interface MenuCategory {
+  public_id: string;
+  name: string;
+  menu_type: string;
+  image: string | null;
+  sort_order: number;
+  is_active: boolean;
+  item_count: number;
+}
+
+export interface MenuCategoryOption {
+  public_id: string;
+  name: string;
+  sort_order: number;
+}
+
+export interface MenuCategoryListParams {
+  business_public_id: string;
+  is_active?: boolean;
+}
+
+export interface MenuCategoryListData {
+  count: number;
+  results: MenuCategory[];
+}
+
+export interface MenuCategoryOptionsData {
+  count: number;
+  results: MenuCategoryOption[];
+}
+
+export interface CreateMenuCategoryFields {
+  business_public_id: string;
+  name: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export type UpdateMenuCategoryFields = Partial<{
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+}>;
+
 /** Summary shape from GET /api/admin/menu-items/ (list). */
 export interface MenuItemSummary {
   public_id: string;
   name: string;
   category: string;
+  category_public_id?: string;
   dietary: MenuDietary;
   price: number | string;
   unit: MenuUnit;
@@ -99,6 +145,7 @@ export interface MenuItemDetail {
   menu_type: string;
   business_public_id?: string;
   category: string;
+  category_public_id?: string;
   name: string;
   description: string | null;
   price: number | string;
@@ -123,7 +170,7 @@ export type MenuItem = MenuItemDetail;
 export interface CreateMenuItemPayload {
   business_public_id: string;
   name: string;
-  category: string;
+  category_public_id: string;
   price: number;
   unit: MenuUnit;
   dietary: MenuDietary;
@@ -138,10 +185,11 @@ export interface CreateMenuItemPayload {
   addon_groups?: MenuAddonGroup[];
 }
 
-/** Partial fields for PATCH /api/admin/menu-items/{public_id}/ */
-export type UpdateMenuItemPayload = Partial<
-  Omit<CreateMenuItemPayload, "business_public_id">
->;
+/** Partial fields for PATCH /api/admin/menu-items/{public_id}/ (multipart payload JSON). */
+export type UpdateMenuItemPayload = Partial<Omit<CreateMenuItemPayload, "business_public_id">> & {
+  /** Image public_ids from detail.images[].public_id to remove on update. */
+  remove_image_public_ids?: string[];
+};
 
 export type CustomerTier = "silver" | "gold" | "platinum";
 export type CustomerSort = "name_asc" | "name_desc" | "orders_desc" | "orders_asc";

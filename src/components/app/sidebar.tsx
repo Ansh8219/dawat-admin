@@ -1,8 +1,23 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, ShoppingBag, Calculator, UtensilsCrossed, Boxes,
-  CalendarDays, Users, Megaphone, Bike, UserCog, Wallet, BarChart3, Bell, Settings,
-  ChevronsLeft, ChevronsRight, LayoutGrid,
+  LayoutDashboard,
+  ShoppingBag,
+  Calculator,
+  UtensilsCrossed,
+  Boxes,
+  CalendarDays,
+  Users,
+  Megaphone,
+  Bike,
+  UserCog,
+  Wallet,
+  BarChart3,
+  Bell,
+  Settings,
+  ChevronsLeft,
+  ChevronsRight,
+  LayoutGrid,
+  Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -11,29 +26,37 @@ import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { isRouteAllowed } from "@/lib/panel";
 
 const nav = [
-  { section: "Overview", items: [
-    { to: "/",             label: "Dashboard",     icon: LayoutDashboard },
-  ]},
-  { section: "Operations", items: [
-    { to: "/orders",       label: "Orders",        icon: ShoppingBag },
-    { to: "/pos",          label: "POS / Billing", icon: Calculator },
-    { to: "/menu",         label: "Menu & Products", icon: UtensilsCrossed },
-    { to: "/inventory",    label: "Inventory",     icon: Boxes },
-    { to: "/bookings",     label: "Tables & Bookings", icon: CalendarDays },
-  ]},
-  { section: "Growth", items: [
-    { to: "/customers",    label: "Customers",     icon: Users },
-    { to: "/marketing",    label: "Marketing",     icon: Megaphone },
-    { to: "/partners",     label: "Partners",      icon: Bike },
-  ]},
-  { section: "Admin", items: [
-    { to: "/home-services", label: "Home Services", icon: LayoutGrid },
-    { to: "/staff",        label: "Staff & Roles", icon: UserCog },
-    { to: "/finance",      label: "Finance",       icon: Wallet },
-    { to: "/reports",      label: "Reports",       icon: BarChart3 },
-    { to: "/notifications",label: "Notifications", icon: Bell },
-    { to: "/settings",     label: "Settings",      icon: Settings },
-  ]},
+  { section: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    section: "Operations",
+    items: [
+      { to: "/orders", label: "Orders", icon: ShoppingBag },
+      { to: "/pos", label: "POS / Billing", icon: Calculator },
+      { to: "/menu", label: "Menu & Products", icon: UtensilsCrossed },
+      { to: "/menu-categories", label: "Menu Categories", icon: Tags },
+      { to: "/inventory", label: "Inventory", icon: Boxes },
+      { to: "/bookings", label: "Tables & Bookings", icon: CalendarDays },
+    ],
+  },
+  {
+    section: "Growth",
+    items: [
+      { to: "/customers", label: "Customers", icon: Users },
+      { to: "/marketing", label: "Marketing", icon: Megaphone },
+      { to: "/partners", label: "Partners", icon: Bike },
+    ],
+  },
+  {
+    section: "Admin",
+    items: [
+      { to: "/home-services", label: "Home Services", icon: LayoutGrid },
+      { to: "/staff", label: "Staff & Roles", icon: UserCog },
+      { to: "/finance", label: "Finance", icon: Wallet },
+      { to: "/reports", label: "Reports", icon: BarChart3 },
+      { to: "/notifications", label: "Notifications", icon: Bell },
+      { to: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ] as const;
 
 const bookingLabels: Record<string, string> = {
@@ -48,7 +71,13 @@ const menuLabels: Record<string, string> = {
   banquet: "Packages",
 };
 
-export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
+export function AppSidebar({
+  mobile = false,
+  onNavigate,
+}: {
+  mobile?: boolean;
+  onNavigate?: () => void;
+}) {
   const collapsed = useApp((s) => s.sidebarCollapsed) && !mobile;
   const toggle = useApp((s) => s.toggleSidebar);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
@@ -73,11 +102,18 @@ export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; o
     .filter((group) => group.items.length > 0);
 
   return (
-    <aside className={cn(
-      "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
-      collapsed ? "w-[72px]" : "w-64",
-    )}>
-      <div className={cn("flex flex-col items-center border-b border-sidebar-border px-3 py-4", collapsed && "px-2")}>
+    <aside
+      className={cn(
+        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
+        collapsed ? "w-[72px]" : "w-64",
+      )}
+    >
+      <div
+        className={cn(
+          "flex flex-col items-center border-b border-sidebar-border px-3 py-4",
+          collapsed && "px-2",
+        )}
+      >
         <img
           src={LOGO_SRC}
           alt="Daawat Baker's — A Designer Bakery Studio"
@@ -88,9 +124,13 @@ export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; o
         />
         {!collapsed && (
           <div className="mt-2 w-full rounded-xl bg-primary/10 px-2.5 py-1.5 text-center">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active panel</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Active panel
+            </div>
             <div className="text-sm font-bold text-primary">{meta.label}</div>
-            <div className="truncate font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
+            <div className="truncate font-mono text-[9px] text-muted-foreground">
+              GST · {meta.gst}
+            </div>
           </div>
         )}
       </div>
@@ -105,7 +145,10 @@ export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; o
             )}
             <ul className="space-y-1">
               {group.items.map((item) => {
-                const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                const active =
+                  item.to === "/"
+                    ? pathname === "/"
+                    : pathname === item.to || pathname.startsWith(`${item.to}/`);
                 const Icon = item.icon;
                 return (
                   <li key={item.to}>
@@ -136,7 +179,13 @@ export function AppSidebar({ mobile = false, onNavigate }: { mobile?: boolean; o
           onClick={toggle}
           className="m-3 flex items-center justify-center gap-2 rounded-xl border border-sidebar-border py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
-          {collapsed ? <ChevronsRight className="h-4 w-4" /> : <><ChevronsLeft className="h-4 w-4" /> Collapse</>}
+          {collapsed ? (
+            <ChevronsRight className="h-4 w-4" />
+          ) : (
+            <>
+              <ChevronsLeft className="h-4 w-4" /> Collapse
+            </>
+          )}
         </button>
       )}
     </aside>
