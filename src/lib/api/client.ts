@@ -1,10 +1,11 @@
 import { ApiError, type ApiEnvelope } from "./types";
 
-const DEFAULT_BASE = "http://localhost:8000";
-
 export function getApiBaseUrl(): string {
   const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim();
-  return (fromEnv || DEFAULT_BASE).replace(/\/$/, "");
+  if (!fromEnv) {
+    throw new Error("VITE_API_BASE_URL is not set. Add it to .env.");
+  }
+  return fromEnv.replace(/\/$/, "");
 }
 
 type RequestOptions = {
