@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import type {
   PartnerDetail,
+  PartnerDocuments,
   PartnerListData,
   PartnerListParams,
   PartnerRejectField,
@@ -52,11 +53,62 @@ export function listPartners(accessToken: string, params: PartnerListParams = {}
   });
 }
 
+const EMPTY_DOCUMENTS: PartnerDocuments = {
+  aadhaar_front_url: null,
+  aadhaar_back_url: null,
+  licence_front_url: null,
+  licence_back_url: null,
+  rc_front_url: null,
+  rc_back_url: null,
+  insurance_image_url: null,
+};
+
+/** API sections are often null on incomplete applications. Fill them so the UI can read fields safely. */
+export function normalizePartner(partner: PartnerDetail): PartnerDetail {
+  return {
+    ...partner,
+    user: partner.user ?? {
+      country_code: "",
+      phone_number: "",
+      email: "",
+      role: "",
+    },
+    profile: partner.profile ?? {
+      full_name: "",
+      date_of_birth: null,
+      gender: null,
+      profile_picture_url: null,
+    },
+    documents: partner.documents ?? EMPTY_DOCUMENTS,
+    address: partner.address ?? {
+      house_flat: null,
+      street: null,
+      city: null,
+      state: null,
+      pincode: null,
+    },
+    licence: partner.licence ?? { licence_number: null },
+    vehicle: partner.vehicle ?? {
+      vehicle_type: null,
+      vehicle_model: null,
+      vehicle_number: null,
+      color: null,
+      insurance_expiry_date: null,
+    },
+    bank: partner.bank ?? {
+      account_holder_name: null,
+      account_number: null,
+      ifsc_code: null,
+      upi_id: null,
+    },
+  };
+}
+
 export function getPartner(accessToken: string, publicId: string) {
   return apiRequest<PartnerDetail>(`/api/admin/partners/${publicId}/`, {
     method: "GET",
     accessToken,
-  });
+  }).then(normalizePartner);
 }
 
 export function reviewPartner(

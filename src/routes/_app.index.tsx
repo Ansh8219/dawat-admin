@@ -1,8 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { inr, banquetEvents, type Order, type OrderStatus } from "@/lib/mock/data";
+import { acceptAdminOrder, listAdminOrders, orderCustomerName, orderItemCount, orderStatusLabel, paymentLabel, rejectAdminOrder } from "@/lib/api/orders";
+import { ApiError, type AdminOrder } from "@/lib/api/types";
+import { withAuthRetry } from "@/lib/api/with-auth";
+import { useAuth } from "@/lib/auth";
+import { inr, banquetEvents } from "@/lib/mock/data";
 import { usePanel, usePanelInventory, usePanelMenu, usePanelMeta, usePanelOrders } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
 import {
@@ -28,33 +32,27 @@ export const Route = createFileRoute("/_app/")({
   head: () => ({ meta: [{ title: "Dashboard — Daawat Baker's" }] }),
 });
 
-type Stage = "new" | "preparing" | "ready" | "done";
-
 const stageMeta: {
-  id: Stage;
+  id: "new" | "preparing" | "ready";
   label: string;
-  statuses: OrderStatus[];
   icon: typeof Bell;
   tone: string;
 }[] = [
   {
     id: "new",
     label: "New Orders",
-    statuses: ["Pending"],
     icon: Bell,
     tone: "border-primary/40 bg-primary/5 text-primary",
   },
   {
     id: "preparing",
     label: "Preparing",
-    statuses: ["Preparing"],
     icon: ChefHat,
     tone: "border-info/30 bg-info/5 text-info",
   },
   {
     id: "ready",
     label: "Food Ready",
-    statuses: ["Ready", "Out for Delivery"],
     icon: CheckCircle2,
     tone: "border-success/30 bg-success/5 text-success",
   },
@@ -68,49 +66,62 @@ function Dashboard() {
   const panelMenu = usePanelMenu();
   const panelInventory = usePanelInventory();
   const [outletOnline, setOutletOnline] = useState(true);
-  const [orders, setOrders] = useState<Order[]>(panelOrders);
+  const [counts, setCounts] = useState({ new: 0, preparing: 0, ready: 0, done: 0 });
+  const [newOrders, setNewOrders] = useState<AdminOrder[]>([]);
+  const [liveOrders, setLiveOrders] = useState<AdminOrder[]>([]);
 
-  useEffect(() => {
-    setOrders(panelOrders);
-  }, [panelOrders]);
-
-  const counts = useMemo(() => {
-    const map = { new: 0, preparing: 0, ready: 0, done: 0 };
-    for (const o of orders) {
-      if (o.status === "Pending") map.new += 1;
-      else if (o.status === "Preparing") map.preparing += 1;
-      else if (o.status === "Ready" || o.status === "Out for Delivery") map.ready += 1;
-      else map.done += 1;
-    }
-    return map;
-  }, [orders]);
-
-  const newOrders = useMemo(
-    () => orders.filter((o) => o.status === "Pending").slice(0, 4),
-    [orders],
-  );
-  const liveOrders = useMemo(
-    () =>
-      orders
-        .filter((o) => o.status === "Preparing" || o.status === "Ready" || o.status === "Out for Delivery")
-        .slice(0, 5),
-    [orders],
-  );
-
-  const todayRevenue = orders
+  const todayRevenue = panelOrders
     .filter((o) => o.status !== "Cancelled")
     .reduce((s, o) => s + o.amount, 0);
-  const avgOrder = orders.length ? Math.round(todayRevenue / Math.max(orders.length, 1)) : 0;
+  const avgOrder = panelOrders.length ? Math.round(todayRevenue / Math.max(panelOrders.length, 1)) : 0;
   const lowStock = panelInventory.filter((i) => i.current <= i.reorder);
 
-  function acceptOrder(order: Order) {
-    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: "Preparing" } : o)));
-    toast.success(`${order.id} accepted`);
+  const loadLiveOrders = useCallback(async () => {
+    try {
+      const [fresh, preparing, ready, past] = await Promise.all([
+        withAuthRetry((token) => listAdminOrders(token, { tab: "new", page: 1, page_size: 4 })),
+        withAuthRetry((token) => listAdminOrders(token, { tab: "preparing", page: 1, page_size: 5 })),
+        withAuthRetry((token) => listAdminOrders(token, { tab: "ready", page: 1, page_size: 5 })),
+        withAuthRetry((token) => listAdminOrders(token, { tab: "past", page: 1, page_size: 1 })),
+      ]);
+      setCounts({
+        new: fresh.count ?? 0,
+        preparing: preparing.count ?? 0,
+        ready: ready.count ?? 0,
+        done: past.count ?? 0,
+      });
+      setNewOrders(fresh.results);
+      setLiveOrders([...preparing.results, ...ready.results].slice(0, 5));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        useAuth.getState().logout();
+        void navigate({ to: "/login" });
+      }
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    void loadLiveOrders();
+  }, [loadLiveOrders]);
+
+  async function acceptOrder(order: AdminOrder) {
+    try {
+      await withAuthRetry((token) => acceptAdminOrder(token, order.public_id, 20));
+      toast.success(`${order.public_id.slice(0, 8)} accepted · prep 20 min`);
+      await loadLiveOrders();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to accept order");
+    }
   }
 
-  function rejectOrder(order: Order) {
-    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: "Cancelled" } : o)));
-    toast.message(`${order.id} rejected`);
+  async function rejectOrder(order: AdminOrder) {
+    try {
+      await withAuthRetry((token) => rejectAdminOrder(token, order.public_id));
+      toast.success(`${order.public_id.slice(0, 8)} rejected`);
+      await loadLiveOrders();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to reject order");
+    }
   }
 
   if (panel === "banquet") {
@@ -199,7 +210,7 @@ function Dashboard() {
           />
           <Kpi
             label="Orders Today"
-            value={String(orders.length)}
+            value={String(counts.new + counts.preparing + counts.ready + counts.done)}
             icon={ShoppingBag}
             hint={`${counts.done} completed`}
           />
@@ -244,45 +255,45 @@ function Dashboard() {
               <div className="space-y-3">
                 {newOrders.map((order) => (
                   <article
-                    key={order.id}
+                    key={order.public_id}
                     className="overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-soft ring-1 ring-primary/10"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3 p-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                            {order.channel}
+                            {order.address?.address_type || "Delivery"}
                           </span>
-                          <span className="text-sm font-bold">{order.id}</span>
+                          <span className="text-sm font-bold">{order.public_id.slice(0, 8)}</span>
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
                             <Timer className="h-3 w-3" /> just now
                           </span>
                         </div>
-                        <div className="mt-1 text-sm font-semibold">{order.customer}</div>
+                        <div className="mt-1 text-sm font-semibold">{orderCustomerName(order)}</div>
                         <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
-                          {order.items.map((it, i) => (
-                            <li key={i}>
-                              <span className="font-semibold text-foreground">{it.qty}×</span> {it.name}
+                          {(order.items ?? []).map((it) => (
+                            <li key={it.public_id}>
+                              <span className="font-semibold text-foreground">{it.quantity}×</span> {it.name || "Item"}
                             </li>
                           ))}
                         </ul>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold">{inr(order.amount)}</div>
-                        <div className="text-[11px] text-muted-foreground">{order.pay} · {order.time}</div>
+                        <div className="text-lg font-bold">{inr(order.subtotal)}</div>
+                        <div className="text-[11px] text-muted-foreground">{paymentLabel(order.payment_method)}</div>
                       </div>
                     </div>
                     <div className="flex border-t">
                       <button
                         type="button"
-                        onClick={() => rejectOrder(order)}
+                        onClick={() => void rejectOrder(order)}
                         className="flex-1 bg-muted/40 py-3 text-sm font-semibold text-destructive hover:bg-destructive/10"
                       >
                         Reject
                       </button>
                       <button
                         type="button"
-                        onClick={() => acceptOrder(order)}
+                        onClick={() => void acceptOrder(order)}
                         className="flex-[1.4] bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90"
                       >
                         Accept
@@ -309,7 +320,7 @@ function Dashboard() {
                 <div className="space-y-2">
                   {liveOrders.map((o) => (
                     <button
-                      key={o.id}
+                      key={o.public_id}
                       type="button"
                       onClick={() => void navigate({ to: "/orders" })}
                       className="flex w-full items-center gap-3 rounded-xl border border-border/70 p-3 text-left hover:bg-muted/40"
@@ -317,20 +328,20 @@ function Dashboard() {
                       <div
                         className={cn(
                           "grid h-9 w-9 place-items-center rounded-lg",
-                          o.status === "Preparing" ? "bg-info/10 text-info" : "bg-success/10 text-success",
+                          o.status === "preparing" ? "bg-info/10 text-info" : "bg-success/10 text-success",
                         )}
                       >
-                        {o.status === "Preparing" ? <ChefHat className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
+                        {o.status === "preparing" ? <ChefHat className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold">{o.id}</div>
+                        <div className="truncate text-sm font-semibold">{o.public_id.slice(0, 8)}</div>
                         <div className="truncate text-xs text-muted-foreground">
-                          {o.customer} · {o.items.length} items
+                          {orderCustomerName(o)} · {orderItemCount(o)} items
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs font-semibold">{o.status}</div>
-                        <div className="text-[11px] text-muted-foreground">{inr(o.amount)}</div>
+                        <div className="text-xs font-semibold">{orderStatusLabel(o.status)}</div>
+                        <div className="text-[11px] text-muted-foreground">{inr(o.subtotal)}</div>
                       </div>
                     </button>
                   ))}

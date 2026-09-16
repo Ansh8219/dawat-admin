@@ -43,7 +43,8 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
   { id: "all", label: "All" },
 ];
 
-function initials(name: string): string {
+function initials(name: string | null | undefined): string {
+  if (!name?.trim()) return "?";
   return name
     .split(/\s+/)
     .filter(Boolean)

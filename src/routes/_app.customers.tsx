@@ -79,8 +79,15 @@ const EMPTY_SUMMARY: CustomerSummary = {
   platinum_customers: 0,
 };
 
-function initials(name: string): string {
-  return name
+function displayName(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  return trimmed || "Unnamed";
+}
+
+function initials(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return "?";
+  return trimmed
     .split(/\s+/)
     .filter(Boolean)
     .map((s) => s[0])
@@ -212,8 +219,8 @@ function CustomersPage() {
       );
       toast.success(
         next
-          ? `${customer.full_name} activated`
-          : `${customer.full_name} deactivated — cannot log in`,
+          ? `${displayName(customer.full_name)} activated`
+          : `${displayName(customer.full_name)} deactivated — cannot log in`,
       );
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -228,7 +235,7 @@ function CustomersPage() {
     setDeleting(true);
     try {
       await withAuthRetry((token) => deleteCustomer(token, deleteTarget.public_id));
-      toast.success(`${deleteTarget.full_name} deleted`);
+      toast.success(`${displayName(deleteTarget.full_name)} deleted`);
       if (sel?.public_id === deleteTarget.public_id) setSel(null);
       setDeleteTarget(null);
       await refresh({ showLoading: false });
@@ -391,16 +398,16 @@ function CustomersPage() {
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   {c.profile_picture_url ? (
-                                    <AvatarImage src={c.profile_picture_url} alt={c.full_name} />
+                                    <AvatarImage src={c.profile_picture_url} alt={displayName(c.full_name)} />
                                   ) : null}
                                   <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                     {initials(c.full_name)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">{c.full_name}</div>
+                                  <div className="font-medium">{displayName(c.full_name)}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {c.public_id.slice(0, 8)}…
+                                    {c.public_id ? `${c.public_id.slice(0, 8)}…` : "—"}
                                   </div>
                                 </div>
                               </div>
@@ -544,13 +551,13 @@ function CustomersPage() {
           {sel && (
             <>
               <SheetHeader>
-                <SheetTitle>{sel.full_name}</SheetTitle>
+                <SheetTitle>{displayName(sel.full_name)}</SheetTitle>
               </SheetHeader>
               <div className="mt-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-14 w-14">
                     {sel.profile_picture_url ? (
-                      <AvatarImage src={sel.profile_picture_url} alt={sel.full_name} />
+                      <AvatarImage src={sel.profile_picture_url} alt={displayName(sel.full_name)} />
                     ) : null}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       {initials(sel.full_name)}
@@ -621,7 +628,7 @@ function CustomersPage() {
             <AlertDialogTitle>Delete customer?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `"${deleteTarget.full_name}" and their profile will be permanently deleted. This cannot be undone.`
+                ? `"${displayName(deleteTarget.full_name)}" and their profile will be permanently deleted. This cannot be undone.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>

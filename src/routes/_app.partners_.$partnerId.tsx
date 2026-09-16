@@ -28,6 +28,7 @@ import {
   formatPartnerDate,
   formatPartnerPhone,
   getPartner,
+  normalizePartner,
   PARTNER_REJECT_FIELDS,
   partnerRejectFieldLabel,
   partnerRejectStepLabel,
@@ -67,7 +68,8 @@ type DocItem = {
   src: string | null | undefined;
 };
 
-function initials(name: string): string {
+function initials(name: string | null | undefined): string {
+  if (!name?.trim()) return "?";
   return name
     .split(/\s+/)
     .filter(Boolean)
@@ -82,7 +84,8 @@ function display(value: string | null | undefined): string {
   return v ? v : "—";
 }
 
-function buildDocuments(docs: PartnerDocuments): DocItem[] {
+function buildDocuments(docs: PartnerDocuments | null | undefined): DocItem[] {
+  if (!docs) return [];
   return [
     { key: "aadhaar_front", label: "Aadhaar front", group: "Identity", src: docs.aadhaar_front_url },
     { key: "aadhaar_back", label: "Aadhaar back", group: "Identity", src: docs.aadhaar_back_url },
@@ -135,7 +138,7 @@ function PartnerDetailPage() {
     setLoadError("");
     try {
       const data = await withAuthRetry((token) => getPartner(token, partnerId));
-      setPartner(data);
+      setPartner(normalizePartner(data));
     } catch (err) {
       if (handleAuthError(err)) return;
       setLoadError(err instanceof ApiError ? err.message : "Unable to load partner.");
@@ -230,7 +233,7 @@ function PartnerDetailPage() {
       await withAuthRetry((token) =>
         reviewPartner(token, partner.public_id, { action: "approve" }),
       );
-      toast.success(`${partner.profile.full_name || "Partner"} approved`);
+      toast.success(`${partner.profile?.full_name || "Partner"} approved`);
       setApproveOpen(false);
       void navigate({ to: "/partners" });
     } catch (err) {
@@ -261,7 +264,7 @@ function PartnerDetailPage() {
           rejected_fields: rejectedFields,
         }),
       );
-      toast.success(`${partner.profile.full_name || "Partner"} rejected`);
+      toast.success(`${partner.profile?.full_name || "Partner"} rejected`);
       setRejectOpen(false);
       void navigate({ to: "/partners" });
     } catch (err) {
@@ -315,25 +318,25 @@ function PartnerDetailPage() {
                         "ring-2 ring-amber-500 ring-offset-2 ring-offset-card",
                     )}
                   >
-                    {partner.profile.profile_picture_url ? (
+                    {partner.profile?.profile_picture_url ? (
                       <AvatarImage
                         src={partner.profile.profile_picture_url}
                         alt={partner.profile.full_name}
                       />
                     ) : null}
                     <AvatarFallback className="bg-primary/10 text-sm text-primary">
-                      {initials(partner.profile.full_name || "?")}
+                      {initials(partner.profile?.full_name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="truncate text-lg font-bold tracking-tight">
-                        {display(partner.profile.full_name)}
+                        {display(partner.profile?.full_name)}
                       </h2>
                       <StatusBadge status={partnerStatusLabel(partner.partner_status)} />
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                      {formatPartnerPhone(partner.user)} · {display(partner.user.email)}
+                      {formatPartnerPhone(partner.user ?? {})} · {display(partner.user?.email)}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Submitted {formatPartnerDate(partner.submitted_at)}
@@ -442,26 +445,26 @@ function PartnerDetailPage() {
                 >
                   <Field
                     label="Full name"
-                    value={partner.profile.full_name}
+                    value={partner.profile?.full_name}
                     needsRecheck={needsRecheck("full_name")}
                   />
                   <Field
                     label="Email"
-                    value={partner.user.email}
+                    value={partner.user?.email}
                     needsRecheck={needsRecheck("email")}
                   />
-                  <Field label="Phone" value={formatPartnerPhone(partner.user)} />
+                  <Field label="Phone" value={formatPartnerPhone(partner.user ?? {})} />
                   <Field
                     label="Date of birth"
-                    value={partner.profile.date_of_birth}
+                    value={partner.profile?.date_of_birth}
                     needsRecheck={needsRecheck("date_of_birth")}
                   />
                   <Field
                     label="Gender"
-                    value={partner.profile.gender}
+                    value={partner.profile?.gender}
                     needsRecheck={needsRecheck("gender")}
                   />
-                  <Field label="Role" value={partner.user.role} />
+                  <Field label="Role" value={partner.user?.role} />
                 </DetailCard>
 
                 <DetailCard
@@ -474,27 +477,27 @@ function PartnerDetailPage() {
                 >
                   <Field
                     label="House / flat"
-                    value={partner.address.house_flat}
+                    value={partner.address?.house_flat}
                     needsRecheck={needsRecheck("house_flat")}
                   />
                   <Field
                     label="Street"
-                    value={partner.address.street}
+                    value={partner.address?.street}
                     needsRecheck={needsRecheck("street")}
                   />
                   <Field
                     label="City"
-                    value={partner.address.city}
+                    value={partner.address?.city}
                     needsRecheck={needsRecheck("city")}
                   />
                   <Field
                     label="State"
-                    value={partner.address.state}
+                    value={partner.address?.state}
                     needsRecheck={needsRecheck("state")}
                   />
                   <Field
                     label="Pincode"
-                    value={partner.address.pincode}
+                    value={partner.address?.pincode}
                     needsRecheck={needsRecheck("pincode")}
                   />
                 </DetailCard>
@@ -509,7 +512,7 @@ function PartnerDetailPage() {
                 >
                   <Field
                     label="Licence number"
-                    value={partner.licence.licence_number}
+                    value={partner.licence?.licence_number}
                     needsRecheck={needsRecheck("licence_number")}
                   />
                 </DetailCard>
@@ -524,27 +527,27 @@ function PartnerDetailPage() {
                 >
                   <Field
                     label="Type"
-                    value={partner.vehicle.vehicle_type}
+                    value={partner.vehicle?.vehicle_type}
                     needsRecheck={needsRecheck("vehicle_type")}
                   />
                   <Field
                     label="Model"
-                    value={partner.vehicle.vehicle_model}
+                    value={partner.vehicle?.vehicle_model}
                     needsRecheck={needsRecheck("vehicle_model")}
                   />
                   <Field
                     label="Number"
-                    value={partner.vehicle.vehicle_number}
+                    value={partner.vehicle?.vehicle_number}
                     needsRecheck={needsRecheck("vehicle_number")}
                   />
                   <Field
                     label="Color"
-                    value={partner.vehicle.color}
+                    value={partner.vehicle?.color}
                     needsRecheck={needsRecheck("color")}
                   />
                   <Field
                     label="Insurance expiry"
-                    value={partner.vehicle.insurance_expiry_date}
+                    value={partner.vehicle?.insurance_expiry_date}
                     needsRecheck={needsRecheck("insurance_expiry_date")}
                   />
                 </DetailCard>
@@ -559,22 +562,22 @@ function PartnerDetailPage() {
                 >
                   <Field
                     label="Account holder"
-                    value={partner.bank.account_holder_name}
+                    value={partner.bank?.account_holder_name ?? null}
                     needsRecheck={needsRecheck("account_holder_name")}
                   />
                   <Field
                     label="Account number"
-                    value={partner.bank.account_number}
+                    value={partner.bank?.account_number}
                     needsRecheck={needsRecheck("account_number")}
                   />
                   <Field
                     label="IFSC"
-                    value={partner.bank.ifsc_code}
+                    value={partner.bank?.ifsc_code}
                     needsRecheck={needsRecheck("ifsc_code")}
                   />
                   <Field
                     label="UPI ID"
-                    value={partner.bank.upi_id}
+                    value={partner.bank?.upi_id}
                     needsRecheck={needsRecheck("upi_id")}
                   />
                 </DetailCard>

@@ -40,11 +40,12 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
 
   const code = envelope.error?.code ?? "request_failed";
   const fromDetails = formatValidationDetails(envelope.error?.details);
+  const apiMessage = envelope.message?.trim();
   const message =
     (code === "validation_error" && fromDetails) ||
+    (apiMessage && apiMessage.toLowerCase() !== "success" ? apiMessage : "") ||
     humanizeErrorCode(code) ||
     fromDetails ||
-    envelope.message ||
     "Something went wrong. Please try again.";
 
   throw new ApiError(
@@ -96,6 +97,12 @@ function humanizeErrorCode(code: string): string {
       return "That service key is already in use.";
     case "home_service_not_found":
       return "Home service not found.";
+    case "not authenticated":
+      return "Please sign in again.";
+    case "order_not_found":
+      return "Order not found.";
+    case "invalid_order_status":
+      return "This action is not allowed for the order's current status.";
     default:
       return "Something went wrong. Please try again.";
   }

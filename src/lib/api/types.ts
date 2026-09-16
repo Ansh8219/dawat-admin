@@ -203,7 +203,7 @@ export interface CustomerSummary {
 
 export interface Customer {
   public_id: string;
-  full_name: string;
+  full_name: string | null;
   country_code: string;
   phone_number: string;
   tier: CustomerTier | string;
@@ -268,10 +268,10 @@ export type PartnerRejectField =
 
 export interface PartnerListItem {
   public_id: string;
-  full_name: string;
+  full_name: string | null;
   phone_number: string;
   country_code: string;
-  email: string;
+  email: string | null;
   partner_status: PartnerStatus;
   submitted_at: string | null;
   created_at: string;
@@ -293,12 +293,12 @@ export interface PartnerListData {
 export interface PartnerUser {
   country_code: string;
   phone_number: string;
-  email: string;
+  email: string | null;
   role: string;
 }
 
 export interface PartnerProfile {
-  full_name: string;
+  full_name: string | null;
   date_of_birth: string | null;
   gender: string | null;
   profile_picture_url: string | null;
@@ -347,13 +347,13 @@ export interface PartnerDetail {
   rejection_reason: string | null;
   submitted_at: string | null;
   reviewed_at: string | null;
-  user: PartnerUser;
-  profile: PartnerProfile;
-  documents: PartnerDocuments;
-  address: PartnerAddress;
-  licence: PartnerLicence;
-  vehicle: PartnerVehicle;
-  bank: PartnerBank;
+  user: PartnerUser | null;
+  profile: PartnerProfile | null;
+  documents: PartnerDocuments | null;
+  address: PartnerAddress | null;
+  licence: PartnerLicence | null;
+  vehicle: PartnerVehicle | null;
+  bank: PartnerBank | null;
   rejected_fields?: PartnerRejectField[] | string[];
   rejected_steps?: string[];
   /** Previous reject reason after partner resubmits (status back to pending). */
@@ -418,6 +418,66 @@ export type UpdateHomeServiceFields = Partial<{
   sort_order: number;
   is_active: boolean;
 }>;
+
+export type AdminOrderTab = "new" | "preparing" | "ready" | "past";
+export type AdminOrderStatus = "new" | "preparing" | "ready" | "rejected" | "delivered";
+
+export interface AdminOrderAddress {
+  address_type: string | null;
+  full_name: string | null;
+  phone: string | null;
+  house_flat: string | null;
+  landmark: string | null;
+  formatted_address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface AdminOrderAddon {
+  name?: string | null;
+  price?: number | null;
+  quantity?: number | null;
+}
+
+export interface AdminOrderItem {
+  public_id: string;
+  menu_item_public_id: string | null;
+  menu_type: string | null;
+  name: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  variant_name: string | null;
+  variant_price: number | null;
+  addons: AdminOrderAddon[] | null;
+}
+
+export interface AdminOrder {
+  public_id: string;
+  status: AdminOrderStatus | string;
+  payment_method: string | null;
+  payment_status: string | null;
+  subtotal: number;
+  preparation_minutes: number | null;
+  reject_reason: string | null;
+  created_at: string;
+  waiting_seconds: number | null;
+  address: AdminOrderAddress | null;
+  items: AdminOrderItem[] | null;
+}
+
+export interface AdminOrderListParams {
+  tab: AdminOrderTab;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminOrderListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: AdminOrder[];
+}
 
 export class ApiError extends Error {
   readonly status: number;
