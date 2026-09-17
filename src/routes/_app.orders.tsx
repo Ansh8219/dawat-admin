@@ -8,21 +8,29 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import {
   acceptAdminOrder,
+  formatOrderMoney,
+  isPlacedStatus,
   listAdminOrders,
   markAdminOrderReady,
   orderAddressLine,
+  orderBillTotal,
   orderCustomerName,
   orderItemCount,
   orderPhone,
   orderStatusLabel,
   paymentLabel,
+  paymentStatusLabel,
   rejectAdminOrder,
+  showsSincePlacedClock,
+  sincePlacedSeconds,
+  startAdminOrderPreparing,
+  formatDeliveredAt,
+  isReadyTrackStatus,
 } from "@/lib/api/orders";
 import { ApiError } from "@/lib/api/types";
 import type { AdminOrder, AdminOrderTab } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { inr } from "@/lib/mock/data";
 import { usePanelMeta } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
 import {
@@ -36,8 +44,6 @@ import {
   ChefHat,
   CheckCircle2,
   XCircle,
-  Printer,
-  CircleDot,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -57,12 +63,6 @@ const TABS: { id: AdminOrderTab; label: string; short: string }[] = [
   { id: "ready", label: "Food Ready", short: "Ready" },
   { id: "past", label: "Past Orders", short: "Past" },
 ];
-
-function elapsedSeconds(createdAt: string, now: number): number {
-  const created = new Date(createdAt).getTime();
-  if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((now - created) / 1000));
-}
 
 function formatDuration(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -119,6 +119,7 @@ function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [loadedAt, setLoadedAt] = useState(() => Date.now());
   const [selected, setSelected] = useState<AdminOrder | null>(null);
   const [acceptTarget, setAcceptTarget] = useState<AdminOrder | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminOrder | null>(null);
@@ -159,6 +160,7 @@ function OrdersPage() {
         ]);
         setOrders(active.results);
         setCount(active.count ?? 0);
+        setLoadedAt(Date.now());
         setTabCounts((prev) => {
           const next = { ...prev, [tab]: active.count ?? 0 };
           const otherTabs = TABS.filter((item) => item.id !== tab);
@@ -188,16 +190,10 @@ function OrdersPage() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!showsSincePlacedClock(tab)) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [tab]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -221,6 +217,12 @@ function OrdersPage() {
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const prepMinutes = prepCustom.trim() ? Number(prepCustom) : prepChoice;
+  const selectedSince = selected ? sincePlacedSeconds(selected, now, loadedAt) : null;
+  const selectedTimeLabel = !selected
+    ? ""
+    : showsSincePlacedClock(tab) && selectedSince != null
+      ? `Since placed ${formatDuration(selectedSince)}`
+      : (formatDeliveredAt(selected.delivered_at) ?? `Placed ${formatPlacedAt(selected.created_at)}`);
 
   function openAccept(order: AdminOrder) {
     setPrepChoice(20);
@@ -284,7 +286,26 @@ function OrdersPage() {
     }
   }
 
+  async function startPreparing(order: AdminOrder) {
+    if (order.status !== "accepted") return;
+    setActingId(order.public_id);
+    try {
+      await withAuthRetry((token) => startAdminOrderPreparing(token, order.public_id));
+      toast.success(`${shortId(order.public_id)} started preparing`);
+      setSelected(null);
+      setTab("preparing");
+      setPage(1);
+      if (tab === "preparing" && page === 1) void refresh();
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      toast.error(err instanceof ApiError ? err.message : "Unable to start preparing");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   async function markReady(order: AdminOrder) {
+    if (order.status !== "preparing") return;
     setActingId(order.public_id);
     try {
       await withAuthRetry((token) => markAdminOrderReady(token, order.public_id));
@@ -308,10 +329,6 @@ function OrdersPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Orders</h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success">
-                <CircleDot className="h-3 w-3 animate-pulse" />
-                Live
-              </span>
               {tabCounts.new > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
                   <Bell className="h-3 w-3 animate-pulse" />
@@ -434,13 +451,15 @@ function OrdersPage() {
                 <OrderTicket
                   key={order.public_id}
                   order={order}
+                  tab={tab}
                   now={now}
+                  loadedAt={loadedAt}
                   busy={actingId === order.public_id}
                   onOpen={() => setSelected(order)}
                   onAccept={() => openAccept(order)}
                   onReject={() => openReject(order)}
+                  onStartPreparing={() => void startPreparing(order)}
                   onReady={() => void markReady(order)}
-                  onPrint={() => toast.success(`KOT printed for ${shortId(order.public_id)}`)}
                 />
               ))}
             </div>
@@ -488,7 +507,7 @@ function OrdersPage() {
                 <div className="text-sm font-semibold">{shortId(acceptTarget.public_id)}</div>
                 <div className="text-xs text-muted-foreground">
                   {orderCustomerName(acceptTarget)} · {orderItemCount(acceptTarget)} items ·{" "}
-                  {inr(acceptTarget.subtotal)}
+                  {formatOrderMoney(orderBillTotal(acceptTarget))}
                 </div>
               </div>
               <div>
@@ -601,20 +620,18 @@ function OrdersPage() {
                   <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                     <Phone className="h-3 w-3" /> {orderPhone(selected)}
                   </div>
-                  {orderAddressLine(selected) && (
+                  {selected.address?.formatted_address && (
                     <div className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
-                      <MapPin className="mt-0.5 h-3 w-3" /> {orderAddressLine(selected)}
+                      <MapPin className="mt-0.5 h-3 w-3" /> {selected.address.formatted_address}
                     </div>
                   )}
                   <div className="mt-2 text-[11px] text-muted-foreground">
-                    Placed {formatPlacedAt(selected.created_at)}
+                    {selectedTimeLabel}
                     {selected.address?.address_type ? ` · ${selected.address.address_type}` : ""}
                   </div>
                 </div>
 
-                {(selected.status === "on_the_way" || selected.driver) && (
-                  <DriverPickup order={selected} />
-                )}
+                {isReadyTrackStatus(selected.status) && <ReadyTrack order={selected} />}
 
                 {selected.reject_reason && (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
@@ -624,17 +641,22 @@ function OrdersPage() {
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  {selected.status === "new" && (
+                  {isPlacedStatus(selected.status) && (
                     <Button className="rounded-xl" onClick={() => openAccept(selected)}>
                       Accept
                     </Button>
                   )}
-                  {selected.status === "preparing" && (
-                    <Button className="rounded-xl" onClick={() => void markReady(selected)}>
-                      Food Ready
+                  {selected.status === "accepted" && (
+                    <Button className="rounded-xl" onClick={() => void startPreparing(selected)}>
+                      Start preparing
                     </Button>
                   )}
-                  {selected.status === "new" && (
+                  {selected.status === "preparing" && (
+                    <Button className="rounded-xl" onClick={() => void markReady(selected)}>
+                      Mark ready
+                    </Button>
+                  )}
+                  {isPlacedStatus(selected.status) && (
                     <Button
                       variant="outline"
                       className="rounded-xl text-destructive"
@@ -653,18 +675,13 @@ function OrdersPage() {
                         <span>
                           {item.quantity}× {itemLabel(item)}
                         </span>
-                        <span className="font-medium">{inr(item.line_total)}</span>
+                        <span className="font-medium">{formatOrderMoney(item.line_total)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3">
-                  <span className="text-sm">
-                    Total · {paymentLabel(selected.payment_method)} · {selected.payment_status || "—"}
-                  </span>
-                  <span className="text-lg font-bold text-primary">{inr(selected.subtotal)}</span>
-                </div>
+                <OrderCharges order={selected} />
               </div>
             </>
           )}
@@ -674,53 +691,79 @@ function OrdersPage() {
   );
 }
 
+function OrderCharges({ order }: { order: AdminOrder }) {
+  return (
+    <div className="space-y-1.5 rounded-xl bg-primary/5 p-3 text-sm">
+      <div className="flex items-center justify-between text-muted-foreground">
+        <span>Subtotal</span>
+        <span>{formatOrderMoney(order.subtotal)}</span>
+      </div>
+      <div className="flex items-center justify-between text-muted-foreground">
+        <span>
+          Delivery
+          {order.distance_km != null ? ` · ${order.distance_km} km` : ""}
+        </span>
+        <span>{order.delivery_fee == null ? "—" : formatOrderMoney(order.delivery_fee)}</span>
+      </div>
+      <div className="flex items-center justify-between border-t border-primary/15 pt-2">
+        <span>
+          Total · {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
+        </span>
+        <span className="text-lg font-bold text-primary">{formatOrderMoney(orderBillTotal(order))}</span>
+      </div>
+    </div>
+  );
+}
+
 function OrderTicket({
   order,
+  tab,
   now,
+  loadedAt,
   busy,
   onOpen,
   onAccept,
   onReject,
+  onStartPreparing,
   onReady,
-  onPrint,
 }: {
   order: AdminOrder;
+  tab: AdminOrderTab;
   now: number;
+  loadedAt: number;
   busy: boolean;
   onOpen: () => void;
   onAccept: () => void;
   onReject: () => void;
+  onStartPreparing: () => void;
   onReady: () => void;
-  onPrint: () => void;
 }) {
-  const isNew = order.status === "new";
+  const isPlaced = isPlacedStatus(order.status);
+  const isAccepted = order.status === "accepted";
   const isPreparing = order.status === "preparing";
-  const isReady = order.status === "ready";
-  const isOnTheWay = order.status === "on_the_way";
+  const isReadyTrack = isReadyTrackStatus(order.status);
   const isRejected = order.status === "rejected";
-  const elapsed = elapsedSeconds(order.created_at, now);
-  const promised = order.preparation_minutes ?? 0;
-  const delayed = isPreparing && promised > 0 && elapsed > promised * 60;
-  const showTimer = isNew || isPreparing || isReady;
+  const isDelivered = order.status === "delivered";
+  const liveClock = showsSincePlacedClock(tab);
+  const waiting = liveClock ? sincePlacedSeconds(order, now, loadedAt) : null;
+  const deliveredAt = formatDeliveredAt(order.delivered_at);
+  const address = order.address?.formatted_address?.trim() || orderAddressLine(order);
   const itemCount = orderItemCount(order);
-  const address = orderAddressLine(order);
 
   return (
     <article
       className={cn(
         "flex flex-col overflow-hidden rounded-2xl border bg-card shadow-soft transition-all hover:shadow-elevated",
-        isNew && "border-primary/45 ring-1 ring-primary/15",
-        delayed && "border-destructive/50 ring-1 ring-destructive/20",
+        isPlaced && "border-primary/45 ring-1 ring-primary/15",
       )}
     >
       <div
         className={cn(
           "h-1 w-full",
-          isNew && "bg-primary",
-          isPreparing && (delayed ? "animate-pulse bg-destructive" : "bg-info"),
-          isReady && "bg-success",
-          isOnTheWay && "bg-info",
-          order.status === "delivered" && "bg-muted",
+          isPlaced && "bg-primary",
+          (isAccepted || isPreparing) && "bg-info",
+          isReadyTrack && "bg-success",
+          isDelivered && "bg-muted",
           isRejected && "bg-destructive/50",
         )}
       />
@@ -729,34 +772,32 @@ function OrderTicket({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-md bg-info/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-info ring-1 ring-info/20">
-                <Bike className="h-3 w-3" />
-                {order.address?.address_type || "Delivery"}
+              <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+                {orderStatusLabel(order.status)}
               </span>
               <span className="text-sm font-bold tracking-tight">{shortId(order.public_id)}</span>
             </div>
             <div className="text-[11px] text-muted-foreground">
               {itemCount} {itemCount === 1 ? "item" : "items"} · {formatPlacedAt(order.created_at)}
-              {order.preparation_minutes ? ` · prep ${order.preparation_minutes}m` : ""}
+              {order.preparation_minutes != null ? ` · prep ${order.preparation_minutes} min` : ""}
             </div>
           </div>
 
-          {showTimer && (
-            <div
-              className={cn(
-                "flex shrink-0 flex-col items-end rounded-xl px-2.5 py-1.5",
-                delayed ? "bg-destructive/10 text-destructive" : "bg-muted/80 text-foreground",
-              )}
-            >
+          {liveClock && waiting != null ? (
+            <div className="flex shrink-0 flex-col items-end rounded-xl bg-muted/80 px-2.5 py-1.5 text-foreground">
               <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">
                 <Timer className="h-3 w-3" />
-                {delayed ? "Delayed" : isNew ? "Waiting" : "Elapsed"}
+                Since placed
               </div>
-              <div className={cn("font-mono text-lg font-bold tabular-nums leading-none", delayed && "animate-pulse")}>
-                {formatDuration(elapsed)}
+              <div className="font-mono text-lg font-bold tabular-nums leading-none">
+                {formatDuration(waiting)}
               </div>
             </div>
-          )}
+          ) : deliveredAt ? (
+            <div className="shrink-0 rounded-xl bg-muted/80 px-2.5 py-1.5 text-right text-xs font-semibold text-foreground">
+              {deliveredAt}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-3">
@@ -773,7 +814,7 @@ function OrderTicket({
           )}
         </div>
 
-        {(isOnTheWay || order.driver) && <DriverPickup order={order} compact />}
+        {isReadyTrack && <ReadyTrack order={order} compact />}
 
         <div className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
           {(order.items ?? []).map((item) => (
@@ -784,24 +825,30 @@ function OrderTicket({
                 </span>
                 {itemLabel(item)}
               </span>
-              <span className="shrink-0 text-xs text-muted-foreground">{inr(item.line_total)}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatOrderMoney(item.line_total)}</span>
             </div>
           ))}
         </div>
 
         <div className="mt-auto flex items-end justify-between border-t border-border/60 pt-3">
           <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {paymentLabel(order.payment_method)} · {order.payment_status || "—"}
+            {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
           </span>
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Bill total</div>
-            <div className="text-lg font-bold">{inr(order.subtotal)}</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
+            <div className="text-lg font-bold">{formatOrderMoney(orderBillTotal(order))}</div>
+            {order.delivery_fee != null && (
+              <div className="text-[10px] text-muted-foreground">
+                incl. delivery {formatOrderMoney(order.delivery_fee)}
+                {order.distance_km != null ? ` · ${order.distance_km} km` : ""}
+              </div>
+            )}
           </div>
         </div>
       </button>
 
       <div className="flex border-t border-border/70">
-        {isNew && (
+        {isPlaced && (
           <button
             type="button"
             disabled={busy}
@@ -812,17 +859,7 @@ function OrderTicket({
             Reject
           </button>
         )}
-        {(isPreparing || isReady || isOnTheWay) && (
-          <button
-            type="button"
-            onClick={onPrint}
-            className="flex items-center justify-center gap-1.5 border-r border-border/70 bg-muted/30 px-4 py-3.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted"
-            aria-label="Print KOT"
-          >
-            <Printer className="h-4 w-4" />
-          </button>
-        )}
-        {isNew ? (
+        {isPlaced ? (
           <button
             type="button"
             disabled={busy}
@@ -831,17 +868,23 @@ function OrderTicket({
           >
             Accept
           </button>
+        ) : isAccepted ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onStartPreparing}
+            className="flex flex-1 items-center justify-center gap-2 bg-info px-3 py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-info/90 disabled:opacity-50"
+          >
+            {busy ? "Starting…" : "Start preparing"}
+          </button>
         ) : isPreparing ? (
           <button
             type="button"
             disabled={busy}
             onClick={onReady}
-            className={cn(
-              "flex flex-[2] items-center justify-center gap-2 px-3 py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors disabled:opacity-50",
-              delayed ? "animate-pulse bg-destructive hover:bg-destructive/90" : "bg-success hover:bg-success/90",
-            )}
+            className="flex flex-1 items-center justify-center gap-2 bg-success px-3 py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-success/90 disabled:opacity-50"
           >
-            {busy ? "Updating…" : "Food Ready"}
+            {busy ? "Updating…" : "Mark ready"}
           </button>
         ) : (
           <div className="flex flex-1 items-center justify-center gap-2 bg-muted/40 px-3 py-3.5 text-sm font-medium text-muted-foreground">
@@ -850,20 +893,15 @@ function OrderTicket({
                 <XCircle className="h-4 w-4 text-destructive" />
                 Rejected
               </>
-            ) : isOnTheWay ? (
+            ) : isReadyTrack ? (
               <>
-                <Bike className="h-4 w-4 text-info" />
-                On the way
-              </>
-            ) : isReady ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                Ready
+                <Bike className="h-4 w-4 text-success" />
+                {orderStatusLabel(order.status)}
               </>
             ) : (
               <>
                 <CheckCircle2 className="h-4 w-4 text-success" />
-                Delivered
+                {orderStatusLabel(order.status)}
               </>
             )}
           </div>
@@ -873,41 +911,45 @@ function OrderTicket({
   );
 }
 
-function DriverPickup({ order, compact = false }: { order: AdminOrder; compact?: boolean }) {
+function ReadyTrack({ order, compact = false }: { order: AdminOrder; compact?: boolean }) {
   const driver = order.driver;
-  const name = driver?.full_name?.trim() || "Driver";
-  const phone = driver?.phone?.trim() || "—";
+  const name = driver?.full_name?.trim();
+  const phone = driver?.phone?.trim();
   const photo = driver?.profile_picture_url;
 
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 rounded-xl border border-info/25 bg-info/5",
+        "rounded-xl border border-success/25 bg-success/5",
         compact ? "mx-4 mb-3 px-2.5 py-2" : "p-3",
       )}
     >
-      {photo ? (
-        <img src={photo} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-      ) : (
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-info/15 text-[11px] font-bold text-info">
-          {driverInitials(name)}
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-info">
-          On the way
-        </div>
-        <div className="truncate text-sm font-semibold">{name}</div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Phone className="h-3 w-3" />
-          {phone}
-        </div>
-        {order.driver_accepted_at && (
-          <div className="text-[11px] text-muted-foreground">
-            Picked up {formatPlacedAt(order.driver_accepted_at)}
-          </div>
-        )}
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-success">
+        {orderStatusLabel(order.status)}
       </div>
+      {driver ? (
+        <div className="mt-2 flex items-center gap-2.5">
+          {photo ? (
+            <img src={photo} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-success/15 text-[11px] font-bold text-success">
+              {driverInitials(name || "Driver")}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{name || "Driver"}</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Phone className="h-3 w-3" />
+              {phone || "—"}
+            </div>
+            {order.status === "driver_assigned" && (
+              <div className="text-[11px] text-muted-foreground">Accepted. Not picked up yet.</div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">Waiting for a driver to pick this up.</p>
+      )}
     </div>
   );
 }

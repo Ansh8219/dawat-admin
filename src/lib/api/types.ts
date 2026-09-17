@@ -421,14 +421,18 @@ export type UpdateHomeServiceFields = Partial<{
 
 export type AdminOrderTab = "new" | "preparing" | "ready" | "past";
 export type AdminOrderStatus =
-  | "new"
+  | "placed"
+  | "accepted"
   | "preparing"
-  | "ready"
+  | "ready_for_pickup"
+  | "driver_assigned"
+  | "driver_at_restaurant"
+  | "picked_up"
   | "on_the_way"
-  | "rejected"
-  | "delivered";
+  | "delivered"
+  | "rejected";
 
-/** Driver attached after they accept a ready order. Kitchen status stays ready. */
+/** Driver on a ready-tab order after assignment. */
 export interface AdminOrderDriver {
   public_id: string;
   full_name: string | null;
@@ -469,16 +473,19 @@ export interface AdminOrderItem {
 export interface AdminOrder {
   public_id: string;
   status: AdminOrderStatus | string;
-  /** unassigned before a driver accepts; accepted after. Order stays on the ready tab. */
   delivery_status: string | null;
   driver: AdminOrderDriver | null;
   driver_accepted_at: string | null;
   payment_method: string | null;
   payment_status: string | null;
   subtotal: number;
+  distance_km: number | null;
+  delivery_fee: number | null;
+  total: number | null;
   preparation_minutes: number | null;
   reject_reason: string | null;
   created_at: string;
+  delivered_at: string | null;
   waiting_seconds: number | null;
   address: AdminOrderAddress | null;
   items: AdminOrderItem[] | null;

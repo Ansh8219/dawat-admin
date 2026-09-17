@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { acceptAdminOrder, listAdminOrders, orderCustomerName, orderItemCount, orderStatusLabel, paymentLabel, rejectAdminOrder } from "@/lib/api/orders";
+import { acceptAdminOrder, formatOrderMoney, listAdminOrders, orderBillTotal, orderCustomerName, orderItemCount, orderStatusLabel, paymentLabel, rejectAdminOrder } from "@/lib/api/orders";
 import { ApiError, type AdminOrder } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
@@ -20,7 +20,6 @@ import {
   ChefHat,
   CheckCircle2,
   CircleDot,
-  Timer,
   Star,
   Bike,
   UtensilsCrossed,
@@ -265,8 +264,13 @@ function Dashboard() {
                             {order.address?.address_type || "Delivery"}
                           </span>
                           <span className="text-sm font-bold">{order.public_id.slice(0, 8)}</span>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
-                            <Timer className="h-3 w-3" /> just now
+                          <span className="text-[11px] text-muted-foreground">
+                            {order.created_at
+                              ? new Date(order.created_at).toLocaleString("en-IN", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })
+                              : ""}
                           </span>
                         </div>
                         <div className="mt-1 text-sm font-semibold">{orderCustomerName(order)}</div>
@@ -279,7 +283,7 @@ function Dashboard() {
                         </ul>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold">{inr(order.subtotal)}</div>
+                        <div className="text-lg font-bold">{formatOrderMoney(orderBillTotal(order))}</div>
                         <div className="text-[11px] text-muted-foreground">{paymentLabel(order.payment_method)}</div>
                       </div>
                     </div>
@@ -328,24 +332,28 @@ function Dashboard() {
                       <div
                         className={cn(
                           "grid h-9 w-9 place-items-center rounded-lg",
-                          o.status === "preparing" || o.status === "on_the_way"
+                          o.status === "preparing" || o.status === "accepted"
                             ? "bg-info/10 text-info"
                             : "bg-success/10 text-success",
                         )}
                       >
-                        {o.status === "preparing" ? <ChefHat className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
+                        {o.status === "preparing" || o.status === "accepted" ? (
+                          <ChefHat className="h-4 w-4" />
+                        ) : (
+                          <Bike className="h-4 w-4" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold">{o.public_id.slice(0, 8)}</div>
                         <div className="truncate text-xs text-muted-foreground">
-                          {o.status === "on_the_way" && o.driver?.full_name
+                          {o.driver?.full_name
                             ? `${o.driver.full_name} · ${o.driver.phone || "—"}`
                             : `${orderCustomerName(o)} · ${orderItemCount(o)} items`}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-semibold">{orderStatusLabel(o.status)}</div>
-                        <div className="text-[11px] text-muted-foreground">{inr(o.subtotal)}</div>
+                        <div className="text-[11px] text-muted-foreground">{formatOrderMoney(orderBillTotal(o))}</div>
                       </div>
                     </button>
                   ))}

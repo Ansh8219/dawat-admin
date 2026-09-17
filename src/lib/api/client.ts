@@ -102,7 +102,7 @@ function humanizeErrorCode(code: string): string {
     case "order_not_found":
       return "Order not found.";
     case "invalid_order_status":
-      return "This action is not allowed for the order's current status.";
+      return "That action is not allowed yet. Start preparing before marking ready.";
     case "invalid_pickup_location":
       return "Set both latitude and longitude, or leave both empty.";
     default:

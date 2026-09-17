@@ -12,8 +12,13 @@ function normalizeOrder(order: AdminOrder): AdminOrder {
     ...order,
     payment_method: order.payment_method ?? null,
     payment_status: order.payment_status ?? null,
+    subtotal: order.subtotal ?? 0,
+    distance_km: order.distance_km ?? null,
+    delivery_fee: order.delivery_fee ?? null,
+    total: order.total ?? null,
     preparation_minutes: order.preparation_minutes ?? null,
     reject_reason: order.reject_reason ?? null,
+    delivered_at: order.delivered_at ?? null,
     waiting_seconds: order.waiting_seconds ?? null,
     delivery_status: order.delivery_status ?? null,
     driver_accepted_at: order.driver_accepted_at ?? null,
@@ -49,11 +54,7 @@ export function acceptAdminOrder(
   }).then(normalizeOrder);
 }
 
-export function rejectAdminOrder(
-  accessToken: string,
-  publicId: string,
-  reason?: string,
-) {
+export function rejectAdminOrder(accessToken: string, publicId: string, reason?: string) {
   const trimmed = reason?.trim() ?? "";
   return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/reject/`, {
     method: "POST",
@@ -64,6 +65,13 @@ export function rejectAdminOrder(
 
 export function markAdminOrderReady(accessToken: string, publicId: string) {
   return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/ready/`, {
+    method: "POST",
+    accessToken,
+  }).then(normalizeOrder);
+}
+
+export function startAdminOrderPreparing(accessToken: string, publicId: string) {
+  return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/preparing/`, {
     method: "POST",
     accessToken,
   }).then(normalizeOrder);
@@ -90,6 +98,46 @@ export function orderItemCount(order: AdminOrder): number {
   return (order.items ?? []).reduce((sum, item) => sum + (item.quantity || 0), 0);
 }
 
+export function isPlacedStatus(status: string | undefined): boolean {
+  return status === "placed";
+}
+
+export function isReadyTrackStatus(status: string | undefined): boolean {
+  return (
+    status === "ready_for_pickup" ||
+    status === "driver_assigned" ||
+    status === "driver_at_restaurant" ||
+    status === "picked_up" ||
+    status === "on_the_way"
+  );
+}
+
+/** Live clock belongs on new and preparing only. Past `waiting_seconds` is null. */
+export function showsSincePlacedClock(tab: AdminOrderTab): boolean {
+  return tab === "new" || tab === "preparing";
+}
+
+export function sincePlacedSeconds(
+  order: Pick<AdminOrder, "created_at" | "waiting_seconds">,
+  now: number,
+  loadedAt: number,
+): number | null {
+  const created = new Date(order.created_at).getTime();
+  if (!Number.isNaN(created)) {
+    return Math.max(0, Math.floor((now - created) / 1000));
+  }
+  if (order.waiting_seconds == null) return null;
+  return Math.max(0, order.waiting_seconds + Math.floor((now - loadedAt) / 1000));
+}
+
+export function orderBillTotal(order: Pick<AdminOrder, "total" | "subtotal">): number {
+  return order.total ?? order.subtotal ?? 0;
+}
+
+export function formatOrderMoney(amount: number): string {
+  return "₹" + amount.toLocaleString("en-IN", { maximumFractionDigits: 1 });
+}
+
 export function paymentLabel(method: string | null | undefined): string {
   if (!method?.trim()) return "—";
   const key = method.trim().toLowerCase();
@@ -102,14 +150,39 @@ export function paymentLabel(method: string | null | undefined): string {
   return known[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Display the API payment status. Delivery does not settle COD. */
+export function paymentStatusLabel(status: string | null | undefined): string {
+  const key = status?.trim().toLowerCase();
+  if (!key) return "—";
+  if (key === "unpaid") return "Unpaid";
+  if (key === "paid") return "Paid";
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function formatDeliveredAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  return `Delivered at ${time}`;
+}
+
 export function orderStatusLabel(status: AdminOrderStatus | string | undefined): string {
   switch (status) {
-    case "new":
-      return "New";
+    case "placed":
+      return "Placed";
+    case "accepted":
+      return "Accepted";
     case "preparing":
       return "Preparing";
-    case "ready":
-      return "Ready";
+    case "ready_for_pickup":
+      return "Ready for pickup";
+    case "driver_assigned":
+      return "Driver accepted";
+    case "driver_at_restaurant":
+      return "Driver at restaurant";
+    case "picked_up":
+      return "Picked up";
     case "on_the_way":
       return "On the way";
     case "rejected":
@@ -117,13 +190,14 @@ export function orderStatusLabel(status: AdminOrderStatus | string | undefined):
     case "delivered":
       return "Delivered";
     default:
-      return status?.trim() || "Unknown";
+      return status?.replace(/_/g, " ").trim() || "Unknown";
   }
 }
 
 export function tabForStatus(status: string): AdminOrderTab | null {
-  if (status === "new" || status === "preparing" || status === "ready") return status;
-  if (status === "on_the_way") return "ready";
+  if (isPlacedStatus(status)) return "new";
+  if (status === "accepted" || status === "preparing") return "preparing";
+  if (isReadyTrackStatus(status)) return "ready";
   if (status === "rejected" || status === "delivered") return "past";
   return null;
 }
