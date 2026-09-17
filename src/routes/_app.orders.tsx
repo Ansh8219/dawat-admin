@@ -208,6 +208,8 @@ function OrdersPage() {
         orderCustomerName(order),
         orderPhone(order),
         orderAddressLine(order),
+        order.driver?.full_name ?? "",
+        order.driver?.phone ?? "",
         ...(order.items ?? []).map((item) => item.name ?? ""),
       ]
         .join(" ")
@@ -610,6 +612,10 @@ function OrdersPage() {
                   </div>
                 </div>
 
+                {(selected.status === "on_the_way" || selected.driver) && (
+                  <DriverPickup order={selected} />
+                )}
+
                 {selected.reject_reason && (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
                     <div className="text-xs font-semibold uppercase text-destructive">Reject reason</div>
@@ -690,6 +696,7 @@ function OrderTicket({
   const isNew = order.status === "new";
   const isPreparing = order.status === "preparing";
   const isReady = order.status === "ready";
+  const isOnTheWay = order.status === "on_the_way";
   const isRejected = order.status === "rejected";
   const elapsed = elapsedSeconds(order.created_at, now);
   const promised = order.preparation_minutes ?? 0;
@@ -712,6 +719,7 @@ function OrderTicket({
           isNew && "bg-primary",
           isPreparing && (delayed ? "animate-pulse bg-destructive" : "bg-info"),
           isReady && "bg-success",
+          isOnTheWay && "bg-info",
           order.status === "delivered" && "bg-muted",
           isRejected && "bg-destructive/50",
         )}
@@ -765,6 +773,8 @@ function OrderTicket({
           )}
         </div>
 
+        {(isOnTheWay || order.driver) && <DriverPickup order={order} compact />}
+
         <div className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
           {(order.items ?? []).map((item) => (
             <div key={item.public_id} className="flex items-start justify-between gap-3 text-sm">
@@ -802,7 +812,7 @@ function OrderTicket({
             Reject
           </button>
         )}
-        {(isPreparing || isReady) && (
+        {(isPreparing || isReady || isOnTheWay) && (
           <button
             type="button"
             onClick={onPrint}
@@ -840,6 +850,11 @@ function OrderTicket({
                 <XCircle className="h-4 w-4 text-destructive" />
                 Rejected
               </>
+            ) : isOnTheWay ? (
+              <>
+                <Bike className="h-4 w-4 text-info" />
+                On the way
+              </>
             ) : isReady ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-success" />
@@ -856,4 +871,49 @@ function OrderTicket({
       </div>
     </article>
   );
+}
+
+function DriverPickup({ order, compact = false }: { order: AdminOrder; compact?: boolean }) {
+  const driver = order.driver;
+  const name = driver?.full_name?.trim() || "Driver";
+  const phone = driver?.phone?.trim() || "—";
+  const photo = driver?.profile_picture_url;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2.5 rounded-xl border border-info/25 bg-info/5",
+        compact ? "mx-4 mb-3 px-2.5 py-2" : "p-3",
+      )}
+    >
+      {photo ? (
+        <img src={photo} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+      ) : (
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-info/15 text-[11px] font-bold text-info">
+          {driverInitials(name)}
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-info">
+          On the way
+        </div>
+        <div className="truncate text-sm font-semibold">{name}</div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Phone className="h-3 w-3" />
+          {phone}
+        </div>
+        {order.driver_accepted_at && (
+          <div className="text-[11px] text-muted-foreground">
+            Picked up {formatPlacedAt(order.driver_accepted_at)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function driverInitials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  const letters = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "");
+  return letters.join("") || "D";
 }

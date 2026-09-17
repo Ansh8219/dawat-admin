@@ -15,6 +15,9 @@ function normalizeOrder(order: AdminOrder): AdminOrder {
     preparation_minutes: order.preparation_minutes ?? null,
     reject_reason: order.reject_reason ?? null,
     waiting_seconds: order.waiting_seconds ?? null,
+    delivery_status: order.delivery_status ?? null,
+    driver_accepted_at: order.driver_accepted_at ?? null,
+    driver: order.driver ?? null,
     address: order.address ?? null,
     items: order.items ?? [],
   };
@@ -107,6 +110,8 @@ export function orderStatusLabel(status: AdminOrderStatus | string | undefined):
       return "Preparing";
     case "ready":
       return "Ready";
+    case "on_the_way":
+      return "On the way";
     case "rejected":
       return "Rejected";
     case "delivered":
@@ -118,6 +123,7 @@ export function orderStatusLabel(status: AdminOrderStatus | string | undefined):
 
 export function tabForStatus(status: string): AdminOrderTab | null {
   if (status === "new" || status === "preparing" || status === "ready") return status;
+  if (status === "on_the_way") return "ready";
   if (status === "rejected" || status === "delivered") return "past";
   return null;
 }

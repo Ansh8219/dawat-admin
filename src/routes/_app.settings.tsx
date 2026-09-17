@@ -1,17 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  buildDeliverySettingsPatch,
+  getDeliverySettings,
+  settingsToForm,
+  updateDeliverySettings,
+  type DeliverySettingsForm as DeliveryFormState,
+} from "@/lib/api/delivery-settings";
+import { ApiError } from "@/lib/api/types";
+import type { DeliverySettings } from "@/lib/api/types";
+import { withAuthRetry } from "@/lib/api/with-auth";
 import { formatRoleLabel, isSuperAdmin, useAuth } from "@/lib/auth";
-import { inr } from "@/lib/mock/data";
 import { useApp } from "@/lib/store";
 import { usePanelMeta } from "@/lib/use-panel";
-import { Loader2, MapPin, Moon, Sun } from "lucide-react";
+import { PickupMap } from "@/components/app/pickup-map";
+import { Loader2, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -24,6 +34,7 @@ function SettingsPage() {
   const meta = usePanelMeta();
   const user = useAuth((s) => s.user);
   const canChangePassword = isSuperAdmin(user);
+  const [tab, setTab] = useState("business");
 
   return (
     <div>
@@ -33,7 +44,7 @@ function SettingsPage() {
         description={`Configuration for ${meta.label} · GST ${meta.gst}`}
       />
       <div className="p-4 sm:p-6 lg:p-8">
-        <Tabs defaultValue="business">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="rounded-xl flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
             <TabsTrigger value="tax">Tax</TabsTrigger>
@@ -120,7 +131,9 @@ function SettingsPage() {
           <TabsContent value="tax" className="mt-4">
             <div className="card-elevated max-w-lg p-4 space-y-3">
               <div className="text-sm font-semibold">GST Configuration — {meta.label}</div>
-              <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs">GSTIN · {meta.gst}</div>
+              <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs">
+                GSTIN · {meta.gst}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>CGST %</Label>
@@ -170,7 +183,10 @@ function SettingsPage() {
                 <span className="text-sm">Print KOT (Kitchen)</span>
                 <Switch defaultChecked />
               </div>
-              <Button className="rounded-xl" onClick={() => toast.success("Printer settings saved")}>
+              <Button
+                className="rounded-xl"
+                onClick={() => toast.success("Printer settings saved")}
+              >
                 Save Printer
               </Button>
             </div>
@@ -180,12 +196,17 @@ function SettingsPage() {
             <div className="card-elevated max-w-lg p-4">
               <div className="text-sm font-semibold">Enabled Payment Modes</div>
               <div className="mt-3 space-y-2">
-                {["UPI", "Cash", "Card (POS)", "Net Banking", "Cash on Delivery", "Wallet"].map((m) => (
-                  <div key={m} className="flex items-center justify-between rounded-xl border p-3">
-                    <span className="text-sm">{m}</span>
-                    <Switch defaultChecked={m !== "Wallet"} />
-                  </div>
-                ))}
+                {["UPI", "Cash", "Card (POS)", "Net Banking", "Cash on Delivery", "Wallet"].map(
+                  (m) => (
+                    <div
+                      key={m}
+                      className="flex items-center justify-between rounded-xl border p-3"
+                    >
+                      <span className="text-sm">{m}</span>
+                      <Switch defaultChecked={m !== "Wallet"} />
+                    </div>
+                  ),
+                )}
               </div>
               <Button
                 className="mt-4 rounded-xl"
@@ -197,65 +218,7 @@ function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="delivery" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="card-elevated p-4 space-y-3">
-                <div className="text-sm font-semibold">Delivery Zone</div>
-                <div>
-                  <Label>Free delivery radius: 3 km</Label>
-                  <Slider defaultValue={[3]} min={1} max={15} className="mt-2" />
-                </div>
-                <div>
-                  <Label>Per-km rate (₹)</Label>
-                  <Input defaultValue="12" className="mt-1 rounded-xl" />
-                </div>
-                <div>
-                  <Label>Min order for free delivery</Label>
-                  <Input defaultValue={inr(499)} className="mt-1 rounded-xl" />
-                </div>
-                <div className="grid h-40 place-items-center rounded-xl bg-gradient-to-br from-primary/10 to-gold/10 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" /> Map placeholder — delivery zone
-                  </div>
-                </div>
-                <Button className="rounded-xl" onClick={() => toast.success("Delivery settings saved")}>
-                  Save Delivery
-                </Button>
-              </div>
-              <div className="card-elevated p-4">
-                <div className="text-sm font-semibold">Zone-based Menu Visibility</div>
-                <table className="mt-3 w-full text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr>
-                      <th className="text-left font-medium py-2">Zone</th>
-                      <th className="text-left font-medium">Menu</th>
-                      <th className="text-right font-medium">Active</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { z: "Sector 1–20 (Gurugram)", m: "Full Menu" },
-                      { z: "DLF Phase 1–5", m: "Bakery + Restaurant" },
-                      { z: "South Delhi", m: "Bakery only" },
-                      { z: "Noida (up to 12km)", m: "Delivery Menu" },
-                    ].map((r, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="py-2.5">{r.z}</td>
-                        <td className="py-2.5 text-muted-foreground">{r.m}</td>
-                        <td className="py-2.5 text-right">
-                          <Switch defaultChecked />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <Button
-                  className="mt-4 rounded-xl"
-                  onClick={() => toast.success("Zone visibility saved")}
-                >
-                  Save Zones
-                </Button>
-              </div>
-            </div>
+            {tab === "delivery" ? <DeliverySettingsForm /> : null}
           </TabsContent>
 
           <TabsContent value="appearance" className="mt-4">
@@ -314,6 +277,223 @@ function SettingsPage() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+const EMPTY_DELIVERY_FORM: DeliveryFormState = {
+  pickup_name: "",
+  pickup_address: "",
+  latitude: "",
+  longitude: "",
+  free_delivery_radius_km: "0",
+  per_km_rate: "0",
+  min_order_for_free_delivery: "0",
+};
+
+function DeliverySettingsForm() {
+  const navigate = useNavigate();
+  const [original, setOriginal] = useState<DeliverySettings | null>(null);
+  const [form, setForm] = useState<DeliveryFormState>(EMPTY_DELIVERY_FORM);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const handleAuthError = useCallback(
+    (err: unknown) => {
+      if (err instanceof ApiError && err.status === 401) {
+        useAuth.getState().logout();
+        void navigate({ to: "/login" });
+        return true;
+      }
+      return false;
+    },
+    [navigate],
+  );
+
+  const applySettings = useCallback((data: DeliverySettings) => {
+    setOriginal(data);
+    setForm(settingsToForm(data));
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await withAuthRetry((token) => getDeliverySettings(token));
+      applySettings(data);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      setLoadError(err instanceof ApiError ? err.message : "Unable to load delivery settings.");
+    } finally {
+      setLoading(false);
+    }
+  }, [applySettings, handleAuthError]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  function setField<K extends keyof DeliveryFormState>(key: K, value: DeliveryFormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (formError) setFormError("");
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!original) return;
+    setFormError("");
+
+    const result = buildDeliverySettingsPatch(form, original);
+    if (!result.ok) {
+      if (result.error === "No changes to save.") {
+        toast.message(result.error);
+        return;
+      }
+      setFormError(result.error);
+      toast.error(result.error);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await withAuthRetry((token) => updateDeliverySettings(token, result.payload));
+      applySettings(updated);
+      toast.success("Delivery settings saved");
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      const message = err instanceof ApiError ? err.message : "Unable to save delivery settings.";
+      setFormError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card-elevated flex max-w-2xl items-center gap-2 p-6 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading delivery settings…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="card-elevated max-w-2xl space-y-3 p-4">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {loadError}
+        </div>
+        <Button type="button" className="rounded-xl" onClick={() => void refresh()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="card-elevated max-w-2xl space-y-4 p-4">
+      <div>
+        <div className="text-sm font-semibold">Delivery settings</div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Search a place or drop a pin to set pickup, then set delivery charges.
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="pickup-name">Pickup name</Label>
+        <Input
+          id="pickup-name"
+          value={form.pickup_name}
+          onChange={(e) => setField("pickup_name", e.target.value)}
+          placeholder="Daawat Restaurant"
+          className="mt-1 rounded-xl"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="pickup-address">Pickup address</Label>
+        <Textarea
+          id="pickup-address"
+          value={form.pickup_address}
+          onChange={(e) => setField("pickup_address", e.target.value)}
+          placeholder="Sector 70, Mohali, Punjab"
+          className="mt-1 min-h-[80px] rounded-xl"
+        />
+      </div>
+
+      <PickupMap
+        latitude={form.latitude}
+        longitude={form.longitude}
+        popupLabel={form.pickup_name || form.pickup_address || "Pickup location"}
+        onPick={(lat, lng) => {
+          const latText = String(Number(lat.toFixed(6)));
+          const lngText = String(Number(lng.toFixed(6)));
+          setForm((prev) => ({ ...prev, latitude: latText, longitude: lngText }));
+          if (formError) setFormError("");
+        }}
+        onPlaceLabel={(label) => {
+          setForm((prev) =>
+            prev.pickup_address.trim() ? prev : { ...prev, pickup_address: label },
+          );
+        }}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <Label htmlFor="free-radius">Free delivery radius (km)</Label>
+          <Input
+            id="free-radius"
+            type="number"
+            min={0}
+            step="any"
+            value={form.free_delivery_radius_km}
+            onChange={(e) => setField("free_delivery_radius_km", e.target.value)}
+            className="mt-1 rounded-xl"
+          />
+        </div>
+        <div>
+          <Label htmlFor="per-km-rate">Per-km rate (₹)</Label>
+          <Input
+            id="per-km-rate"
+            type="number"
+            min={0}
+            step="any"
+            value={form.per_km_rate}
+            onChange={(e) => setField("per_km_rate", e.target.value)}
+            className="mt-1 rounded-xl"
+          />
+        </div>
+        <div>
+          <Label htmlFor="min-order">Min order for free delivery (₹)</Label>
+          <Input
+            id="min-order"
+            type="number"
+            min={0}
+            step="any"
+            value={form.min_order_for_free_delivery}
+            onChange={(e) => setField("min_order_for_free_delivery", e.target.value)}
+            className="mt-1 rounded-xl"
+          />
+        </div>
+      </div>
+
+      {formError && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {formError}
+        </div>
+      )}
+
+      <Button type="submit" className="rounded-xl" disabled={saving}>
+        {saving ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
+          </>
+        ) : (
+          "Save Delivery"
+        )}
+      </Button>
+    </form>
   );
 }
 

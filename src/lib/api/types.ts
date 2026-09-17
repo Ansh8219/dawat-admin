@@ -420,7 +420,21 @@ export type UpdateHomeServiceFields = Partial<{
 }>;
 
 export type AdminOrderTab = "new" | "preparing" | "ready" | "past";
-export type AdminOrderStatus = "new" | "preparing" | "ready" | "rejected" | "delivered";
+export type AdminOrderStatus =
+  | "new"
+  | "preparing"
+  | "ready"
+  | "on_the_way"
+  | "rejected"
+  | "delivered";
+
+/** Driver attached after they accept a ready order. Kitchen status stays ready. */
+export interface AdminOrderDriver {
+  public_id: string;
+  full_name: string | null;
+  phone: string | null;
+  profile_picture_url: string | null;
+}
 
 export interface AdminOrderAddress {
   address_type: string | null;
@@ -455,6 +469,10 @@ export interface AdminOrderItem {
 export interface AdminOrder {
   public_id: string;
   status: AdminOrderStatus | string;
+  /** unassigned before a driver accepts; accepted after. Order stays on the ready tab. */
+  delivery_status: string | null;
+  driver: AdminOrderDriver | null;
+  driver_accepted_at: string | null;
   payment_method: string | null;
   payment_status: string | null;
   subtotal: number;
@@ -478,6 +496,20 @@ export interface AdminOrderListData {
   page_size: number;
   results: AdminOrder[];
 }
+
+/** Single-row entity from GET/PATCH /api/admin/delivery-settings/. */
+export interface DeliverySettings {
+  pickup_name: string | null;
+  pickup_address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  free_delivery_radius_km: number;
+  per_km_rate: number;
+  min_order_for_free_delivery: number;
+}
+
+/** Partial fields for PATCH /api/admin/delivery-settings/. Omit unchanged keys. */
+export type UpdateDeliverySettingsPayload = Partial<DeliverySettings>;
 
 export class ApiError extends Error {
   readonly status: number;

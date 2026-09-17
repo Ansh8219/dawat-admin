@@ -328,7 +328,9 @@ function Dashboard() {
                       <div
                         className={cn(
                           "grid h-9 w-9 place-items-center rounded-lg",
-                          o.status === "preparing" ? "bg-info/10 text-info" : "bg-success/10 text-success",
+                          o.status === "preparing" || o.status === "on_the_way"
+                            ? "bg-info/10 text-info"
+                            : "bg-success/10 text-success",
                         )}
                       >
                         {o.status === "preparing" ? <ChefHat className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
@@ -336,7 +338,9 @@ function Dashboard() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold">{o.public_id.slice(0, 8)}</div>
                         <div className="truncate text-xs text-muted-foreground">
-                          {orderCustomerName(o)} · {orderItemCount(o)} items
+                          {o.status === "on_the_way" && o.driver?.full_name
+                            ? `${o.driver.full_name} · ${o.driver.phone || "—"}`
+                            : `${orderCustomerName(o)} · ${orderItemCount(o)} items`}
                         </div>
                       </div>
                       <div className="text-right">
