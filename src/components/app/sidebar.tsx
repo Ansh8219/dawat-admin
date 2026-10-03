@@ -8,8 +8,7 @@ import {
   CalendarDays,
   Users,
   Megaphone,
-  Bike,
-  UserCog,
+  UsersRound,
   Wallet,
   BarChart3,
   Bell,
@@ -43,14 +42,13 @@ const nav = [
     items: [
       { to: "/customers", label: "Customers", icon: Users },
       { to: "/marketing", label: "Marketing", icon: Megaphone },
-      { to: "/partners", label: "Partners", icon: Bike },
     ],
   },
   {
     section: "Admin",
     items: [
+      { to: "/people", label: "People", icon: UsersRound },
       { to: "/home-services", label: "Home Services", icon: LayoutGrid },
-      { to: "/staff", label: "Staff & Roles", icon: UserCog },
       { to: "/finance", label: "Finance", icon: Wallet },
       { to: "/reports", label: "Reports", icon: BarChart3 },
       { to: "/notifications", label: "Notifications", icon: Bell },

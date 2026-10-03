@@ -382,6 +382,108 @@ export interface PartnerReviewResult {
   reviewed_at?: string | null;
 }
 
+/** Store keeper onboarding / admin review */
+export type StoreKeeperStatus = "draft" | "pending" | "approved" | "rejected" | string;
+
+export type StoreKeeperAssignedStore = "restaurant" | "bakery" | string;
+
+export type StoreKeeperRejectField =
+  | "full_name"
+  | "email"
+  | "profile_picture"
+  | "date_of_joining"
+  | "emergency_contact"
+  | "assigned_store"
+  | "manager_name"
+  | "manager_phone"
+  | "aadhaar_front"
+  | "aadhaar_back"
+  | "address_proof";
+
+export interface StoreKeeperListItem {
+  public_id: string;
+  store_keeper_code: string | null;
+  full_name: string | null;
+  phone_number: string;
+  country_code: string;
+  email: string | null;
+  assigned_store: StoreKeeperAssignedStore | null;
+  store_keeper_status: StoreKeeperStatus;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export interface StoreKeeperListParams {
+  status?: StoreKeeperStatus | "";
+  page?: number;
+  page_size?: number;
+}
+
+export interface StoreKeeperListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: StoreKeeperListItem[];
+}
+
+export interface StoreKeeperUser {
+  country_code: string;
+  phone_number: string;
+  email: string | null;
+  role: string;
+}
+
+export interface StoreKeeperProfile {
+  full_name: string | null;
+  date_of_joining: string | null;
+  emergency_country_code: string | null;
+  emergency_phone_number: string | null;
+  assigned_store: StoreKeeperAssignedStore | null;
+  manager_name: string | null;
+  manager_country_code: string | null;
+  manager_phone_number: string | null;
+  profile_picture_url: string | null;
+}
+
+export interface StoreKeeperDocuments {
+  aadhaar_front_url: string | null;
+  aadhaar_back_url: string | null;
+  address_proof_url: string | null;
+}
+
+export interface StoreKeeperDetail {
+  public_id: string;
+  store_keeper_code: string | null;
+  store_keeper_status: StoreKeeperStatus;
+  rejection_reason: string | null;
+  rejected_fields: StoreKeeperRejectField[] | string[];
+  last_rejection_reason: string | null;
+  last_rejected_fields: StoreKeeperRejectField[] | string[];
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  user: StoreKeeperUser | null;
+  profile: StoreKeeperProfile | null;
+  documents: StoreKeeperDocuments | null;
+}
+
+export type StoreKeeperReviewPayload =
+  | { action: "approve" }
+  | {
+      action: "reject";
+      reason: string;
+      rejected_fields: StoreKeeperRejectField[];
+    };
+
+export interface StoreKeeperReviewResult {
+  detail?: string;
+  public_id: string;
+  store_keeper_status: StoreKeeperStatus;
+  rejection_reason?: string | null;
+  rejected_fields?: StoreKeeperRejectField[] | string[];
+  last_rejection_reason?: string | null;
+  last_rejected_fields?: StoreKeeperRejectField[] | string[];
+}
+
 /** Home Services tiles on the customer app (admin CRUD). */
 export interface HomeService {
   public_id: string;

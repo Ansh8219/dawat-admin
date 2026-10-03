@@ -15,10 +15,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
-import { Route as AppStaffRouteImport } from './routes/_app.staff'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
+import { Route as AppPeopleRouteImport } from './routes/_app.people'
 import { Route as AppPartnersRouteImport } from './routes/_app.partners'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
@@ -31,6 +31,8 @@ import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners_.$partnerId'
+import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
+import { Route as AppPeoplePartnersPartnerIdRouteImport } from './routes/_app.people_.partners.$partnerId'
 
 const SelectPanelRoute = SelectPanelRouteImport.update({
   id: '/select-panel',
@@ -61,11 +63,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppStaffRoute = AppStaffRouteImport.update({
-  id: '/staff',
-  path: '/staff',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -79,6 +76,11 @@ const AppReportsRoute = AppReportsRouteImport.update({
 const AppPosRoute = AppPosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPeopleRoute = AppPeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPartnersRoute = AppPartnersRouteImport.update({
@@ -141,6 +143,18 @@ const AppPartnersPartnerIdRoute = AppPartnersPartnerIdRouteImport.update({
   path: '/partners/$partnerId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPeopleStoreKeepersStoreKeeperIdRoute =
+  AppPeopleStoreKeepersStoreKeeperIdRouteImport.update({
+    id: '/people_/store-keepers/$storeKeeperId',
+    path: '/people/store-keepers/$storeKeeperId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppPeoplePartnersPartnerIdRoute =
+  AppPeoplePartnersPartnerIdRouteImport.update({
+    id: '/people_/partners/$partnerId',
+    path: '/people/partners/$partnerId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -159,11 +173,13 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
   '/partners': typeof AppPartnersRoute
+  '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
-  '/staff': typeof AppStaffRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
+  '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
@@ -181,12 +197,14 @@ export interface FileRoutesByTo {
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
   '/partners': typeof AppPartnersRoute
+  '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
-  '/staff': typeof AppStaffRoute
   '/': typeof AppIndexRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
+  '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -206,12 +224,14 @@ export interface FileRoutesById {
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/partners': typeof AppPartnersRoute
+  '/_app/people': typeof AppPeopleRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
-  '/_app/staff': typeof AppStaffRoute
   '/_app/': typeof AppIndexRoute
   '/_app/partners_/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/_app/people_/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
+  '/_app/people_/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -232,11 +252,13 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/orders'
     | '/partners'
+    | '/people'
     | '/pos'
     | '/reports'
     | '/settings'
-    | '/staff'
     | '/partners/$partnerId'
+    | '/people/partners/$partnerId'
+    | '/people/store-keepers/$storeKeeperId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -254,12 +276,14 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/orders'
     | '/partners'
+    | '/people'
     | '/pos'
     | '/reports'
     | '/settings'
-    | '/staff'
     | '/'
     | '/partners/$partnerId'
+    | '/people/partners/$partnerId'
+    | '/people/store-keepers/$storeKeeperId'
   id:
     | '__root__'
     | '/_app'
@@ -278,12 +302,14 @@ export interface FileRouteTypes {
     | '/_app/notifications'
     | '/_app/orders'
     | '/_app/partners'
+    | '/_app/people'
     | '/_app/pos'
     | '/_app/reports'
     | '/_app/settings'
-    | '/_app/staff'
     | '/_app/'
     | '/_app/partners_/$partnerId'
+    | '/_app/people_/partners/$partnerId'
+    | '/_app/people_/store-keepers/$storeKeeperId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -338,13 +364,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/staff': {
-      id: '/_app/staff'
-      path: '/staff'
-      fullPath: '/staff'
-      preLoaderRoute: typeof AppStaffRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -364,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof AppPosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/people': {
+      id: '/_app/people'
+      path: '/people'
+      fullPath: '/people'
+      preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/partners': {
@@ -450,6 +476,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPartnersPartnerIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/people_/store-keepers/$storeKeeperId': {
+      id: '/_app/people_/store-keepers/$storeKeeperId'
+      path: '/people/store-keepers/$storeKeeperId'
+      fullPath: '/people/store-keepers/$storeKeeperId'
+      preLoaderRoute: typeof AppPeopleStoreKeepersStoreKeeperIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/people_/partners/$partnerId': {
+      id: '/_app/people_/partners/$partnerId'
+      path: '/people/partners/$partnerId'
+      fullPath: '/people/partners/$partnerId'
+      preLoaderRoute: typeof AppPeoplePartnersPartnerIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -465,12 +505,14 @@ interface AppRouteChildren {
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPartnersRoute: typeof AppPartnersRoute
+  AppPeopleRoute: typeof AppPeopleRoute
   AppPosRoute: typeof AppPosRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppStaffRoute: typeof AppStaffRoute
   AppIndexRoute: typeof AppIndexRoute
   AppPartnersPartnerIdRoute: typeof AppPartnersPartnerIdRoute
+  AppPeoplePartnersPartnerIdRoute: typeof AppPeoplePartnersPartnerIdRoute
+  AppPeopleStoreKeepersStoreKeeperIdRoute: typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -485,12 +527,15 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotificationsRoute: AppNotificationsRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPartnersRoute: AppPartnersRoute,
+  AppPeopleRoute: AppPeopleRoute,
   AppPosRoute: AppPosRoute,
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppStaffRoute: AppStaffRoute,
   AppIndexRoute: AppIndexRoute,
   AppPartnersPartnerIdRoute: AppPartnersPartnerIdRoute,
+  AppPeoplePartnersPartnerIdRoute: AppPeoplePartnersPartnerIdRoute,
+  AppPeopleStoreKeepersStoreKeeperIdRoute:
+    AppPeopleStoreKeepersStoreKeeperIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
