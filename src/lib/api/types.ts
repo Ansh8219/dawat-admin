@@ -606,6 +606,43 @@ export interface AdminOrderListData {
   results: AdminOrder[];
 }
 
+/** Restaurant floor table for QR dine-in ordering (admin CRUD). */
+export interface RestaurantTable {
+  public_id: string;
+  table_number: string;
+  seats: number;
+  is_active: boolean;
+  /** Opaque token embedded in guest QR URL (`/t/{qr_token}`). */
+  qr_token: string;
+  business_public_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RestaurantTableListParams {
+  business_public_id: string;
+  is_active?: boolean;
+  q?: string;
+}
+
+export interface RestaurantTableListData {
+  count: number;
+  results: RestaurantTable[];
+}
+
+export interface CreateRestaurantTableFields {
+  business_public_id: string;
+  table_number: string;
+  seats: number;
+  is_active?: boolean;
+}
+
+export type UpdateRestaurantTableFields = Partial<{
+  table_number: string;
+  seats: number;
+  is_active: boolean;
+}>;
+
 /** Single-row entity from GET/PATCH /api/admin/delivery-settings/. */
 export interface DeliverySettings {
   pickup_name: string | null;

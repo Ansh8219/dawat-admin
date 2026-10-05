@@ -51,6 +51,10 @@ export interface Order {
   time: string;
   address?: string;
   phone: string;
+  /** Present for QR table orders */
+  tableNumber?: string;
+  /** `qr` = paid dine-in from order-web */
+  source?: "qr" | "pos" | "online";
 }
 
 const customerNames = [
@@ -459,16 +463,70 @@ export const notifications = [
   { id: 6, type: "inventory", title: "Paneer low stock",               body: "6 Kg remaining",                       time: "Yesterday",   priority: "medium", read: true,  group: "Earlier" },
 ];
 
-export const tables = Array.from({ length: 18 }).map((_, i) => {
-  const states = ["Available","Occupied","Reserved","Available","Available","Occupied"] as const;
+export type TableFloorStatus = "Available" | "Occupied" | "Reserved";
+
+export interface FloorTable {
+  id: string;
+  seats: number;
+  status: TableFloorStatus;
+  orderId?: string;
+  amount?: number;
+  /** Opaque token embedded in guest QR URL */
+  qrToken: string;
+  qrActive: boolean;
+}
+
+export const tables: FloorTable[] = Array.from({ length: 18 }).map((_, i) => {
+  const states: TableFloorStatus[] = ["Available","Occupied","Reserved","Available","Available","Occupied"];
+  const id = "T" + String(i + 1).padStart(2, "0");
   return {
-    id: "T" + String(i + 1).padStart(2, "0"),
+    id,
     seats: [2, 4, 4, 6, 8][i % 5],
     status: states[i % states.length],
     orderId: i % 6 === 1 ? "DB-" + (1100 + i) : undefined,
     amount: i % 6 === 1 ? 800 + i * 40 : undefined,
+    qrToken: `tbl_demo_${id.toLowerCase()}_rest`,
+    qrActive: true,
   };
 });
+
+/** Seeded paid QR dine-in orders for kitchen board (restaurant). */
+export const qrDineInOrders: Order[] = [
+  {
+    id: "DB-QR-2201",
+    customer: "Guest · Table T04",
+    channel: "Dine-In",
+    branch: "restaurant",
+    items: [
+      { name: "Daal Makhni (Full)", qty: 1, price: 320, code: 22 },
+      { name: "Garlic Naan", qty: 2, price: 80, code: 8 },
+    ],
+    amount: 504,
+    pay: "UPI",
+    status: "Pending",
+    time: "1:42 PM",
+    phone: "+91 9876543210",
+    tableNumber: "T04",
+    source: "qr",
+  },
+  {
+    id: "DB-QR-2202",
+    customer: "Guest · Table T08",
+    channel: "Dine-In",
+    branch: "restaurant",
+    items: [
+      { name: "Veg Dum Biryani (Regular)", qty: 1, price: 340, code: 31 },
+      { name: "Boondi Raita", qty: 1, price: 60, code: 0 },
+    ],
+    amount: 420,
+    pay: "UPI",
+    status: "Preparing",
+    time: "1:35 PM",
+    phone: "+91 9811122233",
+    tableNumber: "T08",
+    source: "qr",
+  },
+];
 
 export const banquetEvents = [
   { date: 12, title: "Sharma Wedding Reception", guests: 350, pkg: "Royal Gold",   advance: 25, total: 480000 },

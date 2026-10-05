@@ -68,7 +68,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     imageAlt: "Restaurant dining room",
     active: true,
     alert: "2 Pending Approvals",
-    features: ["Table floor", "Kitchen KOT", "Online orders", "Bookings"],
+    features: ["Table floor", "Tables", "Kitchen KOT", "Online orders"],
     stats: [
       { label: "Today's Sales", value: "₹24,500", hint: "↑ 12.4%", hintTone: "up", icon: "sales" },
       { label: "Orders Today", value: "143", hint: "↑ 8.7%", hintTone: "up", icon: "orders" },
@@ -90,6 +90,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
       "/menu-categories",
       "/inventory",
       "/bookings",
+      "/table-qr",
       "/customers",
       "/marketing",
       "/people",

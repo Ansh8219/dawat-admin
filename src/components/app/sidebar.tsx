@@ -17,6 +17,7 @@ import {
   ChevronsRight,
   LayoutGrid,
   Tags,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -35,6 +36,7 @@ const nav = [
       { to: "/menu-categories", label: "Menu Categories", icon: Tags },
       { to: "/inventory", label: "Inventory", icon: Boxes },
       { to: "/bookings", label: "Tables & Bookings", icon: CalendarDays },
+      { to: "/table-qr", label: "Tables", icon: QrCode },
     ],
   },
   {
