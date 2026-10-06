@@ -105,6 +105,14 @@ function humanizeErrorCode(code: string): string {
       return "That action is not allowed yet. Start preparing before marking ready.";
     case "invalid_pickup_location":
       return "Set both latitude and longitude, or leave both empty.";
+    case "table_number_taken":
+      return "That table number is already in use.";
+    case "dining_table_not_found":
+      return "Table not found.";
+    case "table_qr_base_url_not_configured":
+      return "QR base URL is not configured on the server.";
+    case "validation":
+      return "Please check your input and try again.";
     default:
       return "Something went wrong. Please try again.";
   }
@@ -184,4 +192,57 @@ export async function apiFormRequest<T>(path: string, options: FormRequestOption
   }
 
   return parseEnvelope<T>(response);
+}
+
+type BinaryRequestOptions = {
+  method?: "GET";
+  accessToken?: string | null;
+  signal?: AbortSignal;
+  /** Expected MIME type(s); used for Accept header. */
+  accept?: string;
+};
+
+/**
+ * Fetches a non-JSON response (e.g. image/png). On error responses that are JSON
+ * envelopes, parses and throws ApiError like apiRequest.
+ */
+export async function apiBinaryRequest(
+  path: string,
+  options: BinaryRequestOptions = {},
+): Promise<Blob> {
+  const { method = "GET", accessToken, signal, accept = "*/*" } = options;
+  const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const headers: Record<string, string> = {
+    Accept: accept,
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, { method, headers, signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok) {
+    if (contentType.includes("application/json")) {
+      return parseEnvelope<never>(response);
+    }
+    throw new ApiError(
+      response.status,
+      "request_failed",
+      `Unexpected response (${response.status}).`,
+    );
+  }
+
+  if (contentType.includes("application/json")) {
+    return parseEnvelope<never>(response);
+  }
+
+  return response.blob();
 }

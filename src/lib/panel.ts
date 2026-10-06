@@ -142,6 +142,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
       "/reports",
       "/notifications",
       "/settings",
+      "/table-qr",
     ],
   },
   banquet: {

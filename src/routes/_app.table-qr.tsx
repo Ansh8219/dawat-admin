@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   ExternalLink,
@@ -8,7 +10,6 @@ import {
   Pencil,
   Plus,
   QrCode,
-  RotateCcw,
   Search,
   Trash2,
   Users,
@@ -42,16 +43,17 @@ import { Switch } from "@/components/ui/switch";
 import {
   createTable,
   deleteTable,
+  downloadBlob,
+  getTableQrPng,
   listTables,
-  rotateTableQrToken,
   updateTable,
 } from "@/lib/api/tables";
 import { ApiError } from "@/lib/api/types";
 import type { RestaurantTable } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { ORDER_WEB_BASE_URL, qrImageUrl, tableOrderUrl } from "@/lib/order-web";
-import { usePanel, usePanelMeta } from "@/lib/use-panel";
+import { qrImageUrl } from "@/lib/order-web";
+import { usePanel } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/table-qr")({
@@ -74,28 +76,31 @@ const EMPTY_FORM: FormState = {
 };
 
 const SEAT_PRESETS = [2, 4, 6, 8];
+const PAGE_SIZE = 20;
 
 function TablesPage() {
   const navigate = useNavigate();
   const panel = usePanel();
-  const meta = usePanelMeta();
-  const business = useAuth((s) => s.business);
-  const businessPublicId = business?.publicId ?? "biz_restaurant_local";
 
   const [results, setResults] = useState<RestaurantTable[]>([]);
   const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [rotating, setRotating] = useState(false);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<RestaurantTable | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<RestaurantTable | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -113,7 +118,7 @@ function TablesPage() {
   );
 
   const refresh = useCallback(
-    async (options?: { showLoading?: boolean; keepSelection?: boolean }) => {
+    async (options?: { showLoading?: boolean; keepSelection?: boolean; selectId?: string }) => {
       const showLoading = options?.showLoading ?? false;
       if (showLoading) {
         setLoading(true);
@@ -122,16 +127,26 @@ function TablesPage() {
       try {
         const data = await withAuthRetry((token) =>
           listTables(token, {
-            business_public_id: businessPublicId,
+            page,
+            page_size: PAGE_SIZE,
             is_active: activeFilter === "all" ? undefined : activeFilter === "active",
           }),
         );
-        setResults(data.results ?? []);
+        const list = data.results ?? [];
+        setResults(list);
         setCount(data.count ?? 0);
+        const maxPage = Math.max(1, Math.ceil((data.count ?? 0) / (data.page_size || PAGE_SIZE)));
+        if (page > maxPage) {
+          setPage(maxPage);
+          return;
+        }
         setSelectedId((prev) => {
-          if (options?.keepSelection === false) return data.results[0]?.public_id ?? null;
-          if (prev && data.results.some((t) => t.public_id === prev)) return prev;
-          return data.results[0]?.public_id ?? null;
+          if (options?.selectId && list.some((t) => t.public_id === options.selectId)) {
+            return options.selectId;
+          }
+          if (options?.keepSelection === false) return list[0]?.public_id ?? null;
+          if (prev && list.some((t) => t.public_id === prev)) return prev;
+          return list[0]?.public_id ?? null;
         });
       } catch (err) {
         if (handleAuthError(err)) return;
@@ -142,13 +157,17 @@ function TablesPage() {
         if (showLoading) setLoading(false);
       }
     },
-    [activeFilter, businessPublicId, handleAuthError],
+    [activeFilter, handleAuthError, page],
   );
 
   useEffect(() => {
-    if (panel !== "restaurant") return;
+    if (panel === "banquet") return;
     void refresh({ showLoading: true });
   }, [panel, refresh]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -156,7 +175,7 @@ function TablesPage() {
     return results.filter(
       (t) =>
         t.table_number.toLowerCase().includes(needle) ||
-        t.qr_token.toLowerCase().includes(needle),
+        t.qr_url.toLowerCase().includes(needle),
     );
   }, [q, results]);
 
@@ -167,6 +186,55 @@ function TablesPage() {
 
   const activeCount = useMemo(() => results.filter((t) => t.is_active).length, [results]);
   const seatTotal = useMemo(() => results.reduce((sum, t) => sum + t.seats, 0), [results]);
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rangeStart = count === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, count);
+
+  useEffect(() => {
+    if (!selected) {
+      setQrPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setQrError("");
+      setQrLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setQrLoading(true);
+    setQrError("");
+    setQrPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+
+    void (async () => {
+      try {
+        const blob = await withAuthRetry((token) =>
+          getTableQrPng(token, selected.public_id, controller.signal),
+        );
+        if (cancelled) return;
+        setQrPreviewUrl(URL.createObjectURL(blob));
+      } catch (err) {
+        if (cancelled || controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (handleAuthError(err)) return;
+        setQrError(err instanceof ApiError ? err.message : "Unable to load QR image.");
+      } finally {
+        if (!cancelled) setQrLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [handleAuthError, selected]);
 
   function openCreate() {
     setEditing(null);
@@ -182,6 +250,44 @@ function TablesPage() {
       is_active: table.is_active,
     });
     setSheetOpen(true);
+  }
+
+  async function downloadQr(table: RestaurantTable) {
+    setDownloadingId(table.public_id);
+    try {
+      const blob = await withAuthRetry((token) => getTableQrPng(token, table.public_id));
+      downloadBlob(blob, `${table.table_number}-qr.png`);
+      toast.success(`Downloaded ${table.table_number}-qr.png`);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      toast.error(err instanceof ApiError ? err.message : "Unable to download QR");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleting(true);
+    try {
+      await withAuthRetry((token) => deleteTable(token, target.public_id));
+      toast.success(`${target.table_number} deleted`);
+      setDeleteTarget(null);
+      if (selectedId === target.public_id) setSelectedId(null);
+      await refresh({ showLoading: false });
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      if (err instanceof ApiError && (err.status === 404 || err.code === "dining_table_not_found")) {
+        toast.error("That table is already gone.");
+        setDeleteTarget(null);
+        await refresh({ showLoading: false });
+        return;
+      }
+      toast.error(err instanceof ApiError ? err.message : "Unable to delete table");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function toggleActive(table: RestaurantTable, next: boolean) {
@@ -214,22 +320,6 @@ function TablesPage() {
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await withAuthRetry((token) => deleteTable(token, deleteTarget.public_id));
-      toast.success(`${deleteTarget.table_number} deleted`);
-      setDeleteTarget(null);
-      await refresh({ showLoading: false });
-    } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to delete table");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   async function saveForm() {
     const tableNumber = form.table_number.trim();
     const seats = Number.parseInt(form.seats, 10);
@@ -238,8 +328,12 @@ function TablesPage() {
       toast.error("Table number is required");
       return;
     }
-    if (!Number.isFinite(seats) || seats < 1 || seats > 24) {
-      toast.error("Seats must be between 1 and 24");
+    if (tableNumber.length > 64) {
+      toast.error("Table number must be 64 characters or fewer");
+      return;
+    }
+    if (!Number.isFinite(seats) || seats < 1) {
+      toast.error("Seats must be at least 1");
       return;
     }
 
@@ -261,15 +355,19 @@ function TablesPage() {
       } else {
         const created = await withAuthRetry((token) =>
           createTable(token, {
-            business_public_id: businessPublicId,
             table_number: tableNumber,
             seats,
             is_active: form.is_active,
           }),
         );
-        toast.success(`${created.table_number} created`);
         setSelectedId(created.public_id);
-        await refresh({ showLoading: false, keepSelection: true });
+        toast.success(`${created.table_number} created`, {
+          action: {
+            label: "Download QR",
+            onClick: () => void downloadQr(created),
+          },
+        });
+        await refresh({ showLoading: false, keepSelection: true, selectId: created.public_id });
       }
       setSheetOpen(false);
     } catch (err) {
@@ -277,25 +375,6 @@ function TablesPage() {
       toast.error(err instanceof ApiError ? err.message : "Unable to save table");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function rotateSelected() {
-    if (!selected) return;
-    setRotating(true);
-    try {
-      const updated = await withAuthRetry((token) =>
-        rotateTableQrToken(token, selected.public_id),
-      );
-      setResults((prev) =>
-        prev.map((r) => (r.public_id === selected.public_id ? { ...r, ...updated } : r)),
-      );
-      toast.success(`QR rotated for ${updated.table_number}`);
-    } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to rotate QR");
-    } finally {
-      setRotating(false);
     }
   }
 
@@ -308,29 +387,27 @@ function TablesPage() {
     }
   };
 
-  if (panel !== "restaurant") {
+  if (panel === "banquet") {
     return (
       <div className="flex min-h-full flex-col bg-muted/20">
         <PageHeader
           title="Tables"
           crumbs={["Operations", "Tables"]}
-          description="Table QR ordering is available for the Restaurant panel."
+          description="Dining table QR codes are managed from the Restaurant or Bakery panel."
         />
         <div className="p-6 text-sm text-muted-foreground">
-          Switch to Restaurant to add tables and print guest QR codes.
+          Switch to Restaurant or Bakery to manage dining tables and print guest QR codes.
         </div>
       </div>
     );
   }
-
-  const selectedUrl = selected ? tableOrderUrl(selected.qr_token) : "";
 
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
         title="Tables"
         crumbs={["Operations", "Tables"]}
-        description={`Add restaurant tables and print QR codes for ${meta.label}. Guests scan, pay online, then kitchen receives the order.`}
+        description="Add dining tables and print QR codes for guest ordering. Tables are shared across restaurant and bakery."
         action={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
@@ -353,9 +430,13 @@ function TablesPage() {
 
       <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
         <div className="grid gap-3 sm:grid-cols-3 print:hidden">
-          <StatChip label="Tables" value={String(results.length)} hint={activeFilter === "all" ? "In this list" : "Filtered"} />
-          <StatChip label="QR active" value={String(activeCount)} hint="Ready for guests" />
-          <StatChip label="Total seats" value={String(seatTotal)} hint="Across listed tables" />
+          <StatChip
+            label="Tables"
+            value={String(count)}
+            hint={activeFilter === "all" ? "Total" : "Filtered"}
+          />
+          <StatChip label="QR active" value={String(activeCount)} hint="On this page" />
+          <StatChip label="Total seats" value={String(seatTotal)} hint="On this page" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] print:grid-cols-1">
@@ -366,11 +447,14 @@ function TablesPage() {
                 <Input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search table number or token…"
+                  placeholder="Search table number or QR URL…"
                   className="h-10 rounded-xl bg-card pl-9"
                 />
               </div>
-              <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as ActiveFilter)}>
+              <Select
+                value={activeFilter}
+                onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
+              >
                 <SelectTrigger className="h-10 w-[160px] rounded-xl bg-card">
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
@@ -409,7 +493,9 @@ function TablesPage() {
                     <QrCode className="h-7 w-7" />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-medium">{results.length === 0 ? "No tables yet" : "No matching tables"}</p>
+                    <p className="font-medium">
+                      {results.length === 0 ? "No tables yet" : "No matching tables"}
+                    </p>
                     <p className="max-w-sm text-sm text-muted-foreground">
                       {results.length === 0
                         ? "Create a table with number and seats. We’ll generate a QR guests can scan to order."
@@ -424,98 +510,152 @@ function TablesPage() {
                   ) : null}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
-                    <thead>
-                      <tr className="border-b border-border/80 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <th className="px-4 py-3">Table</th>
-                        <th className="px-4 py-3">Seats</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">QR</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((table) => {
-                        const active = selected?.public_id === table.public_id;
-                        return (
-                          <tr
-                            key={table.public_id}
-                            className={cn(
-                              "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/30",
-                              active && "bg-primary/5",
-                            )}
-                            onClick={() => setSelectedId(table.public_id)}
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={cn(
-                                    "flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold",
-                                    table.is_active
-                                      ? "bg-primary/10 text-primary"
-                                      : "bg-muted text-muted-foreground",
-                                  )}
-                                >
-                                  {table.table_number.replace(/^T/i, "") || "·"}
-                                </div>
-                                <div>
-                                  <div className="font-semibold tracking-tight">{table.table_number}</div>
-                                  <div className="text-[11px] text-muted-foreground">
-                                    {table.is_active ? "Ready for guest scans" : "QR disabled"}
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-sm">
+                      <thead>
+                        <tr className="border-b border-border/80 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <th className="px-4 py-3">Table</th>
+                          <th className="px-4 py-3">Seats</th>
+                          <th className="px-4 py-3">Active</th>
+                          <th className="px-4 py-3">QR</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((table) => {
+                          const active = selected?.public_id === table.public_id;
+                          return (
+                            <tr
+                              key={table.public_id}
+                              className={cn(
+                                "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/30",
+                                active && "bg-primary/5",
+                              )}
+                              onClick={() => setSelectedId(table.public_id)}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={cn(
+                                      "flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold",
+                                      table.is_active
+                                        ? "bg-primary/10 text-primary"
+                                        : "bg-muted text-muted-foreground",
+                                    )}
+                                  >
+                                    {table.table_number.replace(/^T/i, "") || "·"}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold tracking-tight">
+                                      {table.table_number}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      {table.is_active ? "Ready for guest scans" : "QR disabled"}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                <Users className="h-3.5 w-3.5" />
-                                {table.seats}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-2">
-                                <StatusBadge status={table.is_active ? "Active" : "Inactive"} />
-                                <Switch
-                                  checked={table.is_active}
-                                  disabled={togglingId === table.public_id}
-                                  onCheckedChange={(v) => void toggleActive(table, v)}
-                                  aria-label={`Toggle ${table.table_number}`}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                  <Users className="h-3.5 w-3.5" />
+                                  {table.seats}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-2">
+                                  <StatusBadge status={table.is_active ? "Active" : "Inactive"} />
+                                  <Switch
+                                    checked={table.is_active}
+                                    disabled={togglingId === table.public_id}
+                                    onCheckedChange={(v) => void toggleActive(table, v)}
+                                    aria-label={`Toggle ${table.table_number}`}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-xl"
+                                  disabled={downloadingId === table.public_id}
+                                  onClick={() => void downloadQr(table)}
+                                >
+                                  {downloadingId === table.public_id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Download className="h-3.5 w-3.5" />
+                                  )}
+                                  View / Download
+                                </Button>
+                              </td>
+                              <td
+                                className="px-4 py-3 text-right"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <RowActions
+                                  items={[
+                                    {
+                                      label: "Edit",
+                                      icon: <Pencil className="mr-2 h-4 w-4" />,
+                                      onClick: () => openEdit(table),
+                                    },
+                                    {
+                                      label: "Download QR",
+                                      icon: <QrCode className="mr-2 h-4 w-4" />,
+                                      onClick: () => void downloadQr(table),
+                                    },
+                                    { label: "", onClick: () => {}, separator: true },
+                                    {
+                                      label: "Delete",
+                                      icon: <Trash2 className="mr-2 h-4 w-4" />,
+                                      destructive: true,
+                                      onClick: () => setDeleteTarget(table),
+                                    },
+                                  ]}
                                 />
-                              </div>
-                            </td>
-                            <td className="max-w-[180px] truncate px-4 py-3 font-mono text-[11px] text-muted-foreground">
-                              {table.qr_token}
-                            </td>
-                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                              <RowActions
-                                items={[
-                                  {
-                                    label: "Edit",
-                                    icon: <Pencil className="mr-2 h-4 w-4" />,
-                                    onClick: () => openEdit(table),
-                                  },
-                                  {
-                                    label: "View QR",
-                                    icon: <QrCode className="mr-2 h-4 w-4" />,
-                                    onClick: () => setSelectedId(table.public_id),
-                                  },
-                                  { label: "", onClick: () => {}, separator: true },
-                                  {
-                                    label: "Delete",
-                                    icon: <Trash2 className="mr-2 h-4 w-4" />,
-                                    destructive: true,
-                                    onClick: () => setDeleteTarget(table),
-                                  },
-                                ]}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {count > 0 ? (
+                    <div className="flex flex-col gap-2 border-t bg-muted/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        Showing <b className="text-foreground">{rangeStart}</b>–
+                        <b className="text-foreground">{rangeEnd}</b> of{" "}
+                        <b className="text-foreground">{count}</b>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-xl"
+                          disabled={safePage === 1}
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        >
+                          <ChevronLeft className="h-4 w-4" /> Prev
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          Page {safePage} / {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-xl"
+                          disabled={safePage === totalPages}
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        >
+                          Next <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
@@ -551,7 +691,7 @@ function TablesPage() {
 
                 <div
                   className={cn(
-                    "relative flex justify-center rounded-2xl p-5",
+                    "relative flex min-h-[260px] items-center justify-center rounded-2xl p-5",
                     selected.is_active
                       ? "bg-[radial-gradient(ellipse_at_center,var(--primary-soft),transparent_70%)]"
                       : "bg-muted/50",
@@ -562,11 +702,20 @@ function TablesPage() {
                       <StatusBadge status="Inactive" />
                     </div>
                   ) : null}
-                  <img
-                    src={qrImageUrl(selectedUrl, 220)}
-                    alt={`QR for table ${selected.table_number}`}
-                    className="h-[220px] w-[220px] rounded-xl bg-white p-2 shadow-[var(--shadow-soft)]"
-                  />
+                  {qrLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading QR…
+                    </div>
+                  ) : qrError ? (
+                    <p className="px-4 text-center text-sm text-destructive">{qrError}</p>
+                  ) : qrPreviewUrl ? (
+                    <img
+                      src={qrPreviewUrl}
+                      alt={`QR for table ${selected.table_number}`}
+                      className="h-[220px] w-[220px] rounded-xl bg-white p-2 shadow-[var(--shadow-soft)]"
+                    />
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -574,10 +723,7 @@ function TablesPage() {
                     Guest order link
                   </p>
                   <p className="break-all rounded-xl bg-muted/50 px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                    {selectedUrl}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Hosted on {ORDER_WEB_BASE_URL.replace(/^https?:\/\//, "")}
+                    {selected.qr_url}
                   </p>
                 </div>
 
@@ -587,13 +733,13 @@ function TablesPage() {
                     size="sm"
                     variant="outline"
                     className="rounded-xl"
-                    onClick={() => void copyUrl(selectedUrl)}
+                    onClick={() => void copyUrl(selected.qr_url)}
                   >
                     <Copy className="h-3.5 w-3.5" />
                     Copy link
                   </Button>
                   <Button type="button" size="sm" variant="outline" className="rounded-xl" asChild>
-                    <a href={selectedUrl} target="_blank" rel="noreferrer">
+                    <a href={selected.qr_url} target="_blank" rel="noreferrer">
                       <ExternalLink className="h-3.5 w-3.5" />
                       Open
                     </a>
@@ -601,23 +747,33 @@ function TablesPage() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
                     className="rounded-xl"
-                    disabled={rotating}
-                    onClick={() => void rotateSelected()}
+                    disabled={downloadingId === selected.public_id}
+                    onClick={() => void downloadQr(selected)}
                   >
-                    {rotating ? (
+                    {downloadingId === selected.public_id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <Download className="h-3.5 w-3.5" />
                     )}
-                    Rotate token
+                    Download QR
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setDeleteTarget(selected)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
                   </Button>
                 </div>
 
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Print this card and place it on the table. Rotating the token invalidates old printed
-                  codes — reprint after rotating.
+                  Print this card and place it on the table. The QR URL is fixed when the table is
+                  created and does not change on edit. Prefer deactivating a table to hide it; delete
+                  permanently removes it.
                 </p>
               </div>
             ) : (
@@ -629,23 +785,19 @@ function TablesPage() {
           </aside>
         </div>
 
-        {/* Printable grid of active tables */}
         <div className="hidden print:grid print:grid-cols-3 print:gap-6">
           {results
             .filter((t) => t.is_active)
-            .map((t) => {
-              const link = tableOrderUrl(t.qr_token);
-              return (
-                <div
-                  key={t.public_id}
-                  className="flex flex-col items-center gap-2 border border-border p-4 text-center"
-                >
-                  <p className="text-lg font-bold">Daawat · {t.table_number}</p>
-                  <img src={qrImageUrl(link, 160)} alt="" className="h-40 w-40" />
-                  <p className="text-xs">Scan to order & pay</p>
-                </div>
-              );
-            })}
+            .map((t) => (
+              <div
+                key={t.public_id}
+                className="flex flex-col items-center gap-2 border border-border p-4 text-center"
+              >
+                <p className="text-lg font-bold">Daawat · {t.table_number}</p>
+                <img src={qrImageUrl(t.qr_url, 160)} alt="" className="h-40 w-40" />
+                <p className="text-xs">Scan to order & pay</p>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -661,11 +813,14 @@ function TablesPage() {
                 id="table_number"
                 value={form.table_number}
                 onChange={(e) => setForm((f) => ({ ...f, table_number: e.target.value }))}
-                placeholder="e.g. T04"
+                placeholder="e.g. table01"
+                maxLength={64}
                 className="rounded-xl"
                 autoFocus
               />
-              <p className="text-[11px] text-muted-foreground">Shown to guests on the order screen.</p>
+              <p className="text-[11px] text-muted-foreground">
+                Unique label shown to guests. Max 64 characters.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -674,7 +829,6 @@ function TablesPage() {
                 id="seats"
                 type="number"
                 min={1}
-                max={24}
                 value={form.seats}
                 onChange={(e) => setForm((f) => ({ ...f, seats: e.target.value }))}
                 className="rounded-xl"
@@ -709,11 +863,23 @@ function TablesPage() {
               />
             </div>
 
-            {!editing ? (
+            {editing ? (
+              <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  QR URL
+                </p>
+                <p className="break-all font-mono text-[11px] text-muted-foreground">
+                  {editing.qr_url}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Read-only. Generated on create and never changes.
+                </p>
+              </div>
+            ) : (
               <p className="rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                A unique QR token is generated automatically when you create the table.
+                A unique QR code is generated automatically when you create the table.
               </p>
-            ) : null}
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button
@@ -742,9 +908,10 @@ function TablesPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete table {deleteTarget?.table_number}?</AlertDialogTitle>
+            <AlertDialogTitle>Delete {deleteTarget?.table_number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Printed QR codes for this table will stop working. This cannot be undone.
+              This cannot be undone. Printed QR codes for this table will stop working. Prefer
+              deactivating the table if you only want to hide it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -770,7 +937,9 @@ function TablesPage() {
 function StatChip({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div className="rounded-2xl border border-border/80 bg-card px-4 py-3 shadow-[var(--shadow-soft)]">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
       <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
