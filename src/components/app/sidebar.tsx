@@ -49,7 +49,7 @@ const nav = [
   {
     section: "Admin",
     items: [
-      { to: "/people", label: "People", icon: UsersRound },
+      { to: "/people", label: "Staff", icon: UsersRound },
       { to: "/home-services", label: "Home Services", icon: LayoutGrid },
       { to: "/finance", label: "Finance", icon: Wallet },
       { to: "/reports", label: "Reports", icon: BarChart3 },

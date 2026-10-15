@@ -241,7 +241,7 @@ function StoreKeeperDetailPage() {
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
         title={storeKeeper?.profile?.full_name || "Store keeper review"}
-        crumbs={["Admin", "People", "Store Keepers"]}
+        crumbs={["Admin", "Staff", "Store Keepers"]}
         description="Check profile and assignment on the left. Verify document images on the right."
         action={
           <Button variant="outline" className="rounded-xl gap-2" asChild>

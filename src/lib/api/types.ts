@@ -55,20 +55,55 @@ export type MenuDietary = "veg" | "egg" | "non_veg";
 export type MenuTax = "gst_5" | "gst_12" | "gst_18" | "exempt";
 
 export interface MenuVariant {
+  public_id?: string;
   name: string;
   price: number | string;
 }
 
 export interface MenuAddonOption {
+  public_id?: string;
   name: string;
   price: number | string;
 }
 
 export interface MenuAddonGroup {
+  public_id?: string;
   name: string;
   min?: number;
   max?: number;
   options: MenuAddonOption[];
+}
+
+/** Recipe line scope on create / detail. */
+export type MenuRecipeScope = "base" | "variant" | "addon";
+
+/** Create payload recipe line — match variants/addons by name on create. */
+export interface CreateMenuRecipeLine {
+  inventory_item_public_id: string;
+  quantity_per_unit: number;
+  scope: MenuRecipeScope;
+  variant_name?: string;
+  addon_group_name?: string;
+  addon_option_name?: string;
+  notes?: string;
+}
+
+/** Recipe line on menu item detail response. */
+export interface MenuRecipeLine {
+  public_id?: string;
+  inventory_item_public_id: string;
+  inventory_sku?: string | null;
+  inventory_name?: string | null;
+  inventory_unit?: string | null;
+  quantity_per_unit: number;
+  scope: MenuRecipeScope;
+  variant_name?: string | null;
+  variant_public_id?: string | null;
+  addon_group_name?: string | null;
+  addon_group_public_id?: string | null;
+  addon_option_name?: string | null;
+  addon_option_public_id?: string | null;
+  notes?: string | null;
 }
 
 export interface MenuItemImage {
@@ -159,6 +194,7 @@ export interface MenuItemDetail {
   sort_order: number;
   variants: MenuVariant[];
   addon_groups: MenuAddonGroup[];
+  recipe?: MenuRecipeLine[];
   images: MenuItemImage[];
   created_at: string;
   updated_at: string;
@@ -183,6 +219,8 @@ export interface CreateMenuItemPayload {
   sort_order?: number;
   variants?: MenuVariant[];
   addon_groups?: MenuAddonGroup[];
+  /** Optional recipe lines — omit or [] = no recipe. Create only for now. */
+  recipe?: CreateMenuRecipeLine[];
 }
 
 /** Partial fields for PATCH /api/admin/menu-items/{public_id}/ (multipart payload JSON). */
@@ -656,6 +694,178 @@ export interface DeliverySettings {
 
 /** Partial fields for PATCH /api/admin/delivery-settings/. Omit unchanged keys. */
 export type UpdateDeliverySettingsPayload = Partial<DeliverySettings>;
+
+/** Inventory unit enum from /api/admin/inventory/. */
+export type InventoryUnit = "kg" | "gram" | "litre" | "pcs";
+
+/** GET /api/admin/inventory/categories/ */
+export interface InventoryCategory {
+  public_id: string;
+  slug: string;
+  name: string;
+  sort_order: number;
+  is_system: boolean;
+  is_active: boolean;
+}
+
+export interface InventoryCategoryListData {
+  count: number;
+  results: InventoryCategory[];
+}
+
+export interface InventoryCategoryListParams {
+  is_active?: boolean;
+}
+
+/** POST /api/admin/inventory/items/ */
+export interface CreateInventoryItemPayload {
+  business_public_id: string;
+  category_public_id: string;
+  sku: string;
+  name: string;
+  unit: InventoryUnit;
+  reorder_level?: number;
+  is_active?: boolean;
+}
+
+/** List / create shape from /api/admin/inventory/items/. */
+export interface InventoryItemDetail {
+  public_id: string;
+  business_public_id?: string;
+  category_public_id: string;
+  category_slug?: string | null;
+  category_name?: string | null;
+  category?: string | null;
+  sku: string;
+  name: string;
+  unit: InventoryUnit;
+  reorder_level: number;
+  is_active: boolean;
+  available?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryItemListParams {
+  business_public_id: string;
+  is_active?: boolean;
+}
+
+export interface InventoryItemListData {
+  count: number;
+  results: InventoryItemDetail[];
+}
+
+/** PATCH /api/admin/inventory/items/{item_public_id}/stock/ */
+export interface UpdateInventoryStockPayload {
+  quantity: number;
+  cost_per_unit?: number;
+  stock_date?: string;
+  notes?: string;
+}
+
+/** —— Admin offers / coupons —— */
+export type OfferDiscountType = "percentage" | "flat";
+export type OfferChannel = "delivery" | "pickup" | "dine_in";
+
+export interface Offer {
+  public_id: string;
+  code: string;
+  title: string;
+  description: string;
+  terms: string | null;
+  image: string | null;
+  discount_type: OfferDiscountType;
+  discount_value: number;
+  max_discount: number | null;
+  min_order_amount: number;
+  usage_limit: number | null;
+  per_user_limit: number;
+  valid_from: string;
+  valid_until: string;
+  channels: OfferChannel[];
+  is_active: boolean;
+  sort_order: number;
+  redemption_count: number;
+  remaining_redemptions: number | null;
+  is_currently_valid: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface OfferListParams {
+  page?: number;
+  page_size?: number;
+  is_active?: boolean;
+  channel?: OfferChannel;
+  search?: string;
+}
+
+export interface OfferListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: Offer[];
+}
+
+export interface CreateOfferPayload {
+  code: string;
+  title: string;
+  description: string;
+  terms?: string | null;
+  image?: string | null;
+  discount_type: OfferDiscountType;
+  discount_value: number;
+  max_discount?: number | null;
+  min_order_amount: number;
+  usage_limit: number | null;
+  per_user_limit: number;
+  valid_from: string;
+  valid_until: string;
+  channels: OfferChannel[];
+  is_active: boolean;
+  sort_order?: number;
+}
+
+export type UpdateOfferPayload = Partial<CreateOfferPayload>;
+
+export interface ToggleOfferActivePayload {
+  is_active: boolean;
+}
+
+export interface OfferRedemptionCustomer {
+  public_id: string;
+  full_name: string | null;
+  phone_number: string | null;
+  country_code: string | null;
+}
+
+export interface OfferRedemption {
+  public_id: string;
+  channel: OfferChannel | string;
+  discount_amount: number;
+  order_subtotal: number;
+  order_public_id: string | null;
+  redeemed_at: string;
+  customer: OfferRedemptionCustomer;
+}
+
+export interface OfferRedemptionListParams {
+  page?: number;
+  page_size?: number;
+}
+
+export interface OfferRedemptionListData {
+  count: number;
+  page: number;
+  page_size: number;
+  offer: {
+    public_id: string;
+    code: string;
+    title: string;
+  };
+  results: OfferRedemption[];
+}
 
 export class ApiError extends Error {
   readonly status: number;

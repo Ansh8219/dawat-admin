@@ -111,6 +111,20 @@ function humanizeErrorCode(code: string): string {
       return "Table not found.";
     case "table_qr_base_url_not_configured":
       return "QR base URL is not configured on the server.";
+    case "inventory_item_not_found":
+      return "Inventory item not found.";
+    case "inventory_category_not_found":
+      return "Inventory category not found.";
+    case "inventory_sku_taken":
+      return "That SKU is already in use for this business.";
+    case "inventory_stock_invalid":
+      return "Invalid stock quantity. Please check and try again.";
+    case "offer_code_taken":
+      return "That coupon code is already in use.";
+    case "offer_not_found":
+      return "Offer not found.";
+    case "offer_has_redemptions":
+      return "This offer has redemptions and cannot be deleted. Deactivate it instead.";
     case "validation":
       return "Please check your input and try again.";
     default:
@@ -163,6 +177,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     });
   } catch {
     throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return parseEnvelope<T>(response);

@@ -386,22 +386,79 @@ export const orders: Order[] = [
   },
 ];
 
-export const inventory = [
-  { name: "Wheat Flour",      cat: "Bakery",     unit: "Kg",     opening: 200, current: 42,   reorder: 50 },
-  { name: "Refined Flour (Maida)", cat: "Bakery", unit: "Kg",   opening: 180, current: 12,   reorder: 40 },
-  { name: "Butter (Unsalted)", cat: "Bakery",    unit: "Kg",     opening: 60,  current: 28,   reorder: 20 },
-  { name: "Sugar",             cat: "Bakery",    unit: "Kg",     opening: 100, current: 68,   reorder: 30 },
-  { name: "Cocoa Powder",      cat: "Bakery",    unit: "Kg",     opening: 25,  current: 4,    reorder: 8 },
-  { name: "Fresh Cream",       cat: "Bakery",    unit: "Litre",  opening: 40,  current: 22,   reorder: 15 },
-  { name: "Basmati Rice",      cat: "Restaurant",unit: "Kg",     opening: 150, current: 88,   reorder: 40 },
-  { name: "Paneer",            cat: "Restaurant",unit: "Kg",     opening: 30,  current: 6,    reorder: 10 },
-  { name: "Chicken",           cat: "Restaurant",unit: "Kg",     opening: 40,  current: 18,   reorder: 12 },
-  { name: "Onions",            cat: "Restaurant",unit: "Kg",     opening: 80,  current: 34,   reorder: 25 },
-  { name: "Tomatoes",          cat: "Restaurant",unit: "Kg",     opening: 60,  current: 22,   reorder: 20 },
-  { name: "Milk",              cat: "Restaurant",unit: "Litre",  opening: 80,  current: 44,   reorder: 25 },
-  { name: "Ghee",              cat: "Restaurant",unit: "Litre",  opening: 25,  current: 9,    reorder: 8 },
-  { name: "Cardamom",          cat: "Restaurant",unit: "Gram",   opening: 2000,current: 340,  reorder: 500 },
+export type InventoryUnit = "kg" | "gram" | "litre" | "pcs";
+export type InventoryStore = "restaurant" | "bakery";
+export type InventoryItemStatus = "Active" | "Inactive";
+
+/** Item master — quantity is never stored here; available = API field or sum of stock entries. */
+export type InventoryItem = {
+  id: string;
+  name: string;
+  category: string;
+  category_public_id?: string;
+  sku?: string;
+  unit: InventoryUnit;
+  reorder_level: number;
+  store: InventoryStore;
+  status: InventoryItemStatus;
+  /** From list API when live; otherwise derive via inventoryAvailable(). */
+  available?: number;
+};
+
+/** Stock-in row against an inventory item. */
+export type InventoryStockEntry = {
+  id: string;
+  item_id: string;
+  item_name: string;
+  quantity: number;
+  cost_per_unit: number;
+  date: string;
+  notes: string;
+};
+
+export const inventory: InventoryItem[] = [
+  { id: "INV-001", name: "Wheat Flour", category: "Grains", unit: "kg", reorder_level: 50, store: "bakery", status: "Active" },
+  { id: "INV-002", name: "Refined Flour (Maida)", category: "Grains", unit: "kg", reorder_level: 40, store: "bakery", status: "Active" },
+  { id: "INV-003", name: "Butter (Unsalted)", category: "Dairy", unit: "kg", reorder_level: 20, store: "bakery", status: "Active" },
+  { id: "INV-004", name: "Sugar", category: "Grains", unit: "kg", reorder_level: 30, store: "bakery", status: "Active" },
+  { id: "INV-005", name: "Cocoa Powder", category: "Spices", unit: "kg", reorder_level: 8, store: "bakery", status: "Active" },
+  { id: "INV-006", name: "Fresh Cream", category: "Dairy", unit: "litre", reorder_level: 15, store: "bakery", status: "Active" },
+  { id: "INV-007", name: "Basmati Rice", category: "Grains", unit: "kg", reorder_level: 40, store: "restaurant", status: "Active" },
+  { id: "INV-008", name: "Paneer", category: "Dairy", unit: "kg", reorder_level: 10, store: "restaurant", status: "Active" },
+  { id: "INV-009", name: "Cardamom", category: "Spices", unit: "gram", reorder_level: 500, store: "restaurant", status: "Active" },
+  { id: "INV-010", name: "Onions", category: "Produce", unit: "kg", reorder_level: 25, store: "restaurant", status: "Active" },
+  { id: "INV-011", name: "Tomatoes", category: "Produce", unit: "kg", reorder_level: 20, store: "restaurant", status: "Active" },
+  { id: "INV-012", name: "Milk", category: "Dairy", unit: "litre", reorder_level: 25, store: "restaurant", status: "Active" },
+  { id: "INV-013", name: "Ghee", category: "Dairy", unit: "litre", reorder_level: 8, store: "restaurant", status: "Active" },
+  { id: "INV-014", name: "Takeaway Boxes", category: "Packaging", unit: "pcs", reorder_level: 50, store: "restaurant", status: "Inactive" },
 ];
+
+export const inventoryStock: InventoryStockEntry[] = [
+  { id: "STK-001", item_id: "INV-001", item_name: "Wheat Flour", quantity: 50, cost_per_unit: 45, date: "2026-07-01", notes: "Opening" },
+  { id: "STK-002", item_id: "INV-001", item_name: "Wheat Flour", quantity: 20, cost_per_unit: 48, date: "2026-07-07", notes: "Restock" },
+  { id: "STK-003", item_id: "INV-002", item_name: "Refined Flour (Maida)", quantity: 12, cost_per_unit: 42, date: "2026-07-02", notes: "" },
+  { id: "STK-004", item_id: "INV-003", item_name: "Butter (Unsalted)", quantity: 28, cost_per_unit: 520, date: "2026-07-03", notes: "" },
+  { id: "STK-005", item_id: "INV-004", item_name: "Sugar", quantity: 68, cost_per_unit: 48, date: "2026-07-01", notes: "" },
+  { id: "STK-006", item_id: "INV-005", item_name: "Cocoa Powder", quantity: 4, cost_per_unit: 680, date: "2026-07-04", notes: "" },
+  { id: "STK-007", item_id: "INV-006", item_name: "Fresh Cream", quantity: 22, cost_per_unit: 180, date: "2026-07-05", notes: "" },
+  { id: "STK-008", item_id: "INV-007", item_name: "Basmati Rice", quantity: 50, cost_per_unit: 95, date: "2026-07-01", notes: "" },
+  { id: "STK-009", item_id: "INV-007", item_name: "Basmati Rice", quantity: 20, cost_per_unit: 98, date: "2026-07-06", notes: "" },
+  { id: "STK-010", item_id: "INV-007", item_name: "Basmati Rice", quantity: 18, cost_per_unit: 92, date: "2026-07-08", notes: "" },
+  { id: "STK-011", item_id: "INV-008", item_name: "Paneer", quantity: 6, cost_per_unit: 320, date: "2026-07-06", notes: "" },
+  { id: "STK-012", item_id: "INV-009", item_name: "Cardamom", quantity: 340, cost_per_unit: 2.5, date: "2026-07-02", notes: "" },
+  { id: "STK-013", item_id: "INV-010", item_name: "Onions", quantity: 34, cost_per_unit: 30, date: "2026-07-03", notes: "" },
+  { id: "STK-014", item_id: "INV-011", item_name: "Tomatoes", quantity: 22, cost_per_unit: 40, date: "2026-07-03", notes: "" },
+  { id: "STK-015", item_id: "INV-012", item_name: "Milk", quantity: 44, cost_per_unit: 60, date: "2026-07-05", notes: "" },
+  { id: "STK-016", item_id: "INV-013", item_name: "Ghee", quantity: 9, cost_per_unit: 580, date: "2026-07-04", notes: "" },
+  { id: "STK-017", item_id: "INV-014", item_name: "Takeaway Boxes", quantity: 120, cost_per_unit: 8, date: "2026-06-20", notes: "" },
+];
+
+export function inventoryAvailable(
+  itemId: string,
+  stock: InventoryStockEntry[] = inventoryStock,
+) {
+  return stock.filter((s) => s.item_id === itemId).reduce((sum, s) => sum + s.quantity, 0);
+}
 
 export const customers = Array.from({ length: 18 }).map((_, i) => {
   const tiers = ["Silver", "Gold", "Platinum"] as const;
@@ -444,15 +501,6 @@ export const staff = [
 
 export const roles = ["Admin","Manager","Store Keeper","Cashier","Driver","Chef"];
 export const modules = ["Dashboard","Orders","POS","Menu","Inventory","Bookings","Customers","Marketing","People","Finance","Reports","Settings"];
-
-export const offers = [
-  { code: "WELCOME20",    type: "Percentage", value: 20, expiry: "31 Aug 2026", used: 142, active: true,  audience: "New Customers" },
-  { code: "BAKERY100",    type: "Flat",       value: 100, expiry: "15 Jul 2026", used: 89,  active: true,  audience: "All" },
-  { code: "BOGO-CAKE",    type: "BOGO",       value: 1,   expiry: "20 Jul 2026", used: 34,  active: true,  audience: "Gold+" },
-  { code: "COMBO499",     type: "Combo",      value: 499, expiry: "10 Aug 2026", used: 210, active: true,  audience: "All" },
-  { code: "DIWALI25",     type: "Percentage", value: 25,  expiry: "05 Nov 2026", used: 0,   active: false, audience: "All" },
-  { code: "PLATINUM15",   type: "Percentage", value: 15,  expiry: "31 Dec 2026", used: 56,  active: true,  audience: "Platinum" },
-];
 
 export const notifications = [
   { id: 1, type: "inventory", title: "Cocoa Powder is critically low", body: "4 Kg remaining · Reorder level 8 Kg", time: "10 min ago", priority: "high",   read: false, group: "Today" },

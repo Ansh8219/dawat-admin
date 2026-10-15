@@ -279,7 +279,7 @@ function PartnerDetailPage() {
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
         title={partner?.profile?.full_name || "Partner review"}
-        crumbs={["Admin", "People", "Partners"]}
+        crumbs={["Admin", "Staff", "Partners"]}
         description="Check application details on the left. Verify document images on the right."
         action={
           <Button variant="outline" className="rounded-xl gap-2" asChild>

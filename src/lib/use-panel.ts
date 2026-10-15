@@ -5,6 +5,8 @@ import {
   menuItems,
   orders,
   inventory,
+  inventoryAvailable,
+  inventoryStock,
   type Branch,
   type Order,
 } from "./mock/data";
@@ -51,8 +53,13 @@ export function usePanelInventory() {
   const panel = usePanel();
   return useMemo(() => {
     if (panel === "banquet") return [];
-    const label = panel === "bakery" ? "Bakery" : "Restaurant";
-    return inventory.filter((i) => i.cat === label);
+    const store = panel === "bakery" ? "bakery" : "restaurant";
+    return inventory
+      .filter((i) => i.store === store)
+      .map((i) => ({
+        ...i,
+        available: inventoryAvailable(i.id, inventoryStock),
+      }));
   }, [panel]);
 }
 

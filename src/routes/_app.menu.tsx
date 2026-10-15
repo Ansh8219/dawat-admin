@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { listInventoryItems } from "@/lib/api/inventory";
 import { listMenuCategoryOptions } from "@/lib/api/menu-categories";
 import {
   createMenuItem,
@@ -38,11 +39,15 @@ import {
   updateMenuItem,
 } from "@/lib/api/menu";
 import type {
+  CreateMenuRecipeLine,
+  InventoryItemDetail,
   MenuCategoryOption,
   MenuDietary,
   MenuItemDetail,
   MenuItemImage,
   MenuItemSummary,
+  MenuRecipeLine,
+  MenuRecipeScope,
   MenuUnit,
 } from "@/lib/api/types";
 import type { Panel } from "@/lib/panel";
@@ -79,6 +84,16 @@ type FormAddonGroup = {
   max: number;
   options: FormAddonOption[];
 };
+type FormRecipeLine = {
+  id: string;
+  inventory_item_public_id: string;
+  quantity_per_unit: string;
+  scope: MenuRecipeScope;
+  variant_name: string;
+  addon_group_name: string;
+  addon_option_name: string;
+  notes: string;
+};
 
 type ProductForm = {
   name: string;
@@ -93,6 +108,7 @@ type ProductForm = {
   serves: string;
   variants: FormVariant[];
   addons: FormAddonGroup[];
+  recipe: FormRecipeLine[];
 };
 
 const UNIT_OPTIONS: MenuUnit[] = ["plate", "pcs", "kg", "box", "cup", "glass", "portion"];
@@ -161,7 +177,7 @@ const MENU_FORM_COPY: Record<"restaurant" | "bakery", MenuFormCopy> = {
   restaurant: {
     sheetTitle: "Add Menu Item",
     sheetSubtitle:
-      "Add a dish for your restaurant — include dietary info, GST, portion variants, and add-ons for dine-in & delivery.",
+      "Add a dish for your restaurant — GST, portion variants, and add-ons for dine-in & delivery. Daawat is 100% vegetarian.",
     itemSectionTitle: "Dish details",
     nameLabel: "Name of the dish *",
     namePlaceholder: "e.g. Dal Makhni",
@@ -187,7 +203,7 @@ const MENU_FORM_COPY: Record<"restaurant" | "bakery", MenuFormCopy> = {
   bakery: {
     sheetTitle: "Add Bakery Product",
     sheetSubtitle:
-      "Add a product for your bakery — include dietary info, GST, size variants, and add-ons for cakes, pastries & custom orders.",
+      "Add a product for your bakery — GST, size variants, and add-ons for cakes, pastries & custom orders. Daawat is 100% vegetarian.",
     itemSectionTitle: "Product details",
     nameLabel: "Name of the product *",
     namePlaceholder: "e.g. Black Forest Cake",
@@ -233,7 +249,21 @@ const emptyForm = (copy: MenuFormCopy): ProductForm => ({
   serves: copy.defaultServes,
   variants: [],
   addons: [],
+  recipe: [],
 });
+
+function emptyRecipeLine(): FormRecipeLine {
+  return {
+    id: uid(),
+    inventory_item_public_id: "",
+    quantity_per_unit: "",
+    scope: "base",
+    variant_name: "",
+    addon_group_name: "",
+    addon_option_name: "",
+    notes: "",
+  };
+}
 
 function resolveCategoryPublicId(detail: MenuItemDetail, options: MenuCategoryOption[]): string {
   if (detail.category_public_id) return detail.category_public_id;
@@ -241,20 +271,16 @@ function resolveCategoryPublicId(detail: MenuItemDetail, options: MenuCategoryOp
   return byName?.public_id ?? "";
 }
 
-function dietaryOf(m: MenuItemSummary): MenuDietary {
-  return m.dietary;
+function dietaryOf(_m: MenuItemSummary): MenuDietary {
+  return "veg";
 }
 
-function dietaryMark(d: MenuDietary) {
-  if (d === "veg")
-    return {
-      emoji: "🥗",
-      label: "Veg",
-      className: "border-emerald-500 bg-emerald-50 text-emerald-700",
-    };
-  if (d === "egg")
-    return { emoji: "🥚", label: "Egg", className: "border-amber-500 bg-amber-50 text-amber-700" };
-  return { emoji: "🍗", label: "Non-veg", className: "border-rose-500 bg-rose-50 text-rose-700" };
+function dietaryMark(_d?: MenuDietary) {
+  return {
+    emoji: "🥗",
+    label: "Veg",
+    className: "border-emerald-500 bg-emerald-50 text-emerald-700",
+  };
 }
 
 function itemPrice(m: MenuItemSummary): number {
@@ -264,6 +290,19 @@ function itemPrice(m: MenuItemSummary): number {
 function numToStr(value: number | string | undefined | null): string {
   if (value === undefined || value === null) return "0";
   return String(typeof value === "number" ? value : Number(value) || 0);
+}
+
+function recipeFromDetail(lines: MenuRecipeLine[] | undefined): FormRecipeLine[] {
+  return (lines ?? []).map((line) => ({
+    id: uid(),
+    inventory_item_public_id: line.inventory_item_public_id,
+    quantity_per_unit: numToStr(line.quantity_per_unit),
+    scope: line.scope,
+    variant_name: line.variant_name?.trim() || "",
+    addon_group_name: line.addon_group_name?.trim() || "",
+    addon_option_name: line.addon_option_name?.trim() || "",
+    notes: line.notes?.trim() || "",
+  }));
 }
 
 function detailToForm(
@@ -276,7 +315,7 @@ function detailToForm(
     categoryPublicId: resolveCategoryPublicId(detail, options),
     price: numToStr(detail.price),
     desc: detail.description ?? "",
-    dietary: detail.dietary,
+    dietary: "veg",
     unit: detail.unit,
     tax: detail.tax,
     packagingCharge: numToStr(detail.packaging_charge),
@@ -298,6 +337,7 @@ function detailToForm(
         price: numToStr(o.price),
       })),
     })),
+    recipe: recipeFromDetail(detail.recipe),
   };
 }
 
@@ -332,10 +372,16 @@ function MenuPage() {
   const [customServes, setCustomServes] = useState(false);
   const [customVariantIds, setCustomVariantIds] = useState<Set<string>>(new Set());
   const [customAddonIds, setCustomAddonIds] = useState<Set<string>>(new Set());
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemDetail[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
 
   const panel = business?.panel ?? "restaurant";
   const formCopy = useMemo(() => getMenuFormCopy(panel), [panel]);
   const hasCategories = categoryOptions.length > 0;
+  const activeInventoryItems = useMemo(
+    () => inventoryItems.filter((i) => i.is_active !== false),
+    [inventoryItems],
+  );
   const keptExistingImages = useMemo(
     () => existingImages.filter((img) => img.public_id && !removedImageIds.includes(img.public_id)),
     [existingImages, removedImageIds],
@@ -511,6 +557,27 @@ function MenuPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  async function loadInventoryOptions() {
+    if (!businessPublicId) return;
+    setInventoryLoading(true);
+    try {
+      const data = await withAuthRetry((token) =>
+        listInventoryItems(token, { business_public_id: businessPublicId, is_active: true }),
+      );
+      setInventoryItems(data.results ?? []);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        useAuth.getState().logout();
+        void navigate({ to: "/login" });
+        return;
+      }
+      toast.error(err instanceof ApiError ? err.message : "Unable to load inventory items");
+      setInventoryItems([]);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }
+
   function openAdd() {
     setEditingId(null);
     setExistingImages([]);
@@ -521,6 +588,7 @@ function MenuPage() {
     setCustomVariantIds(new Set());
     setCustomAddonIds(new Set());
     setModal(true);
+    void loadInventoryOptions();
   }
 
   async function openEdit(publicId: string) {
@@ -536,6 +604,7 @@ function MenuPage() {
     setCustomServes(false);
     setCustomVariantIds(new Set());
     setCustomAddonIds(new Set());
+    void loadInventoryOptions();
     try {
       const detail = await withAuthRetry((token) => getMenuItem(token, publicId, businessPublicId));
       setForm(detailToForm(detail, formCopy, categoryOptions));
@@ -666,12 +735,94 @@ function MenuPage() {
   }
 
   function removeVariant(id: string) {
-    setForm((f) => ({ ...f, variants: f.variants.filter((v) => v.id !== id) }));
+    setForm((f) => {
+      const removed = f.variants.find((v) => v.id === id);
+      return {
+        ...f,
+        variants: f.variants.filter((v) => v.id !== id),
+        recipe: f.recipe.map((line) =>
+          line.scope === "variant" && removed && line.variant_name === removed.name
+            ? { ...line, variant_name: "" }
+            : line,
+        ),
+      };
+    });
     setCustomVariantIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
       return next;
     });
+  }
+
+  function addRecipeLine() {
+    setForm((f) => ({ ...f, recipe: [...f.recipe, emptyRecipeLine()] }));
+  }
+
+  function updateRecipeLine(id: string, patch: Partial<FormRecipeLine>) {
+    setForm((f) => ({
+      ...f,
+      recipe: f.recipe.map((line) => (line.id === id ? { ...line, ...patch } : line)),
+    }));
+  }
+
+  function removeRecipeLine(id: string) {
+    setForm((f) => ({ ...f, recipe: f.recipe.filter((line) => line.id !== id) }));
+  }
+
+  /** Returns recipe lines, or `null` if invalid (toast already shown). Empty = omit. */
+  function buildRecipePayload(): CreateMenuRecipeLine[] | null {
+    if (form.recipe.length === 0) return [];
+
+    const lines: CreateMenuRecipeLine[] = [];
+    for (const line of form.recipe) {
+      if (!line.inventory_item_public_id) {
+        toast.error("Select an inventory item for each recipe line");
+        return null;
+      }
+      const quantity_per_unit = Number(line.quantity_per_unit);
+      if (Number.isNaN(quantity_per_unit) || quantity_per_unit < 0) {
+        toast.error("Recipe quantity must be a valid number");
+        return null;
+      }
+      if (line.scope === "variant") {
+        const variantName = line.variant_name.trim();
+        if (!variantName) {
+          toast.error("Variant recipe lines need a variant name");
+          return null;
+        }
+        if (!form.variants.some((v) => v.name.trim() === variantName)) {
+          toast.error(`Recipe variant "${variantName}" must match a variant above`);
+          return null;
+        }
+      }
+      if (line.scope === "addon") {
+        const groupName = line.addon_group_name.trim();
+        const optionName = line.addon_option_name.trim();
+        if (!groupName || !optionName) {
+          toast.error("Addon recipe lines need group and option names");
+          return null;
+        }
+        const group = form.addons.find((g) => g.name.trim() === groupName);
+        if (!group || !group.options.some((o) => o.name.trim() === optionName)) {
+          toast.error(`Recipe addon "${groupName} / ${optionName}" must match an add-on above`);
+          return null;
+        }
+      }
+
+      const payload: CreateMenuRecipeLine = {
+        inventory_item_public_id: line.inventory_item_public_id,
+        quantity_per_unit,
+        scope: line.scope,
+      };
+      if (line.scope === "variant") payload.variant_name = line.variant_name.trim();
+      if (line.scope === "addon") {
+        payload.addon_group_name = line.addon_group_name.trim();
+        payload.addon_option_name = line.addon_option_name.trim();
+      }
+      if (line.notes.trim()) payload.notes = line.notes.trim();
+      lines.push(payload);
+    }
+    return lines;
   }
 
   function addAddonGroup() {
@@ -758,10 +909,6 @@ function MenuPage() {
       toast.error("Category is required");
       return;
     }
-    if (!form.dietary) {
-      toast.error("Dietary type is required");
-      return;
-    }
     if (!editingId && images.length < 1) {
       toast.error("Add at least one dish photo (up to 10)");
       return;
@@ -792,12 +939,15 @@ function MenuPage() {
       }
     }
 
+    const recipeLines = !editingId ? buildRecipePayload() : [];
+    if (recipeLines === null) return;
+
     const updatePayload = {
       name: form.name.trim(),
       category_public_id: form.categoryPublicId.trim(),
       price: Number(form.price) || 0,
       unit: form.unit,
-      dietary: form.dietary,
+      dietary: "veg" as const,
       tax: form.tax,
       description: form.desc.trim() || undefined,
       serves: form.serves.trim() || undefined,
@@ -832,7 +982,12 @@ function MenuPage() {
         await withAuthRetry((token) =>
           createMenuItem(
             token,
-            { business_public_id: businessPublicId, ...updatePayload, is_available: true },
+            {
+              business_public_id: businessPublicId,
+              ...updatePayload,
+              is_available: true,
+              ...(recipeLines.length > 0 ? { recipe: recipeLines } : {}),
+            },
             images,
           ),
         );
@@ -1092,7 +1247,7 @@ function MenuPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span
-                                  className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm border ${diet.className.split(" ").slice(0, 1).join(" ")} ${dietaryOf(m) === "veg" ? "bg-emerald-500" : dietaryOf(m) === "egg" ? "bg-amber-500" : "bg-rose-500"}`}
+                                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm border border-emerald-500 bg-emerald-500"
                                 />
                                 <div className="truncate text-sm font-semibold">{m.name}</div>
                               </div>
@@ -1175,7 +1330,7 @@ function MenuPage() {
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2 font-medium">
                                   <span
-                                    className={`inline-block h-2.5 w-2.5 rounded-sm ${dietaryOf(m) === "veg" ? "bg-emerald-500" : dietaryOf(m) === "egg" ? "bg-amber-500" : "bg-rose-500"}`}
+                                    className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500"
                                   />
                                   {m.name}
                                 </div>
@@ -1444,48 +1599,14 @@ function MenuPage() {
 
               <Separator />
 
-              {/* Dietary */}
+              {/* Dietary — Daawat is 100% vegetarian */}
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Dietary type *
+                  Dietary type
                 </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      {
-                        id: "veg" as const,
-                        label: "Veg",
-                        mark: "border-emerald-600 bg-emerald-500",
-                      },
-                      { id: "egg" as const, label: "Egg", mark: "border-amber-600 bg-amber-500" },
-                      {
-                        id: "non_veg" as const,
-                        label: "Non-veg",
-                        mark: "border-rose-600 bg-rose-500",
-                      },
-                    ] as const
-                  ).map((opt) => {
-                    const active = form.dietary === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setForm((f) => ({ ...f, dietary: opt.id }))}
-                        className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                          active
-                            ? opt.id === "veg"
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                              : opt.id === "egg"
-                                ? "border-amber-500 bg-amber-50 text-amber-700"
-                                : "border-rose-500 bg-rose-50 text-rose-700"
-                            : "border-border text-muted-foreground hover:bg-muted/50"
-                        }`}
-                      >
-                        <span className={`h-3 w-3 rounded-sm border-2 ${opt.mark}`} />
-                        {opt.label}
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">
+                  <span className="h-3 w-3 rounded-sm border-2 border-emerald-600 bg-emerald-500" />
+                  Pure veg — Daawat is 100% vegetarian
                 </div>
               </section>
 
@@ -1864,6 +1985,247 @@ function MenuPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </section>
+
+              <Separator />
+
+              {/* Recipe — create only (POST payload); edit shows read-only until PATCH recipe API */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Recipe
+                    </h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {editingId
+                        ? "Recipe lines from the server (edit via create-only API for now)."
+                        : "Optional inventory usage per plate / variant / add-on."}
+                    </p>
+                  </div>
+                  {!editingId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg"
+                      onClick={addRecipeLine}
+                      disabled={inventoryLoading}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Add line
+                    </Button>
+                  )}
+                </div>
+
+                {inventoryLoading && !editingId ? (
+                  <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                    Loading inventory items…
+                  </p>
+                ) : form.recipe.length === 0 ? (
+                  <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                    {editingId ? "No recipe lines on this item" : "No recipe — item won’t deduct inventory"}
+                  </p>
+                ) : editingId ? (
+                  <div className="space-y-2">
+                    {form.recipe.map((line) => {
+                      const inv = inventoryItems.find(
+                        (i) => i.public_id === line.inventory_item_public_id,
+                      );
+                      const scopeLabel =
+                        line.scope === "variant"
+                          ? `Variant · ${line.variant_name || "—"}`
+                          : line.scope === "addon"
+                            ? `Addon · ${line.addon_group_name || "—"} / ${line.addon_option_name || "—"}`
+                            : "Base";
+                      return (
+                        <div
+                          key={line.id}
+                          className="flex items-start justify-between gap-3 rounded-xl border bg-muted/20 px-3 py-2.5 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium">
+                              {inv?.name ?? "Inventory item"}
+                              {inv?.sku ? (
+                                <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+                                  {inv.sku}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">{scopeLabel}</div>
+                          </div>
+                          <div className="shrink-0 text-right font-semibold tabular-nums">
+                            {line.quantity_per_unit}
+                            {inv?.unit ? (
+                              <span className="ml-1 text-[10px] font-normal uppercase text-muted-foreground">
+                                {inv.unit}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {form.recipe.map((line) => {
+                      const inv = activeInventoryItems.find(
+                        (i) => i.public_id === line.inventory_item_public_id,
+                      );
+                      const unitLabel = inv?.unit ?? "";
+                      const addonOptions =
+                        form.addons.find((g) => g.name.trim() === line.addon_group_name.trim())
+                          ?.options ?? [];
+
+                      return (
+                        <div
+                          key={line.id}
+                          className="space-y-2 rounded-xl border bg-muted/20 p-3"
+                        >
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
+                            <Select
+                              value={line.inventory_item_public_id || undefined}
+                              onValueChange={(value) =>
+                                updateRecipeLine(line.id, { inventory_item_public_id: value })
+                              }
+                            >
+                              <SelectTrigger className="rounded-xl bg-background">
+                                <SelectValue placeholder="Inventory item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {activeInventoryItems.map((item) => (
+                                  <SelectItem key={item.public_id} value={item.public_id}>
+                                    {item.name}
+                                    {item.sku ? ` · ${item.sku}` : ""} ({item.unit})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={line.quantity_per_unit}
+                              onChange={(e) =>
+                                updateRecipeLine(line.id, { quantity_per_unit: e.target.value })
+                              }
+                              placeholder={unitLabel ? `Qty (${unitLabel})` : "Qty"}
+                              className="rounded-xl bg-background"
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="shrink-0"
+                              onClick={() => removeRecipeLine(line.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <Select
+                              value={line.scope}
+                              onValueChange={(value) =>
+                                updateRecipeLine(line.id, {
+                                  scope: value as MenuRecipeScope,
+                                  variant_name: value === "variant" ? line.variant_name : "",
+                                  addon_group_name: value === "addon" ? line.addon_group_name : "",
+                                  addon_option_name: value === "addon" ? line.addon_option_name : "",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="rounded-xl bg-background">
+                                <SelectValue placeholder="Scope" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="base">Base</SelectItem>
+                                <SelectItem value="variant">Variant</SelectItem>
+                                <SelectItem value="addon">Addon</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {line.scope === "variant" ? (
+                              <Select
+                                value={line.variant_name || undefined}
+                                disabled={form.variants.length === 0}
+                                onValueChange={(value) =>
+                                  updateRecipeLine(line.id, { variant_name: value })
+                                }
+                              >
+                                <SelectTrigger className="rounded-xl bg-background">
+                                  <SelectValue placeholder="Variant name" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {form.variants
+                                    .filter((v) => v.name.trim())
+                                    .map((v) => (
+                                      <SelectItem key={v.id} value={v.name.trim()}>
+                                        {v.name.trim()}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            ) : null}
+
+                            {line.scope === "addon" ? (
+                              <>
+                                <Select
+                                  value={line.addon_group_name || undefined}
+                                  disabled={form.addons.length === 0}
+                                  onValueChange={(value) =>
+                                    updateRecipeLine(line.id, {
+                                      addon_group_name: value,
+                                      addon_option_name: "",
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="rounded-xl bg-background">
+                                    <SelectValue placeholder="Addon group" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {form.addons
+                                      .filter((g) => g.name.trim())
+                                      .map((g) => (
+                                        <SelectItem key={g.id} value={g.name.trim()}>
+                                          {g.name.trim()}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={line.addon_option_name || undefined}
+                                  disabled={addonOptions.length === 0}
+                                  onValueChange={(value) =>
+                                    updateRecipeLine(line.id, { addon_option_name: value })
+                                  }
+                                >
+                                  <SelectTrigger className="rounded-xl bg-background sm:col-span-2">
+                                    <SelectValue placeholder="Addon option" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {addonOptions
+                                      .filter((o) => o.name.trim())
+                                      .map((o) => (
+                                        <SelectItem key={o.id} value={o.name.trim()}>
+                                          {o.name.trim()}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : null}
+                          </div>
+
+                          <Input
+                            value={line.notes}
+                            onChange={(e) => updateRecipeLine(line.id, { notes: e.target.value })}
+                            placeholder="Notes (optional)"
+                            className="rounded-xl bg-background"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </section>

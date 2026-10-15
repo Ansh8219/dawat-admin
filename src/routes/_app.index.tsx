@@ -73,7 +73,7 @@ function Dashboard() {
     .filter((o) => o.status !== "Cancelled")
     .reduce((s, o) => s + o.amount, 0);
   const avgOrder = panelOrders.length ? Math.round(todayRevenue / Math.max(panelOrders.length, 1)) : 0;
-  const lowStock = panelInventory.filter((i) => i.current <= i.reorder);
+  const lowStock = panelInventory.filter((i) => i.available <= i.reorder_level);
 
   const loadLiveOrders = useCallback(async () => {
     try {
@@ -372,7 +372,7 @@ function Dashboard() {
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{i.name}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {i.current} {i.unit} left
+                        {i.available} {i.unit} left
                       </div>
                     </div>
                     <Button

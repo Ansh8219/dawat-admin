@@ -54,7 +54,7 @@ export type PeopleStatusFilter = z.infer<typeof peopleSearchSchema>["status"];
 export const Route = createFileRoute("/_app/people")({
   component: PeoplePage,
   validateSearch: peopleSearchSchema,
-  head: () => ({ meta: [{ title: "People — Daawat Baker's" }] }),
+  head: () => ({ meta: [{ title: "Staff — Daawat Baker's" }] }),
 });
 
 const PAGE_SIZE = 20;
@@ -215,8 +215,8 @@ function PeoplePage() {
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
-        title="People"
-        crumbs={["Admin", "People"]}
+        title="Staff"
+        crumbs={["Admin", "Staff"]}
         description="One place to review and check partners, store keepers, and managers."
       />
 
