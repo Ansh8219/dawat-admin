@@ -663,8 +663,17 @@ function MenuPage() {
       toast.error("You can have up to 10 images per item");
       return;
     }
-    const incoming = Array.from(files).slice(0, room);
-    if (files.length > room) {
+    const allowed = Array.from(files).filter(
+      (file) =>
+        /^image\/(jpeg|png|webp|svg\+xml)$/i.test(file.type) ||
+        /\.(jpe?g|png|webp|svg)$/i.test(file.name),
+    );
+    if (allowed.length < files.length) {
+      toast.error("Image must be JPEG, PNG, WebP, or SVG");
+    }
+    if (!allowed.length) return;
+    const incoming = allowed.slice(0, room);
+    if (allowed.length > room) {
       toast.error(`Only ${room} more image${room === 1 ? "" : "s"} can be added (max 10)`);
     }
     const next = [...images, ...incoming];
@@ -1574,7 +1583,7 @@ function MenuPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml,.jpg,.jpeg,.png,.webp,.svg"
                     multiple
                     className="hidden"
                     onChange={(e) => onImagesSelected(e.target.files)}
@@ -1591,7 +1600,7 @@ function MenuPage() {
                         ? "Maximum 10 photos reached"
                         : editingId
                           ? `Add more photos (${imageSlotsLeft} left)`
-                          : "Drag & drop or click to upload (1–10 photos)"}
+                          : "JPEG, PNG, WebP, or SVG (1–10)"}
                     </div>
                   </button>
                 </div>
