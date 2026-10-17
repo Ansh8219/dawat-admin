@@ -167,8 +167,11 @@ function HomeServicesPage() {
       setImagePreview(editing?.image ?? null);
       return;
     }
-    if (!/^image\/(jpeg|png)$/i.test(file.type) && !/\.(jpe?g|png)$/i.test(file.name)) {
-      toast.error("Image must be JPEG or PNG");
+    if (
+      !/^image\/(jpeg|png|webp|svg\+xml)$/i.test(file.type) &&
+      !/\.(jpe?g|png|webp|svg)$/i.test(file.name)
+    ) {
+      toast.error("Image must be JPEG, PNG, WebP, or SVG");
       return;
     }
     setImageFile(file);
@@ -537,7 +540,7 @@ function HomeServicesPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium">
-                    {imageFile?.name ?? (editing ? "Replace image" : "Upload JPEG or PNG")}
+                    {imageFile?.name ?? (editing ? "Replace image" : "Upload JPEG, PNG, WebP, or SVG")}
                   </div>
                   <div className="text-xs text-muted-foreground">Click to choose a file</div>
                 </div>
@@ -545,7 +548,7 @@ function HomeServicesPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                accept="image/jpeg,image/png,image/webp,image/svg+xml,.jpg,.jpeg,.png,.webp,.svg"
                 className="hidden"
                 onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
               />
