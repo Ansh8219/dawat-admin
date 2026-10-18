@@ -48,6 +48,99 @@ export interface Business {
   type: BusinessType | string;
   name: string;
   image: string | null;
+  /** When false, customers cannot place new orders for this business. */
+  is_accepting_orders: boolean;
+}
+
+/** GET /api/admin/dashboard/?business_public_id= */
+export interface DashboardBusiness {
+  public_id: string;
+  type: BusinessType | string;
+  name: string;
+  is_accepting_orders: boolean;
+}
+
+export interface DashboardCounts {
+  new: number;
+  preparing: number;
+  ready: number;
+  done_today: number;
+}
+
+export interface DashboardKpis {
+  today_sales: number;
+  /** null when comparison is unavailable */
+  sales_change_pct: number | null;
+  orders_today: number;
+  avg_ticket: number;
+  rating: number | null;
+  rating_count: number;
+}
+
+export interface DashboardNewOrderAddress {
+  address_type: string | null;
+  full_name: string | null;
+  phone: string | null;
+  formatted_address: string | null;
+}
+
+export interface DashboardNewOrderItem {
+  public_id: string;
+  name: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+export interface DashboardNewOrder {
+  public_id: string;
+  status: string;
+  created_at: string;
+  payment_method: "cod" | "online" | string | null;
+  subtotal: number;
+  delivery_fee: number | null;
+  total: number | null;
+  address: DashboardNewOrderAddress | null;
+  items: DashboardNewOrderItem[];
+}
+
+export interface DashboardKitchenDriver {
+  full_name: string | null;
+  phone: string | null;
+}
+
+export interface DashboardKitchenOrder {
+  public_id: string;
+  status: string;
+  total: number | null;
+  customer_name: string | null;
+  item_count: number;
+  driver: DashboardKitchenDriver | null;
+}
+
+export interface DashboardStockAlert {
+  public_id: string;
+  name: string;
+  available: number;
+  unit: string;
+  reorder_level: number;
+}
+
+export interface DashboardTopSelling {
+  public_id: string;
+  name: string;
+  category: string | null;
+  sold_today: number;
+}
+
+export interface AdminDashboardData {
+  business: DashboardBusiness;
+  counts: DashboardCounts;
+  kpis: DashboardKpis;
+  new_orders: DashboardNewOrder[];
+  kitchen_orders: DashboardKitchenOrder[];
+  stock_alerts: DashboardStockAlert[];
+  top_selling: DashboardTopSelling[];
 }
 
 export type MenuUnit = "plate" | "pcs" | "kg" | "box" | "cup" | "glass" | "portion";

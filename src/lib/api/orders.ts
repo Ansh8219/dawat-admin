@@ -143,6 +143,7 @@ export function paymentLabel(method: string | null | undefined): string {
   const key = method.trim().toLowerCase();
   const known: Record<string, string> = {
     cod: "COD",
+    online: "Online",
     upi: "UPI",
     card: "Card",
     cash: "Cash",

@@ -85,6 +85,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     routes: [
       "/",
       "/orders",
+      "/outlet-status",
       "/pos",
       "/menu",
       "/menu-categories",
@@ -130,6 +131,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     routes: [
       "/",
       "/orders",
+      "/outlet-status",
       "/pos",
       "/menu",
       "/menu-categories",
@@ -179,6 +181,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     status: "Events only",
     routes: [
       "/",
+      "/outlet-status",
       "/bookings",
       "/customers",
       "/marketing",

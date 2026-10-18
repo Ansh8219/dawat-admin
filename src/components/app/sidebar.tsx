@@ -18,6 +18,7 @@ import {
   LayoutGrid,
   Tags,
   QrCode,
+  Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -32,6 +33,7 @@ const nav = [
     section: "Operations",
     items: [
       { to: "/orders", label: "Orders", icon: ShoppingBag },
+      { to: "/outlet-status", label: "Outlet status", icon: Store },
       { to: "/pos", label: "POS / Billing", icon: Calculator },
       { to: "/menu", label: "Menu & Products", icon: UtensilsCrossed },
       { to: "/menu-categories", label: "Menu Categories", icon: Tags },
