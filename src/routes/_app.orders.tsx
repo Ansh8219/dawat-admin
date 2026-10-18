@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
 import {
   acceptAdminOrder,
   formatOrderMoney,
@@ -31,6 +33,7 @@ import { ApiError } from "@/lib/api/types";
 import type { AdminOrder, AdminOrderTab } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
+import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanelMeta } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
 import {
@@ -104,6 +107,7 @@ function itemLabel(item: NonNullable<AdminOrder["items"]>[number]): string {
 
 function OrdersPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const meta = usePanelMeta();
   const [tab, setTab] = useState<AdminOrderTab>("new");
   const [page, setPage] = useState(1);
@@ -127,6 +131,10 @@ function OrdersPage() {
   const [prepCustom, setPrepCustom] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(() => new Set());
+  const boardTick = useKitchenAlerts((s) => s.boardTick);
+  const clearNewOrderBadge = useKitchenAlerts((s) => s.clearNewOrderBadge);
+  const consumeHighlight = useKitchenAlerts((s) => s.consumeHighlight);
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -161,6 +169,7 @@ function OrdersPage() {
         setOrders(active.results);
         setCount(active.count ?? 0);
         setLoadedAt(Date.now());
+        queryClient.setQueryData(adminOrdersKeys.board(tab, page), active);
         setTabCounts((prev) => {
           const next = { ...prev, [tab]: active.count ?? 0 };
           const otherTabs = TABS.filter((item) => item.id !== tab);
@@ -182,12 +191,39 @@ function OrdersPage() {
         if (showLoading) setLoading(false);
       }
     },
-    [tab, page, handleAuthError],
+    [tab, page, handleAuthError, queryClient],
   );
 
   useEffect(() => {
     void refresh({ showLoading: true });
   }, [refresh]);
+
+  // Clear nav badge while staff is on the kitchen board.
+  useEffect(() => {
+    clearNewOrderBadge();
+  }, [clearNewOrderBadge]);
+
+  // Soft-refresh + highlight when global kitchen WS ticks (layout-owned socket).
+  useEffect(() => {
+    if (boardTick === 0) return;
+    void refresh({ showLoading: false });
+    const highlightId = consumeHighlight();
+    if (!highlightId) return;
+    setHighlightedIds((prev) => {
+      const next = new Set(prev);
+      next.add(highlightId);
+      return next;
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedIds((prev) => {
+        if (!prev.has(highlightId)) return prev;
+        const next = new Set(prev);
+        next.delete(highlightId);
+        return next;
+      });
+    }, 8_000);
+    return () => window.clearTimeout(timer);
+  }, [boardTick, refresh, consumeHighlight]);
 
   useEffect(() => {
     if (!showsSincePlacedClock(tab)) return;
@@ -252,6 +288,7 @@ function OrdersPage() {
       setSelected(null);
       setTab("preparing");
       setPage(1);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "preparing" && page === 1) void refresh();
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -277,6 +314,7 @@ function OrdersPage() {
       setSelected(null);
       setTab("past");
       setPage(1);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "past" && page === 1) void refresh();
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -295,6 +333,7 @@ function OrdersPage() {
       setSelected(null);
       setTab("preparing");
       setPage(1);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "preparing" && page === 1) void refresh();
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -313,6 +352,7 @@ function OrdersPage() {
       setSelected(null);
       setTab("ready");
       setPage(1);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "ready" && page === 1) void refresh();
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -455,6 +495,7 @@ function OrdersPage() {
                   now={now}
                   loadedAt={loadedAt}
                   busy={actingId === order.public_id}
+                  highlighted={highlightedIds.has(order.public_id)}
                   onOpen={() => setSelected(order)}
                   onAccept={() => openAccept(order)}
                   onReject={() => openReject(order)}
@@ -721,6 +762,7 @@ function OrderTicket({
   now,
   loadedAt,
   busy,
+  highlighted,
   onOpen,
   onAccept,
   onReject,
@@ -732,6 +774,7 @@ function OrderTicket({
   now: number;
   loadedAt: number;
   busy: boolean;
+  highlighted?: boolean;
   onOpen: () => void;
   onAccept: () => void;
   onReject: () => void;
@@ -755,6 +798,7 @@ function OrderTicket({
       className={cn(
         "flex flex-col overflow-hidden rounded-2xl border bg-card shadow-soft transition-all hover:shadow-elevated",
         isPlaced && "border-primary/45 ring-1 ring-primary/15",
+        highlighted && "border-primary ring-2 ring-primary/40 animate-pulse",
       )}
     >
       <div

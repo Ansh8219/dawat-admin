@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
+import { useAdminOrdersSocket } from "@/hooks/use-admin-orders-socket";
 import { canCheckPersistedAuth, getSelectedPanel, isAuthenticated } from "@/lib/auth";
 import { isRouteAllowed } from "@/lib/panel";
 
@@ -26,6 +27,10 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Zomato-style: keep kitchen WS alive across all admin pages while authenticated.
+  useAdminOrdersSocket({ enabled: true });
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       <div className="hidden lg:block">

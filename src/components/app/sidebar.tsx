@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { LOGO_SRC } from "@/lib/brand";
+import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { isRouteAllowed } from "@/lib/panel";
 
@@ -81,6 +82,7 @@ export function AppSidebar({
   const collapsed = useApp((s) => s.sidebarCollapsed) && !mobile;
   const toggle = useApp((s) => s.toggleSidebar);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const newOrderBadge = useKitchenAlerts((s) => s.newOrderBadge);
   const panel = usePanel();
   const meta = usePanelMeta();
 
@@ -156,7 +158,7 @@ export function AppSidebar({
                       to={item.to}
                       onClick={onNavigate}
                       className={cn(
-                        "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -165,6 +167,19 @@ export function AppSidebar({
                     >
                       <Icon className="h-[18px] w-[18px] shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
+                      {item.to === "/orders" && newOrderBadge > 0 && (
+                        <span
+                          className={cn(
+                            "inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground",
+                            collapsed
+                              ? "absolute -right-0.5 -top-0.5 min-w-4 px-1"
+                              : "ml-auto",
+                            active && "bg-primary-foreground text-primary",
+                          )}
+                        >
+                          {newOrderBadge > 99 ? "99+" : newOrderBadge}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
