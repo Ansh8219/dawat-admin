@@ -774,6 +774,61 @@ export type UpdateRestaurantTableFields = Partial<{
   is_active: boolean;
 }>;
 
+/** GET/PATCH /api/admin/booking-settings/. The only booking setting. */
+export interface BookingSettings {
+  per_guest_rate: string;
+}
+
+export interface UpdateBookingSettingsPayload {
+  per_guest_rate: string;
+}
+
+export type TableBookingStatus = "pending_payment" | "confirmed" | "expired";
+
+export interface TableBookingTable {
+  public_id: string;
+  table_number: string;
+  seats: number;
+}
+
+export interface TableBookingCustomer {
+  public_id: string;
+  full_name: string;
+  country_code: string;
+  phone_number: string;
+}
+
+/** Booking from GET /api/admin/table-bookings/. Amount is stored on the booking. */
+export interface TableBooking {
+  public_id: string;
+  status: TableBookingStatus | string;
+  booking_date: string;
+  arrival_time: string;
+  duration_hours: number;
+  ends_at: string;
+  guests: number;
+  occasion: string | null;
+  per_guest_rate: string;
+  amount: string;
+  table: TableBookingTable;
+  customer: TableBookingCustomer;
+  created_at: string;
+}
+
+export interface TableBookingListParams {
+  date?: string;
+  status?: TableBookingStatus;
+  page?: number;
+  page_size?: number;
+}
+
+export interface TableBookingListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: TableBooking[];
+}
+
 /** Single-row entity from GET/PATCH /api/admin/delivery-settings/. */
 export interface DeliverySettings {
   pickup_name: string | null;

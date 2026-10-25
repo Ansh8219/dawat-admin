@@ -63,8 +63,8 @@ const nav = [
 ] as const;
 
 const bookingLabels: Record<string, string> = {
-  bakery: "Bookings",
-  restaurant: "Tables & Bookings",
+  bakery: "Table Bookings",
+  restaurant: "Table Bookings",
   banquet: "Banquet Bookings",
 };
 

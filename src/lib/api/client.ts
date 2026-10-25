@@ -106,9 +106,14 @@ function humanizeErrorCode(code: string): string {
     case "invalid_pickup_location":
       return "Set both latitude and longitude, or leave both empty.";
     case "table_number_taken":
+    case "dining_table_number_taken":
       return "That table number is already in use.";
     case "dining_table_not_found":
       return "Table not found.";
+    case "dining_table_has_bookings":
+      return "This table has bookings and cannot be deleted.";
+    case "table_booking_not_found":
+      return "Booking not found.";
     case "table_qr_base_url_not_configured":
       return "QR base URL is not configured on the server.";
     case "inventory_item_not_found":

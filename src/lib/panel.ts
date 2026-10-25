@@ -136,6 +136,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
       "/menu",
       "/menu-categories",
       "/inventory",
+      "/bookings",
       "/customers",
       "/marketing",
       "/people",

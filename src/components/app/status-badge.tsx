@@ -12,8 +12,12 @@ const map: Record<string, string> = {
   "In Stock":        "bg-success/15 text-success border-success/30",
   "Low":             "bg-warning/15 text-warning border-warning/40",
   "Out":             "bg-destructive/15 text-destructive border-destructive/30",
+  // dining table bookings
+  "Pending payment": "bg-warning/15 text-warning border-warning/40",
+  Confirmed: "bg-success/15 text-success border-success/30",
+  Expired: "bg-muted text-muted-foreground border-border",
   // tables
-  "Available":       "bg-success/15 text-success border-success/30",
+  Available: "bg-success/15 text-success border-success/30",
   "Occupied":        "bg-destructive/15 text-destructive border-destructive/30",
   "Reserved":        "bg-warning/15 text-warning border-warning/40",
   // staff

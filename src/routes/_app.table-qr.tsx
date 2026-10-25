@@ -104,6 +104,7 @@ function TablesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<RestaurantTable | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -270,6 +271,7 @@ function TablesPage() {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleting(true);
+    setDeleteError("");
     try {
       await withAuthRetry((token) => deleteTable(token, target.public_id));
       toast.success(`${target.table_number} deleted`);
@@ -284,7 +286,10 @@ function TablesPage() {
         await refresh({ showLoading: false });
         return;
       }
-      toast.error(err instanceof ApiError ? err.message : "Unable to delete table");
+      const message =
+        err instanceof ApiError ? err.message : "Unable to delete table";
+      setDeleteError(message);
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -407,7 +412,7 @@ function TablesPage() {
       <PageHeader
         title="Tables"
         crumbs={["Operations", "Tables"]}
-        description="Add dining tables and print QR codes for guest ordering. Tables are shared across restaurant and bakery."
+        description="Add dining tables and print QR codes for guest ordering. Tables are shared across restaurant and bakery. Inactive tables are not offered for new bookings; existing bookings stay visible."
         action={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button
@@ -611,7 +616,10 @@ function TablesPage() {
                                       label: "Delete",
                                       icon: <Trash2 className="mr-2 h-4 w-4" />,
                                       destructive: true,
-                                      onClick: () => setDeleteTarget(table),
+                                      onClick: () => {
+                                        setDeleteError("");
+                                        setDeleteTarget(table);
+                                      },
                                     },
                                   ]}
                                 />
@@ -763,7 +771,10 @@ function TablesPage() {
                     size="sm"
                     variant="outline"
                     className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setDeleteTarget(selected)}
+                    onClick={() => {
+                      setDeleteError("");
+                      setDeleteTarget(selected);
+                    }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Delete
@@ -905,14 +916,26 @@ function TablesPage() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteTarget?.table_number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. Printed QR codes for this table will stop working. Prefer
-              deactivating the table if you only want to hide it.
+              This cannot be undone. Printed QR codes for this table will stop working. A table
+              that already has bookings cannot be deleted — turn it off instead so it is not
+              offered for new bookings. Existing bookings stay on the bookings list.
             </AlertDialogDescription>
+            {deleteError ? (
+              <p className="text-sm text-destructive">{deleteError}</p>
+            ) : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
