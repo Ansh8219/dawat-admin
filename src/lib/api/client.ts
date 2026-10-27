@@ -132,9 +132,34 @@ function humanizeErrorCode(code: string): string {
       return "This offer has redemptions and cannot be deleted. Deactivate it instead.";
     case "validation":
       return "Please check your input and try again.";
+    case "reward_tier_key_taken":
+      return "A level with this key already exists.";
+    case "reward_tier_threshold_taken":
+      return "Another level already starts at this many coins.";
+    case "reward_tier_base_threshold_locked":
+      return "The starting level must stay at 0 coins.";
+    case "reward_tier_base_protected":
+      return "The starting level cannot be deleted.";
+    case "reward_tier_in_use":
+      return "Customers are on this level, so it cannot be deleted.";
+    case "reward_tier_not_found":
+      return "Level not found.";
     default:
       return "Something went wrong. Please try again.";
   }
+}
+
+/** First message per field from a 400 `validation_error` (`error.details`). */
+export function apiFieldErrors(err: unknown): Record<string, string> {
+  if (!(err instanceof ApiError) || err.code !== "validation_error") return {};
+  const details = err.details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return {};
+  const out: Record<string, string> = {};
+  for (const [field, value] of Object.entries(details as Record<string, unknown>)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first != null && first !== "") out[field] = String(first);
+  }
+  return out;
 }
 
 function formatValidationDetails(details: unknown): string | null {

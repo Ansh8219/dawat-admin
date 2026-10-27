@@ -57,12 +57,6 @@ export interface Order {
   source?: "qr" | "pos" | "online";
 }
 
-const customerNames = [
-  "Aarav Sharma", "Priya Kapoor", "Rohan Mehta", "Ananya Iyer",
-  "Vikram Singh", "Neha Reddy", "Aditya Verma", "Kavya Nair",
-  "Arjun Malhotra", "Isha Choudhary", "Rahul Bhatia", "Meera Joshi",
-];
-
 export const menuItems = [
   { code: 22, name: "Daal Makhni",         cat: "Main Course",  price: 320, unit: "plate",   veg: true,  branch: "restaurant" as Branch },
   { code: 67, name: "Butter Chapati",      cat: "Breads",       price: 45,  unit: "pcs",     veg: true,  branch: "restaurant" as Branch },
@@ -459,24 +453,6 @@ export function inventoryAvailable(
 ) {
   return stock.filter((s) => s.item_id === itemId).reduce((sum, s) => sum + s.quantity, 0);
 }
-
-export const customers = Array.from({ length: 18 }).map((_, i) => {
-  const tiers = ["Silver", "Gold", "Platinum"] as const;
-  const totalOrders = 3 + Math.floor(Math.random() * 60);
-  const ltv = totalOrders * (400 + Math.floor(Math.random() * 800));
-  return {
-    id: "CUST-" + String(1001 + i),
-    name: customerNames[i % customerNames.length],
-    phone: `+91 98${String(20000000 + i * 4321).slice(0,8)}`,
-    email: customerNames[i % customerNames.length].toLowerCase().replace(" ", ".") + "@gmail.com",
-    orders: totalOrders,
-    ltv,
-    tier: tiers[Math.min(2, Math.floor(ltv / 15000))],
-    points: 200 + Math.floor(Math.random() * 2400),
-    lastOrder: `${Math.floor(Math.random()*28)+1} Jun 2026`,
-    birthday: `${Math.floor(Math.random()*28)+1} ${["Mar","Apr","May","Jul","Aug","Nov"][i%6]}`,
-  };
-});
 
 export const drivers = Array.from({ length: 8 }).map((_, i) => ({
   id: "DRV-" + (101 + i),

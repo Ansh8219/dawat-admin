@@ -31,6 +31,7 @@ import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
+import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners_.$partnerId'
 import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
@@ -145,6 +146,11 @@ const AppCustomersRoute = AppCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCustomerLevelsRoute = AppCustomerLevelsRouteImport.update({
+  id: '/customer-levels',
+  path: '/customer-levels',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBookingsRoute = AppBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
   '/bookings': typeof AppBookingsRoute
+  '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
   '/bookings': typeof AppBookingsRoute
+  '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
   '/_app/bookings': typeof AppBookingsRoute
+  '/_app/customer-levels': typeof AppCustomerLevelsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/finance': typeof AppFinanceRoute
   '/_app/home-services': typeof AppHomeServicesRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/select-panel'
     | '/bookings'
+    | '/customer-levels'
     | '/customers'
     | '/finance'
     | '/home-services'
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/select-panel'
     | '/bookings'
+    | '/customer-levels'
     | '/customers'
     | '/finance'
     | '/home-services'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/select-panel'
     | '/_app/bookings'
+    | '/_app/customer-levels'
     | '/_app/customers'
     | '/_app/finance'
     | '/_app/home-services'
@@ -500,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/customer-levels': {
+      id: '/_app/customer-levels'
+      path: '/customer-levels'
+      fullPath: '/customer-levels'
+      preLoaderRoute: typeof AppCustomerLevelsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/bookings': {
       id: '/_app/bookings'
       path: '/bookings'
@@ -533,6 +552,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppBookingsRoute: typeof AppBookingsRoute
+  AppCustomerLevelsRoute: typeof AppCustomerLevelsRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppFinanceRoute: typeof AppFinanceRoute
   AppHomeServicesRoute: typeof AppHomeServicesRoute
@@ -557,6 +577,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppBookingsRoute: AppBookingsRoute,
+  AppCustomerLevelsRoute: AppCustomerLevelsRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppFinanceRoute: AppFinanceRoute,
   AppHomeServicesRoute: AppHomeServicesRoute,

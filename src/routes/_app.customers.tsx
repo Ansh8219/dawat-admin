@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
@@ -30,16 +30,11 @@ import {
   deleteCustomer,
   formatCustomerPhone,
   listCustomers,
-  tierLabel,
   updateCustomer,
 } from "@/lib/api/customers";
+import { listRewardTiers } from "@/lib/api/reward-tiers";
 import { ApiError } from "@/lib/api/types";
-import type {
-  Customer,
-  CustomerSort,
-  CustomerSummary,
-  CustomerTier,
-} from "@/lib/api/types";
+import type { Customer, CustomerSort, CustomerSummary, RewardTier } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { inr } from "@/lib/mock/data";
@@ -51,7 +46,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Sparkles,
+  Trophy,
   UserX,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,8 +58,6 @@ export const Route = createFileRoute("/_app/customers")({
 
 const PAGE_SIZE = 20;
 
-const tierOptions: CustomerTier[] = ["silver", "gold", "platinum"];
-
 const SORT_OPTIONS: { value: CustomerSort; label: string }[] = [
   { value: "name_asc", label: "Name (A → Z)" },
   { value: "name_desc", label: "Name (Z → A)" },
@@ -74,10 +67,14 @@ const SORT_OPTIONS: { value: CustomerSort; label: string }[] = [
 
 const EMPTY_SUMMARY: CustomerSummary = {
   total_customers: 0,
-  silver_customers: 0,
-  gold_customers: 0,
-  platinum_customers: 0,
+  tiers: [],
 };
+
+const ALL_TIERS = "all";
+
+function levelName(c: Pick<Customer, "tier" | "tier_name">): string {
+  return c.tier_name?.trim() || c.tier || "—";
+}
 
 function displayName(name: string | null | undefined): string {
   const trimmed = name?.trim();
@@ -117,7 +114,8 @@ function CustomersPage() {
   const [sel, setSel] = useState<Customer | null>(null);
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-  const [tier, setTier] = useState<"all" | CustomerTier>("all");
+  const [tier, setTier] = useState<string>(ALL_TIERS);
+  const [levels, setLevels] = useState<RewardTier[] | null>(null);
   const [sort, setSort] = useState<CustomerSort>("name_asc");
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -156,7 +154,7 @@ function CustomersPage() {
         const data = await withAuthRetry((token) =>
           listCustomers(token, {
             search: debouncedQ || undefined,
-            tier: tier === "all" ? undefined : tier,
+            tier: tier === ALL_TIERS ? undefined : tier,
             sort,
             page,
             page_size: PAGE_SIZE,
@@ -190,20 +188,35 @@ function CustomersPage() {
     void refresh({ showLoading: true });
   }, [refresh]);
 
+  useEffect(() => {
+    let cancelled = false;
+    withAuthRetry((token) => listRewardTiers(token))
+      .then((data) => {
+        if (!cancelled) setLevels(data.results ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) handleAuthError(err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [handleAuthError]);
+
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const rangeStart = count === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(safePage * PAGE_SIZE, count);
 
-  const tierCounts = useMemo(
-    () => ({
-      all: summary.total_customers,
-      silver: summary.silver_customers,
-      gold: summary.gold_customers,
-      platinum: summary.platinum_customers,
-    }),
-    [summary],
-  );
+  const tierChips = useMemo(() => {
+    const summaryTiers = summary.tiers ?? [];
+    const countByKey = new Map(summaryTiers.map((t) => [t.key, t.customers_count]));
+    const source = levels?.length ? levels : summaryTiers;
+    return source.map((t) => ({
+      key: t.key,
+      name: t.name,
+      count: countByKey.get(t.key) ?? 0,
+    }));
+  }, [levels, summary]);
 
   async function toggleActive(customer: Customer, next: boolean) {
     setTogglingId(customer.public_id);
@@ -252,38 +265,27 @@ function CustomersPage() {
       <PageHeader
         title="Customers"
         crumbs={["Growth", "Customers"]}
-        description="CRM with loyalty tiers. Summary cards show all customers; the table reflects search, filters, and sort."
+        description="CRM with customer levels. Summary cards show all customers; the table reflects search, filters, and sort."
       />
 
       <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Kpi
             label="Customers"
             value={String(summary.total_customers)}
-            hint={`${summary.silver_customers} Silver`}
+            hint={`${(summary.tiers ?? []).length} level${(summary.tiers ?? []).length === 1 ? "" : "s"}`}
             icon={Users}
           />
-          <Kpi
-            label="Silver"
-            value={String(summary.silver_customers)}
-            hint="Entry tier"
-            tone="border-primary/40 bg-primary/5 text-primary"
-            icon={Star}
-          />
-          <Kpi
-            label="Gold"
-            value={String(summary.gold_customers)}
-            hint="Loyal tier"
-            tone="border-gold/30 bg-gold/10 text-gold"
-            icon={Star}
-          />
-          <Kpi
-            label="Platinum"
-            value={String(summary.platinum_customers)}
-            hint="Top tier"
-            tone="border-warning/30 bg-warning/10 text-warning"
-            icon={Star}
-          />
+          {(summary.tiers ?? []).map((t) => (
+            <Kpi
+              key={t.public_id || t.key}
+              label={t.name}
+              value={String(t.customers_count)}
+              hint="Customers on this level"
+              tone="border-primary/30 bg-primary/5 text-primary"
+              icon={Star}
+            />
+          ))}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -319,18 +321,18 @@ function CustomersPage() {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <TierChip
-                  active={tier === "all"}
+                  active={tier === ALL_TIERS}
                   label="All"
-                  count={tierCounts.all}
-                  onClick={() => setTier("all")}
+                  count={summary.total_customers}
+                  onClick={() => setTier(ALL_TIERS)}
                 />
-                {tierOptions.map((t) => (
+                {tierChips.map((t) => (
                   <TierChip
-                    key={t}
-                    active={tier === t}
-                    label={tierLabel(t)}
-                    count={tierCounts[t]}
-                    onClick={() => setTier(t)}
+                    key={t.key}
+                    active={tier === t.key}
+                    label={t.name}
+                    count={t.count}
+                    onClick={() => setTier(t.key)}
                   />
                 ))}
               </div>
@@ -365,7 +367,7 @@ function CustomersPage() {
                         <th className="px-4 py-3 text-left font-medium">Contact</th>
                         <th className="px-4 py-3 text-right font-medium">Orders</th>
                         <th className="px-4 py-3 text-right font-medium">LTV</th>
-                        <th className="px-4 py-3 text-left font-medium">Tier</th>
+                        <th className="px-4 py-3 text-left font-medium">Level</th>
                         <th className="px-4 py-3 text-left font-medium">Last Order</th>
                         <th className="px-4 py-3 text-left font-medium">Status</th>
                         <th className="px-4 py-3 text-right font-medium">Actions</th>
@@ -422,7 +424,7 @@ function CustomersPage() {
                               {c.ltv == null ? "—" : inr(c.ltv)}
                             </td>
                             <td className="px-4 py-3">
-                              <StatusBadge status={tierLabel(c.tier)} />
+                              <StatusBadge status={levelName(c)} />
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">
                               {formatLastOrder(c.last_order_date)}
@@ -502,46 +504,41 @@ function CustomersPage() {
             )}
           </div>
 
-          <div className="card-elevated p-4">
+          <div className="card-elevated h-fit p-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <div className="text-sm font-semibold">Loyalty Program</div>
+              <Trophy className="h-4 w-4 text-primary" />
+              <div className="text-sm font-semibold">Customer levels</div>
             </div>
-            <div className="mt-3 space-y-3">
-              <div>
-                <Label className="text-xs">Points per ₹100 spent</Label>
-                <Input defaultValue="10" className="mt-1 rounded-xl" />
+            <div className="mt-3 space-y-1.5 rounded-xl border p-3 text-xs">
+              <div className="flex justify-between font-semibold uppercase text-muted-foreground">
+                <span>Level</span>
+                <span>Unlocks at (coins)</span>
               </div>
-              <div>
-                <Label className="text-xs">Redemption Value</Label>
-                <Input defaultValue="1 point = ₹1" className="mt-1 rounded-xl" />
-              </div>
-              <div>
-                <Label className="text-xs">Points Expiry</Label>
-                <Input defaultValue="12 months" className="mt-1 rounded-xl" />
-              </div>
-              <div className="mt-2 space-y-1.5 rounded-xl border p-3 text-xs">
-                <div className="font-semibold uppercase text-muted-foreground">Tier Thresholds</div>
-                <div className="flex justify-between">
-                  <span>Silver</span>
-                  <span>₹0 – ₹15,000</span>
+              {levels === null ? (
+                <div className="flex items-center gap-2 py-2 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
                 </div>
-                <div className="flex justify-between">
-                  <span>Gold</span>
-                  <span>₹15,001 – ₹30,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Platinum</span>
-                  <span>₹30,000+</span>
-                </div>
-              </div>
-              <Button
-                className="w-full rounded-xl"
-                onClick={() => toast.success("Loyalty settings saved")}
-              >
-                Save Settings
-              </Button>
+              ) : levels.length === 0 ? (
+                <div className="py-2 text-muted-foreground">No levels configured.</div>
+              ) : (
+                levels.map((l) => (
+                  <div key={l.public_id} className="flex justify-between gap-2">
+                    <span className="truncate">
+                      {l.name}
+                      {l.is_base ? (
+                        <span className="ml-1 text-muted-foreground">(starting)</span>
+                      ) : null}
+                    </span>
+                    <span className="tabular-nums">
+                      {l.min_lifetime_coins.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
+            <Button asChild variant="outline" className="mt-3 w-full rounded-xl">
+              <Link to="/customer-levels">Manage levels</Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -575,7 +572,7 @@ function CustomersPage() {
                 <div className="grid grid-cols-3 gap-2">
                   <Stat label="Orders" value={sel.orders_count == null ? "—" : String(sel.orders_count)} />
                   <Stat label="LTV" value={sel.ltv == null ? "—" : inr(sel.ltv)} />
-                  <Stat label="Tier" value={tierLabel(sel.tier)} />
+                  <Stat label="Level" value={levelName(sel)} />
                 </div>
                 <div className="rounded-xl border p-3 text-sm">
                   <div className="text-xs font-semibold uppercase text-muted-foreground">

@@ -193,13 +193,26 @@
 | Feature | Status |
 |---------|--------|
 | Customer list + search | ✅ |
-| Tier filter (Silver / Gold / Platinum) | ✅ |
+| Level filter (loaded from `/api/admin/reward-tiers/`) | ✅ |
 | Sort + pagination | ✅ |
-| Summary stats (tier counts) | ✅ |
-| Detail sheet | ✅ |
+| Summary stats (one card per level from `summary.tiers`) | ✅ |
+| Detail sheet (shows `tier_name`) | ✅ |
 | Activate / deactivate customer | ✅ |
 | Delete customer | ✅ |
-| Loyalty program settings block | 🟡 Placeholder only |
+| Customer levels side card (read-only + link) | ✅ |
+| Manually change a customer's level | ❌ Not in API yet |
+| Coins (earning, balance, history) | ❌ Not in API yet |
+
+### Customer Levels (`/customer-levels`)
+
+| Feature | Status |
+|---------|--------|
+| List levels (sorted by unlock coins) | ✅ |
+| Create / edit level (name, key auto-suggest, coins, description) | ✅ |
+| Delete level with confirmation | ✅ |
+| Starting level: coins locked at 0, delete hidden | ✅ |
+| Inline field errors (validation, key / threshold taken) | ✅ |
+| Rewards catalog and redemptions | ❌ Not in API yet |
 
 ---
 

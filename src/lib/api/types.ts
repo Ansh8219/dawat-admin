@@ -322,14 +322,18 @@ export type UpdateMenuItemPayload = Partial<Omit<CreateMenuItemPayload, "busines
   remove_image_public_ids?: string[];
 };
 
-export type CustomerTier = "silver" | "gold" | "platinum";
 export type CustomerSort = "name_asc" | "name_desc" | "orders_desc" | "orders_asc";
+
+export interface CustomerTierSummary {
+  public_id: string;
+  key: string;
+  name: string;
+  customers_count: number;
+}
 
 export interface CustomerSummary {
   total_customers: number;
-  silver_customers: number;
-  gold_customers: number;
-  platinum_customers: number;
+  tiers: CustomerTierSummary[];
 }
 
 export interface Customer {
@@ -337,7 +341,10 @@ export interface Customer {
   full_name: string | null;
   country_code: string;
   phone_number: string;
-  tier: CustomerTier | string;
+  /** Level key, e.g. "foodie". */
+  tier: string;
+  /** Level display name, e.g. "Foodie". */
+  tier_name: string;
   profile_picture_url: string | null;
   orders_count: number | null;
   ltv: number | null;
@@ -347,7 +354,7 @@ export interface Customer {
 
 export interface CustomerListParams {
   search?: string;
-  tier?: CustomerTier | "";
+  tier?: string;
   sort?: CustomerSort;
   page?: number;
   page_size?: number;
@@ -363,6 +370,33 @@ export interface CustomerListData {
 
 export type UpdateCustomerPayload = {
   is_active?: boolean;
+};
+
+/** Customer level (reward tier) — /api/admin/reward-tiers/ */
+export interface RewardTier {
+  public_id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  min_lifetime_coins: number;
+  is_base: boolean;
+}
+
+export interface RewardTierListData {
+  count: number;
+  results: RewardTier[];
+}
+
+export interface CreateRewardTierPayload {
+  key: string;
+  name: string;
+  min_lifetime_coins: number;
+  description?: string;
+}
+
+/** PATCH — send only changed fields; `description: null` clears it. */
+export type UpdateRewardTierPayload = Partial<Omit<CreateRewardTierPayload, "description">> & {
+  description?: string | null;
 };
 
 /** Partner onboarding / delivery-partner review */

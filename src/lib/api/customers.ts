@@ -47,8 +47,3 @@ export function formatCustomerPhone(c: Pick<Customer, "country_code" | "phone_nu
   if (!phone) return code;
   return `${code} ${phone}`;
 }
-
-export function tierLabel(tier: string): string {
-  if (!tier) return "—";
-  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
-}

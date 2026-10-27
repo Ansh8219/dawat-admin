@@ -34,13 +34,6 @@ const map: Record<string, string> = {
   rejected: "bg-destructive/15 text-destructive border-destructive/30",
   Draft: "bg-muted text-muted-foreground border-border",
   draft: "bg-muted text-muted-foreground border-border",
-  // loyalty
-  Silver: "bg-muted text-muted-foreground border-border",
-  Gold: "bg-gold/20 text-gold-foreground border-gold/40",
-  Platinum: "bg-primary/15 text-primary border-primary/30",
-  silver: "bg-muted text-muted-foreground border-border",
-  gold: "bg-gold/20 text-gold-foreground border-gold/40",
-  platinum: "bg-primary/15 text-primary border-primary/30",
   // account
   Inactive: "bg-destructive/15 text-destructive border-destructive/30",
   // vendor
