@@ -144,6 +144,10 @@ function humanizeErrorCode(code: string): string {
       return "Customers are on this level, so it cannot be deleted.";
     case "reward_tier_not_found":
       return "Level not found.";
+    case "reward_rule_not_found":
+      return "Bonus rule not found.";
+    case "insufficient_coins":
+      return "Customer does not have enough coins for this deduction.";
     default:
       return "Something went wrong. Please try again.";
   }

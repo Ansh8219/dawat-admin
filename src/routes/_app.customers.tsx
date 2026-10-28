@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomerCoinsPanel } from "@/components/app/customer-coins-panel";
 import {
   Select,
   SelectContent,
@@ -121,6 +123,12 @@ function CustomersPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [drawerTab, setDrawerTab] = useState("profile");
+  const selId = sel?.public_id ?? null;
+
+  useEffect(() => {
+    setDrawerTab("profile");
+  }, [selId]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(q), 300);
@@ -544,73 +552,100 @@ function CustomersPage() {
       </div>
 
       <Sheet open={!!sel} onOpenChange={(v) => !v && setSel(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
           {sel && (
             <>
               <SheetHeader>
                 <SheetTitle>{displayName(sel.full_name)}</SheetTitle>
               </SheetHeader>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-14 w-14">
-                    {sel.profile_picture_url ? (
-                      <AvatarImage src={sel.profile_picture_url} alt={displayName(sel.full_name)} />
-                    ) : null}
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {initials(sel.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatCustomerPhone(sel)}
-                    </div>
-                    <div className="mt-1">
-                      <StatusBadge status={sel.is_active ? "Active" : "Inactive"} />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Stat label="Orders" value={sel.orders_count == null ? "—" : String(sel.orders_count)} />
-                  <Stat label="LTV" value={sel.ltv == null ? "—" : inr(sel.ltv)} />
-                  <Stat label="Level" value={levelName(sel)} />
-                </div>
-                <div className="rounded-xl border p-3 text-sm">
-                  <div className="text-xs font-semibold uppercase text-muted-foreground">
-                    Last order
-                  </div>
-                  <div className="mt-1">{formatLastOrder(sel.last_order_date)}</div>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border p-3">
-                  <div>
-                    <div className="text-sm font-medium">Account active</div>
-                    <div className="text-xs text-muted-foreground">
-                      Inactive customers cannot log in
-                    </div>
-                  </div>
-                  <Switch
-                    checked={sel.is_active}
-                    disabled={togglingId === sel.public_id}
-                    onCheckedChange={(v) => void toggleActive(sel, v)}
+              <Tabs value={drawerTab} onValueChange={setDrawerTab} className="mt-4">
+                <TabsList className="w-full rounded-xl">
+                  <TabsTrigger value="profile" className="flex-1">
+                    Profile
+                  </TabsTrigger>
+                  <TabsTrigger value="coins" className="flex-1">
+                    Coins
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="coins" className="mt-4">
+                  <CustomerCoinsPanel
+                    key={sel.public_id}
+                    customerId={sel.public_id}
+                    customerName={displayName(sel.full_name)}
+                    onAuthError={handleAuthError}
+                    onAdjusted={() => void refresh({ showLoading: false })}
                   />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 rounded-xl"
-                    onClick={() => void toggleActive(sel, !sel.is_active)}
-                    disabled={togglingId === sel.public_id}
-                  >
-                    {sel.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1 rounded-xl gap-2"
-                    onClick={() => setDeleteTarget(sel)}
-                  >
-                    <UserX className="h-4 w-4" /> Delete
-                  </Button>
-                </div>
-              </div>
+                </TabsContent>
+                <TabsContent value="profile" className="mt-0">
+                  <div className="mt-4 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-14 w-14">
+                        {sel.profile_picture_url ? (
+                          <AvatarImage
+                            src={sel.profile_picture_url}
+                            alt={displayName(sel.full_name)}
+                          />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {initials(sel.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatCustomerPhone(sel)}
+                        </div>
+                        <div className="mt-1">
+                          <StatusBadge status={sel.is_active ? "Active" : "Inactive"} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Stat
+                        label="Orders"
+                        value={sel.orders_count == null ? "—" : String(sel.orders_count)}
+                      />
+                      <Stat label="LTV" value={sel.ltv == null ? "—" : inr(sel.ltv)} />
+                      <Stat label="Level" value={levelName(sel)} />
+                    </div>
+                    <div className="rounded-xl border p-3 text-sm">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">
+                        Last order
+                      </div>
+                      <div className="mt-1">{formatLastOrder(sel.last_order_date)}</div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border p-3">
+                      <div>
+                        <div className="text-sm font-medium">Account active</div>
+                        <div className="text-xs text-muted-foreground">
+                          Inactive customers cannot log in
+                        </div>
+                      </div>
+                      <Switch
+                        checked={sel.is_active}
+                        disabled={togglingId === sel.public_id}
+                        onCheckedChange={(v) => void toggleActive(sel, v)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 rounded-xl"
+                        onClick={() => void toggleActive(sel, !sel.is_active)}
+                        disabled={togglingId === sel.public_id}
+                      >
+                        {sel.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1 rounded-xl gap-2"
+                        onClick={() => setDeleteTarget(sel)}
+                      >
+                        <UserX className="h-4 w-4" /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </SheetContent>

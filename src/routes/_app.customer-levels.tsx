@@ -124,6 +124,7 @@ function CustomerLevelsPage() {
   const [keyTouched, setKeyTouched] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+  const [reassignConfirmOpen, setReassignConfirmOpen] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<RewardTier | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -218,12 +219,22 @@ function CustomerLevelsPage() {
     return patch;
   }
 
-  async function saveForm() {
+  function submitForm() {
     const isBase = editing?.is_base ?? false;
     const errors = validate(form, isBase);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    const reassigns = editing ? buildPatch(editing).min_lifetime_coins !== undefined : true;
+    if (reassigns) {
+      setReassignConfirmOpen(true);
+      return;
+    }
+    void saveForm();
+  }
+
+  async function saveForm() {
+    setReassignConfirmOpen(false);
     setSaving(true);
     try {
       if (editing) {
@@ -440,7 +451,7 @@ function CustomerLevelsPage() {
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
-              void saveForm();
+              submitForm();
             }}
           >
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
@@ -560,6 +571,33 @@ function CustomerLevelsPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={reassignConfirmOpen}
+        onOpenChange={(open) => !open && setReassignConfirmOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {editing ? "Change coins threshold?" : "Create level?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Customers will be moved to the matching level based on their lifetime coins.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void saveForm();
+              }}
+            >
+              {editing ? "Save changes" : "Create level"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deleteTarget !== null}

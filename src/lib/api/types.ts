@@ -399,6 +399,83 @@ export type UpdateRewardTierPayload = Partial<Omit<CreateRewardTierPayload, "des
   description?: string | null;
 };
 
+/** Coin earning settings — /api/admin/reward-settings/ */
+export type EarnCalculation = "proportional" | "full_steps";
+
+export interface RewardSettings {
+  is_enabled: boolean;
+  earn_step_amount: number;
+  coins_per_step: number;
+  earn_calculation: EarnCalculation;
+  min_order_amount: number;
+  coin_value: number | null;
+}
+
+/** PATCH — send only changed fields; `coin_value: null` clears it. */
+export type UpdateRewardSettingsPayload = Partial<RewardSettings>;
+
+/** Bonus rule — /api/admin/reward-rules/ */
+export type RewardRuleTrigger = "review" | string;
+
+export interface RewardRule {
+  trigger: RewardRuleTrigger;
+  title: string;
+  description: string | null;
+  coins: number;
+  is_active: boolean;
+}
+
+export interface RewardRuleListData {
+  count: number;
+  results: RewardRule[];
+}
+
+/** PATCH — send only changed fields; `description: null` clears it. */
+export type UpdateRewardRulePayload = Partial<Omit<RewardRule, "trigger">>;
+
+/** Customer coins — /api/admin/customers/{public_id}/coins/ */
+export type CoinDirection = "credit" | "debit";
+export type CoinEntryType = "order_earn" | "review_earn" | "admin_credit" | "admin_debit" | string;
+
+export interface CoinEntry {
+  public_id: string;
+  entry_type: CoinEntryType;
+  direction: CoinDirection;
+  coins: number;
+  order_public_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CustomerCoinsTier {
+  key: string;
+  name: string;
+  min_lifetime_coins: number;
+}
+
+export interface CustomerCoinsNextTier extends CustomerCoinsTier {
+  coins_needed: number;
+}
+
+export interface CustomerCoinsData {
+  coin_balance: number;
+  lifetime_coins: number;
+  tier: CustomerCoinsTier | null;
+  next_tier: CustomerCoinsNextTier | null;
+  history: {
+    count: number;
+    page: number;
+    page_size: number;
+    results: CoinEntry[];
+  };
+}
+
+export interface AdjustCoinsPayload {
+  direction: CoinDirection;
+  coins: number;
+  note: string;
+}
+
 /** Partner onboarding / delivery-partner review */
 export type PartnerStatus = "pending" | "approved" | "rejected" | string;
 

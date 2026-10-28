@@ -20,6 +20,7 @@ import {
   QrCode,
   Store,
   Trophy,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -48,6 +49,7 @@ const nav = [
     items: [
       { to: "/customers", label: "Customers", icon: Users },
       { to: "/customer-levels", label: "Customer Levels", icon: Trophy },
+      { to: "/rewards", label: "Rewards", icon: Coins },
       { to: "/marketing", label: "Marketing", icon: Megaphone },
     ],
   },

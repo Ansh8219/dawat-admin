@@ -17,6 +17,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppTableQrRouteImport } from './routes/_app.table-qr'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppRewardsRouteImport } from './routes/_app.rewards'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPeopleRouteImport } from './routes/_app.people'
@@ -74,6 +75,11 @@ const AppTableQrRoute = AppTableQrRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRewardsRoute = AppRewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
   getParentRoute: () => AppRoute,
 } as any)
 const AppReportsRoute = AppReportsRouteImport.update({
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/reports': typeof AppReportsRoute
+  '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/reports': typeof AppReportsRoute
+  '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
   '/': typeof AppIndexRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/_app/people': typeof AppPeopleRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/reports': typeof AppReportsRoute
+  '/_app/rewards': typeof AppRewardsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/table-qr': typeof AppTableQrRoute
   '/_app/': typeof AppIndexRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/people'
     | '/pos'
     | '/reports'
+    | '/rewards'
     | '/settings'
     | '/table-qr'
     | '/partners/$partnerId'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/people'
     | '/pos'
     | '/reports'
+    | '/rewards'
     | '/settings'
     | '/table-qr'
     | '/'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/_app/people'
     | '/_app/pos'
     | '/_app/reports'
+    | '/_app/rewards'
     | '/_app/settings'
     | '/_app/table-qr'
     | '/_app/'
@@ -412,6 +424,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/rewards': {
+      id: '/_app/rewards'
+      path: '/rewards'
+      fullPath: '/rewards'
+      preLoaderRoute: typeof AppRewardsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/reports': {
@@ -567,6 +586,7 @@ interface AppRouteChildren {
   AppPeopleRoute: typeof AppPeopleRoute
   AppPosRoute: typeof AppPosRoute
   AppReportsRoute: typeof AppReportsRoute
+  AppRewardsRoute: typeof AppRewardsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTableQrRoute: typeof AppTableQrRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -592,6 +612,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPeopleRoute: AppPeopleRoute,
   AppPosRoute: AppPosRoute,
   AppReportsRoute: AppReportsRoute,
+  AppRewardsRoute: AppRewardsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTableQrRoute: AppTableQrRoute,
   AppIndexRoute: AppIndexRoute,
