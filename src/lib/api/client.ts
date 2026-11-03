@@ -97,6 +97,8 @@ function humanizeErrorCode(code: string): string {
       return "Only pending partners can be reviewed.";
     case "home_service_key_taken":
       return "That service key is already in use.";
+    case "home_service_limit_reached":
+      return "Only 6 home services can be created.";
     case "home_service_not_found":
       return "Home service not found.";
     case "not authenticated":

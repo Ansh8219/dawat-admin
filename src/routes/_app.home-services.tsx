@@ -27,6 +27,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   createHomeService,
   deleteHomeService,
   HOME_SERVICE_KEY_PATTERN,
@@ -56,6 +62,9 @@ type FormState = {
   is_active: boolean;
 };
 
+/** Matches backend MAX_HOME_SERVICES. */
+const MAX_HOME_SERVICES = 6;
+
 const EMPTY_FORM: FormState = {
   key: "",
   name: "",
@@ -68,6 +77,8 @@ function HomeServicesPage() {
   const navigate = useNavigate();
   const [results, setResults] = useState<HomeService[]>([]);
   const [count, setCount] = useState(0);
+  /** Total services across filters — used for the create cap. */
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
@@ -111,6 +122,12 @@ function HomeServicesPage() {
         );
         setResults(data.results ?? []);
         setCount(data.count ?? 0);
+        if (activeFilter === "all") {
+          setTotalCount(data.count ?? 0);
+        } else {
+          const all = await withAuthRetry((token) => listHomeServices(token));
+          setTotalCount(all.count ?? 0);
+        }
       } catch (err) {
         if (handleAuthError(err)) return;
         const message = err instanceof ApiError ? err.message : "Unable to load home services.";
@@ -138,7 +155,13 @@ function HomeServicesPage() {
     [results],
   );
 
+  const atServiceLimit = totalCount >= MAX_HOME_SERVICES;
+
   function openCreate() {
+    if (atServiceLimit) {
+      toast.error(`Only ${MAX_HOME_SERVICES} home services can be created.`);
+      return;
+    }
     setEditing(null);
     setForm(EMPTY_FORM);
     setImageFile(null);
@@ -248,6 +271,10 @@ function HomeServicesPage() {
       toast.error("Image is required");
       return;
     }
+    if (!editing && atServiceLimit) {
+      toast.error(`Only ${MAX_HOME_SERVICES} home services can be created.`);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -303,10 +330,33 @@ function HomeServicesPage() {
         crumbs={["Admin", "Home Services"]}
         description="Manage customer-app home tiles (image, key, sort order, active state)."
         action={
-          <Button type="button" onClick={openCreate} className="rounded-xl">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add service
-          </Button>
+          atServiceLimit ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button type="button" className="rounded-xl pointer-events-none" disabled>
+                      <Plus className="mr-1.5 h-4 w-4" />
+                      Add service
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Maximum of {MAX_HOME_SERVICES} home services reached
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <Button
+              type="button"
+              onClick={openCreate}
+              className="rounded-xl"
+              disabled={loading}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add service
+            </Button>
+          )
         }
       />
 
@@ -327,6 +377,7 @@ function HomeServicesPage() {
           </Select>
           <p className="text-sm text-muted-foreground">
             {count} service{count === 1 ? "" : "s"}
+            {atServiceLimit ? ` · max ${MAX_HOME_SERVICES}` : ` · ${totalCount}/${MAX_HOME_SERVICES}`}
           </p>
         </div>
 
