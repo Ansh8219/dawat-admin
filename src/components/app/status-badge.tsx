@@ -40,6 +40,9 @@ const map: Record<string, string> = {
   Upcoming: "bg-info/15 text-info border-info/30",
   Overdue: "bg-destructive/15 text-destructive border-destructive/30",
   Paid: "bg-success/15 text-success border-success/30",
+  // refunds
+  Processed: "bg-success/15 text-success border-success/30",
+  Failed: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

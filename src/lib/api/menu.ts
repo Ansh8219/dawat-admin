@@ -29,11 +29,19 @@ export function menuImageUrl(image: { url: string } | string): string {
 }
 
 /** Map a detail/create response onto the list summary shape (fallback if list isn't re-fetched). */
+/** Up to 16 letters/numbers/hyphens, must start with a letter or number. */
+export const ITEM_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,15}$/;
+
+export function normalizeItemCode(raw: string): string {
+  return raw.trim().toUpperCase();
+}
+
 export function menuItemToSummary(item: MenuItemDetail): MenuItemSummary {
   const firstImage = item.images[0];
   return {
     public_id: item.public_id,
     name: item.name,
+    item_code: item.item_code ?? null,
     category: item.category,
     category_public_id: item.category_public_id,
     dietary: item.dietary,

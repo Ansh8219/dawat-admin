@@ -19,6 +19,7 @@ import { Route as AppTableQrRouteImport } from './routes/_app.table-qr'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppRewardsRouteImport } from './routes/_app.rewards'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
+import { Route as AppRefundsRouteImport } from './routes/_app.refunds'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPeopleRouteImport } from './routes/_app.people'
 import { Route as AppPartnersRouteImport } from './routes/_app.partners'
@@ -28,6 +29,7 @@ import { Route as AppNotificationsRouteImport } from './routes/_app.notification
 import { Route as AppMenuCategoriesRouteImport } from './routes/_app.menu-categories'
 import { Route as AppMenuRouteImport } from './routes/_app.menu'
 import { Route as AppMarketingRouteImport } from './routes/_app.marketing'
+import { Route as AppInvoicesRouteImport } from './routes/_app.invoices'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
@@ -35,6 +37,7 @@ import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners_.$partnerId'
+import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app.invoices_.$invoiceId'
 import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
 import { Route as AppPeoplePartnersPartnerIdRouteImport } from './routes/_app.people_.partners.$partnerId'
 
@@ -87,6 +90,11 @@ const AppReportsRoute = AppReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRefundsRoute = AppRefundsRouteImport.update({
+  id: '/refunds',
+  path: '/refunds',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPosRoute = AppPosRouteImport.update({
   id: '/pos',
   path: '/pos',
@@ -132,6 +140,11 @@ const AppMarketingRoute = AppMarketingRouteImport.update({
   path: '/marketing',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInventoryRoute = AppInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
@@ -167,6 +180,11 @@ const AppPartnersPartnerIdRoute = AppPartnersPartnerIdRouteImport.update({
   path: '/partners/$partnerId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesInvoiceIdRoute = AppInvoicesInvoiceIdRouteImport.update({
+  id: '/invoices_/$invoiceId',
+  path: '/invoices/$invoiceId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPeopleStoreKeepersStoreKeeperIdRoute =
   AppPeopleStoreKeepersStoreKeeperIdRouteImport.update({
     id: '/people_/store-keepers/$storeKeeperId',
@@ -192,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
+  '/invoices': typeof AppInvoicesRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
   '/menu-categories': typeof AppMenuCategoriesRoute
@@ -201,10 +220,12 @@ export interface FileRoutesByFullPath {
   '/partners': typeof AppPartnersRoute
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
+  '/refunds': typeof AppRefundsRoute
   '/reports': typeof AppReportsRoute
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
+  '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
@@ -220,6 +241,7 @@ export interface FileRoutesByTo {
   '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
+  '/invoices': typeof AppInvoicesRoute
   '/marketing': typeof AppMarketingRoute
   '/menu': typeof AppMenuRoute
   '/menu-categories': typeof AppMenuCategoriesRoute
@@ -229,11 +251,13 @@ export interface FileRoutesByTo {
   '/partners': typeof AppPartnersRoute
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
+  '/refunds': typeof AppRefundsRoute
   '/reports': typeof AppReportsRoute
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
   '/': typeof AppIndexRoute
+  '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
@@ -251,6 +275,7 @@ export interface FileRoutesById {
   '/_app/finance': typeof AppFinanceRoute
   '/_app/home-services': typeof AppHomeServicesRoute
   '/_app/inventory': typeof AppInventoryRoute
+  '/_app/invoices': typeof AppInvoicesRoute
   '/_app/marketing': typeof AppMarketingRoute
   '/_app/menu': typeof AppMenuRoute
   '/_app/menu-categories': typeof AppMenuCategoriesRoute
@@ -260,11 +285,13 @@ export interface FileRoutesById {
   '/_app/partners': typeof AppPartnersRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/pos': typeof AppPosRoute
+  '/_app/refunds': typeof AppRefundsRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/rewards': typeof AppRewardsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/table-qr': typeof AppTableQrRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/invoices_/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/partners_/$partnerId': typeof AppPartnersPartnerIdRoute
   '/_app/people_/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/_app/people_/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
@@ -283,6 +310,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/home-services'
     | '/inventory'
+    | '/invoices'
     | '/marketing'
     | '/menu'
     | '/menu-categories'
@@ -292,10 +320,12 @@ export interface FileRouteTypes {
     | '/partners'
     | '/people'
     | '/pos'
+    | '/refunds'
     | '/reports'
     | '/rewards'
     | '/settings'
     | '/table-qr'
+    | '/invoices/$invoiceId'
     | '/partners/$partnerId'
     | '/people/partners/$partnerId'
     | '/people/store-keepers/$storeKeeperId'
@@ -311,6 +341,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/home-services'
     | '/inventory'
+    | '/invoices'
     | '/marketing'
     | '/menu'
     | '/menu-categories'
@@ -320,11 +351,13 @@ export interface FileRouteTypes {
     | '/partners'
     | '/people'
     | '/pos'
+    | '/refunds'
     | '/reports'
     | '/rewards'
     | '/settings'
     | '/table-qr'
     | '/'
+    | '/invoices/$invoiceId'
     | '/partners/$partnerId'
     | '/people/partners/$partnerId'
     | '/people/store-keepers/$storeKeeperId'
@@ -341,6 +374,7 @@ export interface FileRouteTypes {
     | '/_app/finance'
     | '/_app/home-services'
     | '/_app/inventory'
+    | '/_app/invoices'
     | '/_app/marketing'
     | '/_app/menu'
     | '/_app/menu-categories'
@@ -350,11 +384,13 @@ export interface FileRouteTypes {
     | '/_app/partners'
     | '/_app/people'
     | '/_app/pos'
+    | '/_app/refunds'
     | '/_app/reports'
     | '/_app/rewards'
     | '/_app/settings'
     | '/_app/table-qr'
     | '/_app/'
+    | '/_app/invoices_/$invoiceId'
     | '/_app/partners_/$partnerId'
     | '/_app/people_/partners/$partnerId'
     | '/_app/people_/store-keepers/$storeKeeperId'
@@ -440,6 +476,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/refunds': {
+      id: '/_app/refunds'
+      path: '/refunds'
+      fullPath: '/refunds'
+      preLoaderRoute: typeof AppRefundsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/pos': {
       id: '/_app/pos'
       path: '/pos'
@@ -503,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMarketingRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices': {
+      id: '/_app/invoices'
+      path: '/invoices'
+      fullPath: '/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/inventory': {
       id: '/_app/inventory'
       path: '/inventory'
@@ -552,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPartnersPartnerIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices_/$invoiceId': {
+      id: '/_app/invoices_/$invoiceId'
+      path: '/invoices/$invoiceId'
+      fullPath: '/invoices/$invoiceId'
+      preLoaderRoute: typeof AppInvoicesInvoiceIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/people_/store-keepers/$storeKeeperId': {
       id: '/_app/people_/store-keepers/$storeKeeperId'
       path: '/people/store-keepers/$storeKeeperId'
@@ -576,6 +633,7 @@ interface AppRouteChildren {
   AppFinanceRoute: typeof AppFinanceRoute
   AppHomeServicesRoute: typeof AppHomeServicesRoute
   AppInventoryRoute: typeof AppInventoryRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
   AppMarketingRoute: typeof AppMarketingRoute
   AppMenuRoute: typeof AppMenuRoute
   AppMenuCategoriesRoute: typeof AppMenuCategoriesRoute
@@ -585,11 +643,13 @@ interface AppRouteChildren {
   AppPartnersRoute: typeof AppPartnersRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPosRoute: typeof AppPosRoute
+  AppRefundsRoute: typeof AppRefundsRoute
   AppReportsRoute: typeof AppReportsRoute
   AppRewardsRoute: typeof AppRewardsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTableQrRoute: typeof AppTableQrRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppPartnersPartnerIdRoute: typeof AppPartnersPartnerIdRoute
   AppPeoplePartnersPartnerIdRoute: typeof AppPeoplePartnersPartnerIdRoute
   AppPeopleStoreKeepersStoreKeeperIdRoute: typeof AppPeopleStoreKeepersStoreKeeperIdRoute
@@ -602,6 +662,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceRoute: AppFinanceRoute,
   AppHomeServicesRoute: AppHomeServicesRoute,
   AppInventoryRoute: AppInventoryRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
   AppMarketingRoute: AppMarketingRoute,
   AppMenuRoute: AppMenuRoute,
   AppMenuCategoriesRoute: AppMenuCategoriesRoute,
@@ -611,11 +672,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppPartnersRoute: AppPartnersRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPosRoute: AppPosRoute,
+  AppRefundsRoute: AppRefundsRoute,
   AppReportsRoute: AppReportsRoute,
   AppRewardsRoute: AppRewardsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTableQrRoute: AppTableQrRoute,
   AppIndexRoute: AppIndexRoute,
+  AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppPartnersPartnerIdRoute: AppPartnersPartnerIdRoute,
   AppPeoplePartnersPartnerIdRoute: AppPeoplePartnersPartnerIdRoute,
   AppPeopleStoreKeepersStoreKeeperIdRoute:

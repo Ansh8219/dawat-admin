@@ -254,6 +254,8 @@ export type UpdateMenuCategoryFields = Partial<{
 export interface MenuItemSummary {
   public_id: string;
   name: string;
+  /** Staff-only short code (uppercased by backend), e.g. "101". */
+  item_code?: string | null;
   category: string;
   category_public_id?: string;
   dietary: MenuDietary;
@@ -275,6 +277,7 @@ export interface MenuItemDetail {
   category: string;
   category_public_id?: string;
   name: string;
+  item_code?: string | null;
   description: string | null;
   price: number | string;
   unit: MenuUnit;
@@ -299,6 +302,8 @@ export type MenuItem = MenuItemDetail;
 export interface CreateMenuItemPayload {
   business_public_id: string;
   name: string;
+  /** Up to 16 letters/numbers/hyphens, starting with a letter or number. "" or null on PATCH clears it. */
+  item_code?: string | null;
   category_public_id: string;
   price: number;
   unit: MenuUnit;
@@ -774,7 +779,8 @@ export type AdminOrderStatus =
   | "picked_up"
   | "on_the_way"
   | "delivered"
-  | "rejected";
+  | "rejected"
+  | "cancelled";
 
 /** Driver on a ready-tab order after assignment. */
 export interface AdminOrderDriver {
@@ -806,6 +812,8 @@ export interface AdminOrderItem {
   menu_item_public_id: string | null;
   menu_type: string | null;
   name: string | null;
+  /** Item code snapshotted when the order was placed. */
+  item_code?: string | null;
   quantity: number;
   unit_price: number;
   line_total: number;
@@ -814,9 +822,20 @@ export interface AdminOrderItem {
   addons: AdminOrderAddon[] | null;
 }
 
+/** Dining table on a QR order (dine-in or counter takeaway). */
+export interface AdminOrderTable {
+  public_id?: string | null;
+  table_number: string | null;
+}
+
 export interface AdminOrder {
   public_id: string;
+  order_code?: string | null;
   status: AdminOrderStatus | string;
+  /** delivery | pickup (app), dine_in | takeaway (QR table). */
+  fulfillment_type?: string | null;
+  /** Set on QR table orders only. */
+  table?: AdminOrderTable | null;
   delivery_status: string | null;
   driver: AdminOrderDriver | null;
   driver_accepted_at: string | null;
@@ -828,6 +847,9 @@ export interface AdminOrder {
   total: number | null;
   preparation_minutes: number | null;
   reject_reason: string | null;
+  /** Set when the customer cancelled before preparing. */
+  cancelled_at: string | null;
+  cancel_reason: string | null;
   created_at: string;
   delivered_at: string | null;
   waiting_seconds: number | null;
@@ -847,6 +869,62 @@ export interface AdminOrderListData {
   page_size: number;
   results: AdminOrder[];
 }
+
+export type AdminRefundStatus = "pending" | "processed" | "failed";
+export type AdminRefundDestination = "wallet" | "original_payment";
+export type AdminRefundReason = "customer_cancelled" | "restaurant_rejected";
+
+export interface AdminRefundOrder {
+  public_id: string;
+  order_code: string | null;
+  fulfillment_type: string | null;
+  payment_method: string | null;
+  total: number | null;
+  item_count: number | null;
+  ordered_at: string | null;
+  cancelled_at: string | null;
+  rejected_at: string | null;
+}
+
+export interface AdminRefundCustomer {
+  public_id: string;
+  full_name: string | null;
+  country_code: string | null;
+  phone_number: string | null;
+}
+
+export interface AdminRefund {
+  public_id: string;
+  amount: number;
+  destination: AdminRefundDestination | string;
+  status: AdminRefundStatus | string;
+  reason: AdminRefundReason | string;
+  initiated_at: string | null;
+  refunded_at: string | null;
+  failed_at: string | null;
+  razorpay_refund_id: string | null;
+  order: AdminRefundOrder | null;
+  customer: AdminRefundCustomer | null;
+}
+
+export interface AdminRefundListParams {
+  status?: AdminRefundStatus;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminRefundListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: AdminRefund[];
+}
+
+/** POST /api/admin/refunds/{public_id}/retry/ */
+export type AdminRefundRetryData = Pick<
+  AdminRefund,
+  "public_id" | "amount" | "destination" | "status" | "reason" | "initiated_at" | "refunded_at"
+>;
 
 /** Global dining table for QR dine-in ordering (admin CRUD). */
 export interface RestaurantTable {
@@ -1124,6 +1202,161 @@ export interface OfferRedemptionListData {
     title: string;
   };
   results: OfferRedemption[];
+}
+
+/** GET/PUT /api/admin/businesses/{public_id}/invoice-details/ */
+export interface BusinessInvoiceDetails {
+  public_id: string;
+  type: BusinessType | string;
+  name: string;
+  legal_name: string | null;
+  gst_number: string | null;
+  address: string | null;
+  state: string | null;
+  state_code: string | null;
+  fssai_number: string | null;
+  invoice_prefix: string | null;
+  /** Invoices are only issued for this business when true. */
+  is_invoice_ready: boolean;
+  missing_fields: string[];
+}
+
+/** PUT body: all fields required. */
+export interface BusinessInvoiceDetailsPayload {
+  legal_name: string;
+  gst_number: string;
+  address: string;
+  state: string;
+  state_code: string;
+  fssai_number: string;
+  invoice_prefix: string;
+}
+
+export interface InvoiceBusiness {
+  public_id: string;
+  type: BusinessType | string;
+  name: string;
+}
+
+export interface InvoiceTotals {
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_amount: number;
+}
+
+/** Row from GET /api/admin/invoices/ */
+export interface InvoiceListItem {
+  public_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  status: string;
+  business: InvoiceBusiness;
+  order_public_id: string;
+  buyer_name: string | null;
+  fulfillment_type: string | null;
+  payment_method: string | null;
+  taxable_amount: number;
+  total_tax: number;
+  total_amount: number;
+}
+
+export interface InvoiceListParams {
+  business_public_id?: string;
+  /** YYYY-MM-DD, IST, inclusive */
+  date_from?: string;
+  /** YYYY-MM-DD, IST, inclusive */
+  date_to?: string;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface InvoiceListData {
+  count: number;
+  page: number;
+  page_size: number;
+  /** Totals for the whole filter, not just this page. */
+  totals: InvoiceTotals;
+  results: InvoiceListItem[];
+}
+
+export interface InvoiceSeller {
+  name: string;
+  legal_name: string;
+  gstin: string;
+  address: string;
+  state: string;
+  state_code: string;
+  fssai_number: string;
+}
+
+export interface InvoiceBuyer {
+  name: string | null;
+  phone: string | null;
+  /** Null for pickup / dine-in. */
+  address: string | null;
+}
+
+export interface InvoiceOrderSummary {
+  public_id: string;
+  status: string;
+  fulfillment_type: string | null;
+  payment_method: string | null;
+  ordered_at: string | null;
+  /** Driver tip; not part of the invoice. */
+  tip_amount: number | null;
+}
+
+export interface InvoiceLine {
+  position: number;
+  line_type: "item" | "delivery" | string;
+  description: string;
+  sac_code: string;
+  quantity: number;
+  unit_price: number;
+  gross_amount: number;
+  discount_amount: number;
+  taxable_amount: number;
+  gst_rate: number;
+  cgst_rate: number;
+  sgst_rate: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_amount: number;
+}
+
+/** GET /api/admin/invoices/{public_id}/ */
+export interface InvoiceDetail {
+  public_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  financial_year: string;
+  status: string;
+  title: string;
+  business: InvoiceBusiness;
+  seller: InvoiceSeller;
+  buyer: InvoiceBuyer;
+  place_of_supply: string;
+  place_of_supply_code: string;
+  order: InvoiceOrderSummary;
+  lines: InvoiceLine[];
+  gross_amount: number;
+  discount_amount: number;
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_tax: number;
+  total_amount: number;
+}
+
+/** GET /api/admin/orders/{public_id}/invoices/ */
+export interface OrderInvoicesData {
+  order_public_id: string;
+  results: InvoiceDetail[];
 }
 
 export class ApiError extends Error {

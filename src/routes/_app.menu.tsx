@@ -34,7 +34,9 @@ import {
   createMenuItem,
   deleteMenuItem,
   getMenuItem,
+  ITEM_CODE_PATTERN,
   listMenuItems,
+  normalizeItemCode,
   TAX_OPTIONS,
   updateMenuItem,
 } from "@/lib/api/menu";
@@ -97,6 +99,7 @@ type FormRecipeLine = {
 
 type ProductForm = {
   name: string;
+  itemCode: string;
   categoryPublicId: string;
   price: string;
   desc: string;
@@ -238,6 +241,7 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 const emptyForm = (copy: MenuFormCopy): ProductForm => ({
   name: "",
+  itemCode: "",
   categoryPublicId: "",
   price: "",
   desc: "",
@@ -305,6 +309,28 @@ function recipeFromDetail(lines: MenuRecipeLine[] | undefined): FormRecipeLine[]
   }));
 }
 
+function itemCodeError(code: string): string {
+  if (!code) return "";
+  if (!ITEM_CODE_PATTERN.test(code)) {
+    return "Use up to 16 letters, numbers or hyphens, starting with a letter or number.";
+  }
+  return "";
+}
+
+/** Pull a field's message out of API validation details (flat or nested under e.g. "payload"). */
+function fieldErrorFromDetails(details: unknown, field: string): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  for (const [key, value] of Object.entries(details as Record<string, unknown>)) {
+    if (key === field) {
+      if (Array.isArray(value)) return value.map(String).join(" ") || null;
+      if (typeof value === "string") return value;
+    }
+    const nested = fieldErrorFromDetails(value, field);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 function detailToForm(
   detail: MenuItemDetail,
   copy: MenuFormCopy,
@@ -312,6 +338,7 @@ function detailToForm(
 ): ProductForm {
   return {
     name: detail.name,
+    itemCode: detail.item_code ?? "",
     categoryPublicId: resolveCategoryPublicId(detail, options),
     price: numToStr(detail.price),
     desc: detail.description ?? "",
@@ -366,6 +393,7 @@ function MenuPage() {
   const [deleting, setDeleting] = useState(false);
   const [togglingAvail, setTogglingAvail] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<ProductForm>(() => emptyForm(getMenuFormCopy("restaurant")));
+  const [itemCodeApiError, setItemCodeApiError] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -469,7 +497,12 @@ function MenuPage() {
           m.category_public_id === category ||
           m.category === categoryNameById[category] ||
           m.category === category;
-        return matchesCategory && m.name.toLowerCase().includes(q.toLowerCase());
+        const needle = q.toLowerCase();
+        return (
+          matchesCategory &&
+          (m.name.toLowerCase().includes(needle) ||
+            (m.item_code ?? "").toLowerCase().includes(needle))
+        );
       }),
     [items, category, q, categoryNameById],
   );
@@ -583,6 +616,7 @@ function MenuPage() {
     setExistingImages([]);
     setRemovedImageIds([]);
     setForm(emptyForm(formCopy));
+    setItemCodeApiError("");
     clearImages();
     setCustomServes(false);
     setCustomVariantIds(new Set());
@@ -599,6 +633,7 @@ function MenuPage() {
     setEditingId(publicId);
     setDetailLoading(true);
     setModal(true);
+    setItemCodeApiError("");
     clearImages();
     setRemovedImageIds([]);
     setCustomServes(false);
@@ -910,6 +945,12 @@ function MenuPage() {
       toast.error("Dish name and price are required");
       return;
     }
+    const itemCode = normalizeItemCode(form.itemCode);
+    const codeFormatError = itemCodeError(itemCode);
+    if (codeFormatError) {
+      toast.error(codeFormatError);
+      return;
+    }
     if (!hasCategories) {
       toast.error("Create a menu category first, then add items.");
       return;
@@ -953,6 +994,8 @@ function MenuPage() {
 
     const updatePayload = {
       name: form.name.trim(),
+      // Edit: always send so clearing the field removes the code. Create: omit when empty.
+      ...(editingId ? { item_code: itemCode || null } : itemCode ? { item_code: itemCode } : {}),
       category_public_id: form.categoryPublicId.trim(),
       price: Number(form.price) || 0,
       unit: form.unit,
@@ -1015,11 +1058,27 @@ function MenuPage() {
         void navigate({ to: "/login" });
         return;
       }
+      if (err instanceof ApiError && err.code === "item_code_taken") {
+        const msg = "This code is already used by another item in this business.";
+        setItemCodeApiError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (err instanceof ApiError && err.status === 400) {
+        const codeMsg = fieldErrorFromDetails(err.details, "item_code");
+        if (codeMsg) {
+          setItemCodeApiError(codeMsg);
+          toast.error(codeMsg);
+          return;
+        }
+      }
       toast.error(err instanceof ApiError ? err.message : "Unable to save menu item");
     } finally {
       setSaving(false);
     }
   }
+
+  const itemCodeMessage = itemCodeApiError || itemCodeError(normalizeItemCode(form.itemCode));
 
   return (
     <div>
@@ -1258,6 +1317,11 @@ function MenuPage() {
                                 <span
                                   className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm border border-emerald-500 bg-emerald-500"
                                 />
+                                {m.item_code && (
+                                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+                                    #{m.item_code}
+                                  </span>
+                                )}
                                 <div className="truncate text-sm font-semibold">{m.name}</div>
                               </div>
                               <div className="text-xs text-muted-foreground">
@@ -1308,6 +1372,7 @@ function MenuPage() {
                     <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                       <tr>
                         <th className="w-8 px-4 py-3" />
+                        <th className="px-4 py-3 text-left font-medium">Code</th>
                         <th className="px-4 py-3 text-left font-medium">Item</th>
                         <th className="px-4 py-3 text-left font-medium">Category</th>
                         <th className="px-4 py-3 text-left font-medium">Type</th>
@@ -1319,7 +1384,7 @@ function MenuPage() {
                     <tbody>
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                          <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                             No menu items yet.
                           </td>
                         </tr>
@@ -1335,6 +1400,9 @@ function MenuPage() {
                                   onChange={() => toggleSel(m.public_id)}
                                   className="accent-primary"
                                 />
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                                {m.item_code ? `#${m.item_code}` : "—"}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2 font-medium">
@@ -1428,14 +1496,38 @@ function MenuPage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {formCopy.itemSectionTitle}
                 </h3>
-                <div>
-                  <Label>{formCopy.nameLabel}</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder={formCopy.namePlaceholder}
-                    className="mt-1 rounded-xl"
-                  />
+                <div className="grid gap-3 sm:grid-cols-[1fr_11rem]">
+                  <div>
+                    <Label>{formCopy.nameLabel}</Label>
+                    <Input
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder={formCopy.namePlaceholder}
+                      className="mt-1 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="menu-item-code">Item code</Label>
+                    <Input
+                      id="menu-item-code"
+                      value={form.itemCode}
+                      onChange={(e) => {
+                        setItemCodeApiError("");
+                        setForm((f) => ({ ...f, itemCode: e.target.value.toUpperCase() }));
+                      }}
+                      placeholder="e.g. 101"
+                      maxLength={16}
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-invalid={Boolean(itemCodeMessage)}
+                      className="mt-1 rounded-xl font-mono uppercase"
+                    />
+                    {itemCodeMessage ? (
+                      <p className="mt-1 text-xs text-destructive">{itemCodeMessage}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">Optional · staff only</p>
+                    )}
+                  </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>

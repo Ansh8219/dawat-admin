@@ -7,10 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { OrderInvoices } from "@/components/app/order-invoices";
 import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
 import {
   acceptAdminOrder,
+  canHandoverOrder,
   formatOrderMoney,
+  getAdminOrder,
+  handoverAdminOrder,
+  isQrTableOrder,
+  orderTableLabel,
   isPlacedStatus,
   listAdminOrders,
   markAdminOrderReady,
@@ -26,8 +32,13 @@ import {
   showsSincePlacedClock,
   sincePlacedSeconds,
   startAdminOrderPreparing,
+  formatCancelledAt,
   formatDeliveredAt,
+  isAutoRefundPayment,
+  isCancelledStatus,
+  isOrderStatusConflict,
   isReadyTrackStatus,
+  orderDisplayCode,
 } from "@/lib/api/orders";
 import { ApiError } from "@/lib/api/types";
 import type { AdminOrder, AdminOrderTab } from "@/lib/api/types";
@@ -37,6 +48,7 @@ import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanelMeta } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
 import {
+  Ban,
   Search,
   Timer,
   MapPin,
@@ -50,11 +62,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  HandPlatter,
+  Armchair,
 } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const ordersSearchSchema = z.object({
+  /** Open this order's detail sheet (linked from invoices). */
+  order: z.string().min(1).optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/_app/orders")({
   component: OrdersPage,
+  validateSearch: ordersSearchSchema,
   head: () => ({ meta: [{ title: "Orders — Daawat Baker's" }] }),
 });
 
@@ -89,12 +110,10 @@ function formatPlacedAt(value: string): string {
   });
 }
 
-function shortId(publicId: string): string {
-  return publicId.slice(0, 8);
-}
-
 function itemLabel(item: NonNullable<AdminOrder["items"]>[number]): string {
-  const name = item.name?.trim() || "Item";
+  const baseName = item.name?.trim() || "Item";
+  const code = item.item_code?.trim();
+  const name = code ? `#${code} ${baseName}` : baseName;
   const variant = item.variant_name?.trim();
   const addons = (item.addons ?? [])
     .map((addon) => addon.name?.trim())
@@ -135,6 +154,8 @@ function OrdersPage() {
   const boardTick = useKitchenAlerts((s) => s.boardTick);
   const clearNewOrderBadge = useKitchenAlerts((s) => s.clearNewOrderBadge);
   const consumeHighlight = useKitchenAlerts((s) => s.consumeHighlight);
+  const consumeCancelled = useKitchenAlerts((s) => s.consumeCancelled);
+  const { order: orderParam } = Route.useSearch();
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -198,6 +219,30 @@ function OrdersPage() {
     void refresh({ showLoading: true });
   }, [refresh]);
 
+  // Deep link from an invoice: /orders?order=<public_id> opens that order's sheet.
+  useEffect(() => {
+    if (!orderParam) return;
+    let cancelled = false;
+    setTab("past");
+    setPage(1);
+    withAuthRetry((token) => getAdminOrder(token, orderParam))
+      .then((order) => {
+        if (!cancelled) setSelected(order);
+      })
+      .catch((err) => {
+        if (cancelled || handleAuthError(err)) return;
+        toast.error(
+          `Couldn't open order ${orderParam.slice(0, 8)} directly. Look for it under Past Orders.`,
+        );
+      })
+      .finally(() => {
+        if (!cancelled) void navigate({ to: "/orders", search: {}, replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderParam, handleAuthError, navigate]);
+
   // Clear nav badge while staff is on the kitchen board.
   useEffect(() => {
     clearNewOrderBadge();
@@ -206,6 +251,15 @@ function OrdersPage() {
   // Soft-refresh + highlight when global kitchen WS ticks (layout-owned socket).
   useEffect(() => {
     if (boardTick === 0) return;
+    const cancelled = new Set(consumeCancelled());
+    if (cancelled.size > 0 && tab !== "past") {
+      setOrders((prev) => prev.filter((order) => !cancelled.has(order.public_id)));
+      const drop = (current: AdminOrder | null) =>
+        current && cancelled.has(current.public_id) ? null : current;
+      setSelected(drop);
+      setAcceptTarget(drop);
+      setRejectTarget(drop);
+    }
     void refresh({ showLoading: false });
     const highlightId = consumeHighlight();
     if (!highlightId) return;
@@ -223,7 +277,7 @@ function OrdersPage() {
       });
     }, 8_000);
     return () => window.clearTimeout(timer);
-  }, [boardTick, refresh, consumeHighlight]);
+  }, [boardTick, refresh, consumeHighlight, consumeCancelled, tab]);
 
   useEffect(() => {
     if (!showsSincePlacedClock(tab)) return;
@@ -237,12 +291,15 @@ function OrdersPage() {
     return orders.filter((order) => {
       const haystack = [
         order.public_id,
+        order.order_code ?? "",
+        order.cancel_reason ?? "",
+        order.table?.table_number ?? "",
         orderCustomerName(order),
         orderPhone(order),
         orderAddressLine(order),
         order.driver?.full_name ?? "",
         order.driver?.phone ?? "",
-        ...(order.items ?? []).map((item) => item.name ?? ""),
+        ...(order.items ?? []).map((item) => `${item.item_code ?? ""} ${item.name ?? ""}`),
       ]
         .join(" ")
         .toLowerCase();
@@ -259,6 +316,20 @@ function OrdersPage() {
     : showsSincePlacedClock(tab) && selectedSince != null
       ? `Since placed ${formatDuration(selectedSince)}`
       : (formatDeliveredAt(selected.delivered_at) ?? `Placed ${formatPlacedAt(selected.created_at)}`);
+
+  function handleActionError(err: unknown, fallback: string) {
+    if (handleAuthError(err)) return;
+    if (isOrderStatusConflict(err)) {
+      toast.error(err instanceof ApiError ? err.message : fallback);
+      setAcceptTarget(null);
+      setRejectTarget(null);
+      setSelected(null);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
+      void refresh();
+      return;
+    }
+    toast.error(err instanceof ApiError ? err.message : fallback);
+  }
 
   function openAccept(order: AdminOrder) {
     setPrepChoice(20);
@@ -283,7 +354,7 @@ function OrdersPage() {
       await withAuthRetry((token) =>
         acceptAdminOrder(token, acceptTarget.public_id, prepMinutes),
       );
-      toast.success(`${shortId(acceptTarget.public_id)} accepted · prep ${prepMinutes} min`);
+      toast.success(`${orderDisplayCode(acceptTarget)} accepted · prep ${prepMinutes} min`);
       setAcceptTarget(null);
       setSelected(null);
       setTab("preparing");
@@ -291,8 +362,7 @@ function OrdersPage() {
       void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "preparing" && page === 1) void refresh();
     } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to accept order");
+      handleActionError(err, "Unable to accept order");
     } finally {
       setActingId(null);
     }
@@ -309,7 +379,7 @@ function OrdersPage() {
       await withAuthRetry((token) =>
         rejectAdminOrder(token, rejectTarget.public_id, rejectReason),
       );
-      toast.success(`${shortId(rejectTarget.public_id)} rejected`);
+      toast.success(`${orderDisplayCode(rejectTarget)} rejected`);
       setRejectTarget(null);
       setSelected(null);
       setTab("past");
@@ -317,8 +387,7 @@ function OrdersPage() {
       void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "past" && page === 1) void refresh();
     } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to reject order");
+      handleActionError(err, "Unable to reject order");
     } finally {
       setActingId(null);
     }
@@ -329,15 +398,14 @@ function OrdersPage() {
     setActingId(order.public_id);
     try {
       await withAuthRetry((token) => startAdminOrderPreparing(token, order.public_id));
-      toast.success(`${shortId(order.public_id)} started preparing`);
+      toast.success(`${orderDisplayCode(order)} started preparing`);
       setSelected(null);
       setTab("preparing");
       setPage(1);
       void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "preparing" && page === 1) void refresh();
     } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to start preparing");
+      handleActionError(err, "Unable to start preparing");
     } finally {
       setActingId(null);
     }
@@ -348,15 +416,33 @@ function OrdersPage() {
     setActingId(order.public_id);
     try {
       await withAuthRetry((token) => markAdminOrderReady(token, order.public_id));
-      toast.success(`${shortId(order.public_id)} marked ready`);
+      toast.success(`${orderDisplayCode(order)} marked ready`);
       setSelected(null);
       setTab("ready");
       setPage(1);
       void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
       if (tab === "ready" && page === 1) void refresh();
     } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to mark order ready");
+      handleActionError(err, "Unable to mark order ready");
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  /** QR table order handed to the guest → delivered; invoice is issued now. */
+  async function handover(order: AdminOrder) {
+    if (!canHandoverOrder(order)) return;
+    setActingId(order.public_id);
+    try {
+      await withAuthRetry((token) => handoverAdminOrder(token, order.public_id));
+      toast.success(`${orderDisplayCode(order)} handed over · invoice issued`);
+      setOrders((prev) => prev.filter((o) => o.public_id !== order.public_id));
+      setCount((c) => Math.max(0, c - 1));
+      setSelected(null);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
+      void refresh();
+    } catch (err) {
+      handleActionError(err, "Unable to hand over order");
     } finally {
       setActingId(null);
     }
@@ -501,6 +587,7 @@ function OrdersPage() {
                   onReject={() => openReject(order)}
                   onStartPreparing={() => void startPreparing(order)}
                   onReady={() => void markReady(order)}
+                  onHandover={() => void handover(order)}
                 />
               ))}
             </div>
@@ -545,7 +632,7 @@ function OrdersPage() {
           {acceptTarget && (
             <div className="space-y-4">
               <div className="rounded-xl border bg-muted/30 p-3">
-                <div className="text-sm font-semibold">{shortId(acceptTarget.public_id)}</div>
+                <div className="text-sm font-semibold">{orderDisplayCode(acceptTarget)}</div>
                 <div className="text-xs text-muted-foreground">
                   {orderCustomerName(acceptTarget)} · {orderItemCount(acceptTarget)} items ·{" "}
                   {formatOrderMoney(orderBillTotal(acceptTarget))}
@@ -614,6 +701,11 @@ function OrdersPage() {
               <p className="text-sm text-muted-foreground">
                 Only a new order can be rejected. Reason is optional, up to 255 characters.
               </p>
+              {isAutoRefundPayment(rejectTarget.payment_method) && (
+                <p className="rounded-xl border border-info/30 bg-info/10 px-3 py-2 text-sm text-info">
+                  Customer will be refunded automatically (wallet: instantly, online: 5–7 working days).
+                </p>
+              )}
               <Textarea
                 value={rejectReason}
                 maxLength={255}
@@ -648,7 +740,7 @@ function OrdersPage() {
             <>
               <SheetHeader>
                 <SheetTitle className="flex items-center justify-between gap-3 pr-6">
-                  <span>{shortId(selected.public_id)}</span>
+                  <span>{orderDisplayCode(selected)}</span>
                   <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                     {orderStatusLabel(selected.status)}
                   </span>
@@ -656,6 +748,11 @@ function OrdersPage() {
               </SheetHeader>
               <div className="mt-4 space-y-4">
                 <div className="rounded-xl border p-3">
+                  {orderTableLabel(selected) && (
+                    <div className="mb-2">
+                      <TableChip label={orderTableLabel(selected)!} />
+                    </div>
+                  )}
                   <div className="text-xs text-muted-foreground">Customer</div>
                   <div className="font-medium">{orderCustomerName(selected)}</div>
                   <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
@@ -673,6 +770,24 @@ function OrdersPage() {
                 </div>
 
                 {isReadyTrackStatus(selected.status) && <ReadyTrack order={selected} />}
+
+                {isCancelledStatus(selected.status) && (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CancelledBadge />
+                      {formatCancelledAt(selected.cancelled_at) && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatCancelledAt(selected.cancelled_at)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      {selected.cancel_reason?.trim() || (
+                        <span className="text-muted-foreground">No reason given</span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {selected.reject_reason && (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
@@ -695,6 +810,16 @@ function OrdersPage() {
                   {selected.status === "preparing" && (
                     <Button className="rounded-xl" onClick={() => void markReady(selected)}>
                       Mark ready
+                    </Button>
+                  )}
+                  {canHandoverOrder(selected) && (
+                    <Button
+                      className="gap-2 rounded-xl"
+                      disabled={actingId === selected.public_id}
+                      onClick={() => void handover(selected)}
+                    >
+                      <HandPlatter className="h-4 w-4" />
+                      {actingId === selected.public_id ? "Handing over…" : "Hand over"}
                     </Button>
                   )}
                   {isPlacedStatus(selected.status) && (
@@ -723,6 +848,10 @@ function OrdersPage() {
                 </div>
 
                 <OrderCharges order={selected} />
+
+                {selected.status === "delivered" && (
+                  <OrderInvoices orderPublicId={selected.public_id} />
+                )}
               </div>
             </>
           )}
@@ -768,6 +897,7 @@ function OrderTicket({
   onReject,
   onStartPreparing,
   onReady,
+  onHandover,
 }: {
   order: AdminOrder;
   tab: AdminOrderTab;
@@ -780,6 +910,7 @@ function OrderTicket({
   onReject: () => void;
   onStartPreparing: () => void;
   onReady: () => void;
+  onHandover: () => void;
 }) {
   const isPlaced = isPlacedStatus(order.status);
   const isAccepted = order.status === "accepted";
@@ -787,11 +918,14 @@ function OrderTicket({
   const isReadyTrack = isReadyTrackStatus(order.status);
   const isRejected = order.status === "rejected";
   const isDelivered = order.status === "delivered";
+  const isCancelled = isCancelledStatus(order.status);
   const liveClock = showsSincePlacedClock(tab);
   const waiting = liveClock ? sincePlacedSeconds(order, now, loadedAt) : null;
-  const deliveredAt = formatDeliveredAt(order.delivered_at);
+  const closedAt = formatDeliveredAt(order.delivered_at) ?? formatCancelledAt(order.cancelled_at);
   const address = order.address?.formatted_address?.trim() || orderAddressLine(order);
   const itemCount = orderItemCount(order);
+  const tableLabel = orderTableLabel(order);
+  const canHandover = canHandoverOrder(order);
 
   return (
     <article
@@ -808,7 +942,7 @@ function OrderTicket({
           (isAccepted || isPreparing) && "bg-info",
           isReadyTrack && "bg-success",
           isDelivered && "bg-muted",
-          isRejected && "bg-destructive/50",
+          (isRejected || isCancelled) && "bg-destructive/50",
         )}
       />
 
@@ -819,7 +953,7 @@ function OrderTicket({
               <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
                 {orderStatusLabel(order.status)}
               </span>
-              <span className="text-sm font-bold tracking-tight">{shortId(order.public_id)}</span>
+              <span className="text-sm font-bold tracking-tight">{orderDisplayCode(order)}</span>
             </div>
             <div className="text-[11px] text-muted-foreground">
               {itemCount} {itemCount === 1 ? "item" : "items"} · {formatPlacedAt(order.created_at)}
@@ -837,14 +971,19 @@ function OrderTicket({
                 {formatDuration(waiting)}
               </div>
             </div>
-          ) : deliveredAt ? (
+          ) : closedAt ? (
             <div className="shrink-0 rounded-xl bg-muted/80 px-2.5 py-1.5 text-right text-xs font-semibold text-foreground">
-              {deliveredAt}
+              {closedAt}
             </div>
           ) : null}
         </div>
 
         <div className="mt-3">
+          {tableLabel && (
+            <div className="mb-1.5">
+              <TableChip label={tableLabel} />
+            </div>
+          )}
           <div className="text-sm font-semibold">{orderCustomerName(order)}</div>
           <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Phone className="h-3 w-3" />
@@ -859,6 +998,17 @@ function OrderTicket({
         </div>
 
         {isReadyTrack && <ReadyTrack order={order} compact />}
+
+        {isCancelled && (
+          <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-2.5 py-2">
+            <CancelledBadge />
+            {order.cancel_reason?.trim() && (
+              <div className="mt-1.5 line-clamp-2 text-xs text-foreground">
+                {order.cancel_reason}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
           {(order.items ?? []).map((item) => (
@@ -921,6 +1071,16 @@ function OrderTicket({
           >
             {busy ? "Starting…" : "Start preparing"}
           </button>
+        ) : canHandover ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onHandover}
+            className="flex flex-1 items-center justify-center gap-2 bg-success px-3 py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-success/90 disabled:opacity-50"
+          >
+            <HandPlatter className="h-4 w-4" />
+            {busy ? "Handing over…" : "Hand over"}
+          </button>
         ) : isPreparing ? (
           <button
             type="button"
@@ -936,6 +1096,11 @@ function OrderTicket({
               <>
                 <XCircle className="h-4 w-4 text-destructive" />
                 Rejected
+              </>
+            ) : isCancelled ? (
+              <>
+                <Ban className="h-4 w-4 text-destructive" />
+                Cancelled by customer
               </>
             ) : isReadyTrack ? (
               <>
@@ -955,6 +1120,24 @@ function OrderTicket({
   );
 }
 
+function TableChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-info/30 bg-info/10 px-2 py-0.5 text-[11px] font-semibold text-info">
+      <Armchair className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
+
+function CancelledBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+      <Ban className="h-3 w-3" />
+      Cancelled by customer
+    </span>
+  );
+}
+
 function ReadyTrack({ order, compact = false }: { order: AdminOrder; compact?: boolean }) {
   const driver = order.driver;
   const name = driver?.full_name?.trim();
@@ -971,7 +1154,15 @@ function ReadyTrack({ order, compact = false }: { order: AdminOrder; compact?: b
       <div className="text-[10px] font-semibold uppercase tracking-wide text-success">
         {orderStatusLabel(order.status)}
       </div>
-      {driver ? (
+      {isQrTableOrder(order) ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {order.status === "ready_for_pickup"
+            ? order.fulfillment_type === "takeaway"
+              ? "Ready at the counter. Hand over when the guest collects it."
+              : "Ready to serve. Hand over once it reaches the table."
+            : "With the guest."}
+        </p>
+      ) : driver ? (
         <div className="mt-2 flex items-center gap-2.5">
           {photo ? (
             <img src={photo} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />

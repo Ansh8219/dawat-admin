@@ -2,6 +2,8 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
+import { isCancelledStatus, orderDisplayCode } from "@/lib/api/orders";
+import type { AdminOrderListData } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import {
@@ -40,6 +42,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   const refreshSession = useAuth((s) => s.refreshSession);
   const bumpNewOrder = useKitchenAlerts((s) => s.bumpNewOrder);
   const tickBoard = useKitchenAlerts((s) => s.tickBoard);
+  const markCancelled = useKitchenAlerts((s) => s.markCancelled);
   const resetAlerts = useKitchenAlerts((s) => s.reset);
 
   const playSoundRef = useRef(playSoundOnCreate);
@@ -80,8 +83,26 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       }
     };
 
+    const cachedOrderCode = (publicId: string): string => {
+      const boards = queryClient.getQueriesData<AdminOrderListData>({
+        queryKey: [...adminOrdersKeys.all, "board"],
+      });
+      for (const [, data] of boards) {
+        const order = data?.results?.find((o) => o.public_id === publicId);
+        if (order) return orderDisplayCode(order);
+      }
+      return shortId(publicId);
+    };
+
     const handleEvent = (event: AdminOrderWsEvent) => {
+      const code = isCancelledStatus(event.status) ? cachedOrderCode(event.order_public_id) : "";
       void invalidateQueries(event);
+
+      if (event.type === "order.updated" && isCancelledStatus(event.status)) {
+        toast.warning(`Order ${code} cancelled by customer`, { duration: 8_000 });
+        if (isOrdersPath(pathnameRef.current)) markCancelled(event.order_public_id);
+        return;
+      }
 
       if (event.type === "order.created") {
         if (playSoundRef.current) playNewOrderChime();
@@ -141,5 +162,5 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       socket?.dispose();
       socket = null;
     };
-  }, [enabled, accessToken, queryClient, refreshSession, bumpNewOrder, tickBoard]);
+  }, [enabled, accessToken, queryClient, refreshSession, bumpNewOrder, tickBoard, markCancelled]);
 }

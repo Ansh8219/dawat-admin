@@ -21,11 +21,30 @@ import { formatRoleLabel, isSuperAdmin, useAuth } from "@/lib/auth";
 import { useApp } from "@/lib/store";
 import { usePanelMeta } from "@/lib/use-panel";
 import { PickupMap } from "@/components/app/pickup-map";
+import { BusinessInvoiceDetailsPanel } from "@/components/app/business-invoice-details";
 import { Loader2, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const SETTINGS_TABS = [
+  "business",
+  "businesses",
+  "tax",
+  "printer",
+  "payment",
+  "delivery",
+  "appearance",
+  "security",
+] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+const settingsSearchSchema = z.object({
+  tab: z.enum(SETTINGS_TABS).optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
+  validateSearch: settingsSearchSchema,
   head: () => ({ meta: [{ title: "Settings — Daawat Baker's" }] }),
 });
 
@@ -34,7 +53,13 @@ function SettingsPage() {
   const meta = usePanelMeta();
   const user = useAuth((s) => s.user);
   const canChangePassword = isSuperAdmin(user);
-  const [tab, setTab] = useState("business");
+  const navigate = useNavigate({ from: Route.fullPath });
+  const tab: SettingsTab = Route.useSearch().tab ?? "business";
+  const setTab = (value: string) =>
+    void navigate({
+      search: { tab: value === "business" ? undefined : (value as SettingsTab) },
+      replace: true,
+    });
 
   return (
     <div>
@@ -47,6 +72,7 @@ function SettingsPage() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="rounded-xl flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
+            <TabsTrigger value="businesses">Businesses</TabsTrigger>
             <TabsTrigger value="tax">Tax</TabsTrigger>
             <TabsTrigger value="printer">Printer</TabsTrigger>
             <TabsTrigger value="payment">Payment</TabsTrigger>
@@ -107,25 +133,20 @@ function SettingsPage() {
                 </div>
               </div>
               <div className="card-elevated p-4">
-                <div className="text-sm font-semibold">GST for this panel</div>
+                <div className="text-sm font-semibold">GST & invoice details</div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Each panel (Bakery / Restaurant / Banquet) has its own GSTIN — they never mix.
+                  Each business (Restaurant / Bakery) has its own GSTIN, FSSAI number and invoice
+                  number series. Tax invoices are only issued once these are filled in.
                 </p>
-                <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                  <div className="text-sm font-semibold">{meta.label}</div>
-                  <div className="mt-2">
-                    <Label className="text-xs">GST Number</Label>
-                    <Input defaultValue={meta.gst} className="mt-1 rounded-lg font-mono text-xs" />
-                  </div>
-                </div>
-                <Button
-                  className="mt-3 rounded-xl"
-                  onClick={() => toast.success(`${meta.label} GST saved`)}
-                >
-                  Save GST
+                <Button className="mt-3 rounded-xl" onClick={() => setTab("businesses")}>
+                  Manage invoice details
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="businesses" className="mt-4">
+            <BusinessInvoiceDetailsPanel />
           </TabsContent>
 
           <TabsContent value="tax" className="mt-4">

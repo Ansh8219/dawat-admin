@@ -1,5 +1,26 @@
 import { apiRequest } from "./client";
-import type { Business } from "./types";
+import type { Business, BusinessInvoiceDetails, BusinessInvoiceDetailsPayload } from "./types";
+
+/** GET /api/admin/businesses/{public_id}/invoice-details/ */
+export function getBusinessInvoiceDetails(accessToken: string, publicId: string) {
+  return apiRequest<BusinessInvoiceDetails>(`/api/admin/businesses/${publicId}/invoice-details/`, {
+    method: "GET",
+    accessToken,
+  });
+}
+
+/** PUT /api/admin/businesses/{public_id}/invoice-details/ (all fields required) */
+export function updateBusinessInvoiceDetails(
+  accessToken: string,
+  publicId: string,
+  payload: BusinessInvoiceDetailsPayload,
+) {
+  return apiRequest<BusinessInvoiceDetails>(`/api/admin/businesses/${publicId}/invoice-details/`, {
+    method: "PUT",
+    accessToken,
+    body: payload,
+  });
+}
 
 /** GET /api/admin/businesses/ */
 export function listBusinesses(accessToken: string) {

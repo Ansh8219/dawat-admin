@@ -235,3 +235,30 @@
   background: none !important;
   border: none !important;
 }
+
+/* Printable GST invoice (A4). The app shell hides itself via print:hidden. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .invoice-sheet {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .invoice-sheet thead {
+    display: table-header-group;
+  }
+
+  .invoice-sheet tr {
+    break-inside: avoid;
+  }
+}

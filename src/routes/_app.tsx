@@ -32,8 +32,8 @@ function AppLayout() {
   useAdminOrdersSocket({ enabled: true });
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      <div className="hidden lg:block">
+    <div className="flex h-screen w-full overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">
+      <div className="hidden lg:block print:hidden">
         <AppSidebar />
       </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -42,9 +42,11 @@ function AppLayout() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar onMenu={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
+      <div className="flex min-w-0 flex-1 flex-col print:block">
+        <div className="print:hidden">
+          <TopBar onMenu={() => setMobileOpen(true)} />
+        </div>
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
           <Outlet />
         </main>
       </div>

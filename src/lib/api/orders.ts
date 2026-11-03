@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import { ApiError } from "./types";
 import type {
   AdminOrder,
   AdminOrderListData,
@@ -16,8 +17,13 @@ function normalizeOrder(order: AdminOrder): AdminOrder {
     distance_km: order.distance_km ?? null,
     delivery_fee: order.delivery_fee ?? null,
     total: order.total ?? null,
+    fulfillment_type: order.fulfillment_type ?? null,
+    table: order.table ?? null,
     preparation_minutes: order.preparation_minutes ?? null,
+    order_code: order.order_code ?? null,
     reject_reason: order.reject_reason ?? null,
+    cancelled_at: order.cancelled_at ?? null,
+    cancel_reason: order.cancel_reason ?? null,
     delivered_at: order.delivered_at ?? null,
     waiting_seconds: order.waiting_seconds ?? null,
     delivery_status: order.delivery_status ?? null,
@@ -75,6 +81,92 @@ export function startAdminOrderPreparing(accessToken: string, publicId: string) 
     method: "POST",
     accessToken,
   }).then(normalizeOrder);
+}
+
+/**
+ * POST /api/admin/orders/{public_id}/handover/ — completes a ready QR table order
+ * (status → delivered). The GST invoice is issued at this moment.
+ */
+export function handoverAdminOrder(accessToken: string, publicId: string) {
+  return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/handover/`, {
+    method: "POST",
+    accessToken,
+  }).then(normalizeOrder);
+}
+
+/**
+ * GET /api/admin/orders/{public_id}/ — used to open an order linked from an invoice.
+ * Not in the invoices handoff; callers must handle failure.
+ */
+export function getAdminOrder(accessToken: string, publicId: string) {
+  return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/`, {
+    method: "GET",
+    accessToken,
+  }).then(normalizeOrder);
+}
+
+/** QR table order: dine-in or counter takeaway placed from a table QR. */
+export function isQrTableOrder(order: Pick<AdminOrder, "table" | "fulfillment_type">): boolean {
+  if (order.table) return true;
+  return order.fulfillment_type === "dine_in" || order.fulfillment_type === "takeaway";
+}
+
+/** Only ready QR table orders are handed over by staff; delivery and app pickup are not. */
+export function canHandoverOrder(
+  order: Pick<AdminOrder, "status" | "table" | "fulfillment_type">,
+): boolean {
+  return order.status === "ready_for_pickup" && isQrTableOrder(order);
+}
+
+export function fulfillmentLabel(type: string | null | undefined): string {
+  const key = type?.trim().toLowerCase();
+  if (!key) return "—";
+  const known: Record<string, string> = {
+    delivery: "Delivery",
+    pickup: "Pickup",
+    dine_in: "Dine-in",
+    takeaway: "Takeaway",
+  };
+  return known[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** "Table T04 · Dine-in" for QR orders, else null. */
+export function orderTableLabel(
+  order: Pick<AdminOrder, "table" | "fulfillment_type">,
+): string | null {
+  if (!isQrTableOrder(order)) return null;
+  const number = order.table?.table_number?.trim();
+  const kind = order.fulfillment_type ? fulfillmentLabel(order.fulfillment_type) : "QR order";
+  return number ? `Table ${number} · ${kind}` : kind;
+}
+
+/** Order code (e.g. ORD123) when the API sends one, else a short public id. */
+export function orderDisplayCode(order: Pick<AdminOrder, "public_id" | "order_code">): string {
+  return order.order_code?.trim() || order.public_id.slice(0, 8);
+}
+
+export function isCancelledStatus(status: string | undefined): boolean {
+  return status === "cancelled";
+}
+
+/** Wallet / online orders are refunded automatically on reject; COD is not. */
+export function isAutoRefundPayment(method: string | null | undefined): boolean {
+  const key = method?.trim().toLowerCase();
+  if (!key) return false;
+  return key !== "cod" && key !== "cash";
+}
+
+/** Staff action raced a customer cancel (or another status change). */
+export function isOrderStatusConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "invalid_order_status";
+}
+
+export function formatCancelledAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  return `Cancelled at ${time}`;
 }
 
 export function orderCustomerName(order: AdminOrder): string {
@@ -144,6 +236,7 @@ export function paymentLabel(method: string | null | undefined): string {
   const known: Record<string, string> = {
     cod: "COD",
     online: "Online",
+    wallet: "Wallet",
     upi: "UPI",
     card: "Card",
     cash: "Cash",
@@ -190,6 +283,8 @@ export function orderStatusLabel(status: AdminOrderStatus | string | undefined):
       return "Rejected";
     case "delivered":
       return "Delivered";
+    case "cancelled":
+      return "Cancelled";
     default:
       return status?.replace(/_/g, " ").trim() || "Unknown";
   }
@@ -199,6 +294,6 @@ export function tabForStatus(status: string): AdminOrderTab | null {
   if (isPlacedStatus(status)) return "new";
   if (status === "accepted" || status === "preparing") return "preparing";
   if (isReadyTrackStatus(status)) return "ready";
-  if (status === "rejected" || status === "delivered") return "past";
+  if (status === "rejected" || status === "delivered" || status === "cancelled") return "past";
   return null;
 }

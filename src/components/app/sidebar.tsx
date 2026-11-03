@@ -21,6 +21,8 @@ import {
   Store,
   Trophy,
   Coins,
+  RotateCcw,
+  ReceiptText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -59,6 +61,8 @@ const nav = [
       { to: "/people", label: "Staff", icon: UsersRound },
       { to: "/home-services", label: "Home Services", icon: LayoutGrid },
       { to: "/finance", label: "Finance", icon: Wallet },
+      { to: "/refunds", label: "Refunds", icon: RotateCcw },
+      { to: "/invoices", label: "Invoices", icon: ReceiptText },
       { to: "/reports", label: "Reports", icon: BarChart3 },
       { to: "/notifications", label: "Notifications", icon: Bell },
       { to: "/settings", label: "Settings", icon: Settings },

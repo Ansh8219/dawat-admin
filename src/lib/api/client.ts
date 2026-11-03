@@ -81,6 +81,8 @@ function humanizeErrorCode(code: string): string {
       return "Menu management is not available for this business type.";
     case "menu_item_not_found":
       return "Menu item not found.";
+    case "item_code_taken":
+      return "This code is already used by another item in this business.";
     case "menu_category_not_found":
       return "Menu category not found.";
     case "menu_category_in_use":
@@ -102,7 +104,11 @@ function humanizeErrorCode(code: string): string {
     case "order_not_found":
       return "Order not found.";
     case "invalid_order_status":
-      return "That action is not allowed yet. Start preparing before marking ready.";
+      return "This order's status has changed (it may have been cancelled by the customer).";
+    case "refund_not_found":
+      return "Refund not found.";
+    case "refund_retry_not_allowed":
+      return "This refund cannot be retried.";
     case "invalid_pickup_location":
       return "Set both latitude and longitude, or leave both empty.";
     case "table_number_taken":
@@ -148,6 +154,16 @@ function humanizeErrorCode(code: string): string {
       return "Bonus rule not found.";
     case "insufficient_coins":
       return "Customer does not have enough coins for this deduction.";
+    case "invoice_not_found":
+      return "Invoice not found.";
+    case "invalid_date_range":
+      return "The start date must be on or before the end date.";
+    case "invoice_prefix_locked":
+      return "Invoices have already been issued with this prefix, so it can't be changed.";
+    case "gst_number_taken":
+      return "Another business already uses this GSTIN.";
+    case "invoice_prefix_taken":
+      return "Another business already uses this invoice prefix.";
     default:
       return "Something went wrong. Please try again.";
   }

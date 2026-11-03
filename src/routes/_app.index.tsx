@@ -7,6 +7,7 @@ import { getAdminDashboard } from "@/lib/api/dashboard";
 import {
   acceptAdminOrder,
   formatOrderMoney,
+  isOrderStatusConflict,
   orderStatusLabel,
   paymentLabel,
   rejectAdminOrder,
@@ -272,6 +273,9 @@ function FoodDashboard() {
     } catch (err) {
       if (handleAuthError(err)) return;
       toast.error(err instanceof ApiError ? err.message : "Unable to accept order");
+      if (isOrderStatusConflict(err) && selectedId) {
+        void loadDashboard(selectedId, { silent: true });
+      }
     } finally {
       setActingId(null);
     }
@@ -286,6 +290,9 @@ function FoodDashboard() {
     } catch (err) {
       if (handleAuthError(err)) return;
       toast.error(err instanceof ApiError ? err.message : "Unable to reject order");
+      if (isOrderStatusConflict(err) && selectedId) {
+        void loadDashboard(selectedId, { silent: true });
+      }
     } finally {
       setActingId(null);
     }

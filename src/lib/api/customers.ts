@@ -87,7 +87,10 @@ export function coinEntryLabel(entryType: string): string {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "—";
 }
 
-export function formatCustomerPhone(c: Pick<Customer, "country_code" | "phone_number">): string {
+export function formatCustomerPhone(c: {
+  country_code?: string | null;
+  phone_number?: string | null;
+}): string {
   const code = c.country_code?.trim() || "";
   const phone = c.phone_number?.trim() || "";
   if (!code) return phone;
