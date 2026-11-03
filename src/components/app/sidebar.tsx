@@ -9,7 +9,6 @@ import {
   Users,
   Megaphone,
   UsersRound,
-  Wallet,
   BarChart3,
   Bell,
   Settings,
@@ -18,15 +17,16 @@ import {
   LayoutGrid,
   Tags,
   QrCode,
-  Store,
   Trophy,
   Coins,
   RotateCcw,
   ReceiptText,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { LOGO_SRC } from "@/lib/brand";
+import { isSuperAdmin, useAuth } from "@/lib/auth";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { isRouteAllowed } from "@/lib/panel";
@@ -37,7 +37,6 @@ const nav = [
     section: "Operations",
     items: [
       { to: "/orders", label: "Orders", icon: ShoppingBag },
-      { to: "/outlet-status", label: "Outlet status", icon: Store },
       { to: "/pos", label: "POS / Billing", icon: Calculator },
       { to: "/menu", label: "Menu & Products", icon: UtensilsCrossed },
       { to: "/menu-categories", label: "Menu Categories", icon: Tags },
@@ -59,11 +58,11 @@ const nav = [
     section: "Admin",
     items: [
       { to: "/people", label: "Staff", icon: UsersRound },
+      { to: "/businesses", label: "Businesses", icon: Building2 },
       { to: "/home-services", label: "Home Services", icon: LayoutGrid },
-      { to: "/finance", label: "Finance", icon: Wallet },
       { to: "/refunds", label: "Refunds", icon: RotateCcw },
       { to: "/invoices", label: "Invoices", icon: ReceiptText },
-      { to: "/reports", label: "Reports", icon: BarChart3 },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
       { to: "/notifications", label: "Notifications", icon: Bell },
       { to: "/settings", label: "Settings", icon: Settings },
     ],
@@ -95,12 +94,17 @@ export function AppSidebar({
   const newOrderBadge = useKitchenAlerts((s) => s.newOrderBadge);
   const panel = usePanel();
   const meta = usePanelMeta();
+  const user = useAuth((s) => s.user);
+  const canSeeAnalytics = isSuperAdmin(user);
 
   const filteredNav = nav
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => isRouteAllowed(panel, item.to))
+        .filter((item) => {
+          if (item.to === "/analytics" && !canSeeAnalytics) return false;
+          return isRouteAllowed(panel, item.to);
+        })
         .map((item) => {
           if (item.to === "/bookings") {
             return { ...item, label: bookingLabels[panel] ?? item.label };
@@ -181,9 +185,7 @@ export function AppSidebar({
                         <span
                           className={cn(
                             "inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground",
-                            collapsed
-                              ? "absolute -right-0.5 -top-0.5 min-w-4 px-1"
-                              : "ml-auto",
+                            collapsed ? "absolute -right-0.5 -top-0.5 min-w-4 px-1" : "ml-auto",
                             active && "bg-primary-foreground text-primary",
                           )}
                         >

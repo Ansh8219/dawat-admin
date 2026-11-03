@@ -1,10 +1,13 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Bell,
   Cake,
+  CheckCircle2,
   ChevronDown,
+  CircleDot,
   CloudSun,
   FileText,
   Headset,
@@ -12,6 +15,7 @@ import {
   Loader2,
   MoonStar,
   PartyPopper,
+  Star,
   Sun,
   UtensilsCrossed,
 } from "lucide-react";
@@ -283,10 +287,24 @@ function SelectPanelPage() {
               const meta = panel ? PANEL_META[panel] : null;
               const Icon = panel ? panelIcons[panel] : Cake;
               const theme = themeStyles[meta?.theme ?? "primary"];
-              const selected =
-                current === biz.public_id || (!current && currentPanel === panel);
+              const selected = current === biz.public_id || (!current && currentPanel === panel);
               const imageSrc = biz.image || meta?.image || "/panels/restaurant.jpg";
               const imageAlt = meta?.imageAlt ?? biz.name;
+              const open = biz.is_accepting_orders;
+              const isBanquet =
+                String(biz.type) === "banquet_hall" || String(biz.type) === "banquet";
+              const rating = biz.rating;
+              const reviews = biz.review_count ?? 0;
+              const menuTotal = biz.menu_items_count ?? 0;
+              const menuAvailable = biz.available_items_count ?? 0;
+              const invoiceReady = Boolean(biz.is_invoice_ready);
+              const missingCount = biz.missing_fields?.length ?? 0;
+              const legalName = biz.legal_name?.trim() || null;
+              const gst = biz.gst_number?.trim() || null;
+              const prefix = biz.invoice_prefix?.trim() || null;
+              const stateLine = biz.state?.trim()
+                ? `${biz.state}${biz.state_code ? ` · ${biz.state_code}` : ""}`
+                : null;
 
               return (
                 <article
@@ -306,7 +324,28 @@ function SelectPanelPage() {
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="eager"
                       />
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
+
+                      <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md",
+                            open ? "bg-emerald-500/90 text-white" : "bg-black/55 text-white/90",
+                          )}
+                        >
+                          <CircleDot className={cn("h-3 w-3", open && "animate-pulse")} />
+                          {open ? "Accepting orders" : "Closed"}
+                        </span>
+                        {invoiceReady ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" /> Invoice ready
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2.5 py-1 text-[11px] font-semibold text-amber-950">
+                            <AlertTriangle className="h-3 w-3" /> Invoice incomplete
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div
@@ -326,12 +365,71 @@ function SelectPanelPage() {
                         {meta.tagline}
                       </p>
                     ) : null}
+                    {legalName ? (
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{legalName}</p>
+                    ) : null}
+
+                    {!isBanquet ? (
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Rating
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-foreground">
+                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            {rating != null ? rating.toFixed(1) : "No ratings yet"}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            {reviews > 0
+                              ? `(${reviews.toLocaleString("en-IN")})`
+                              : "No ratings yet"}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Menu
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-foreground">
+                            {menuAvailable}
+                            <span className="font-medium text-muted-foreground">/{menuTotal}</span>
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            items available
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          GST & invoice
+                        </div>
+                        {prefix ? (
+                          <span className="rounded-md bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {prefix}/…
+                          </span>
+                        ) : null}
+                      </div>
+                      {!invoiceReady && missingCount > 0 ? (
+                        <p className="mt-1.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+                          {missingCount} field{missingCount === 1 ? "" : "s"} missing before
+                          invoices can be issued.
+                        </p>
+                      ) : null}
+                      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+                        <dt className="text-muted-foreground">GSTIN</dt>
+                        <dd className="truncate font-mono text-foreground">{gst || "—"}</dd>
+                        <dt className="text-muted-foreground">State</dt>
+                        <dd className="truncate capitalize text-foreground">{stateLine || "—"}</dd>
+                      </dl>
+                    </div>
 
                     <button
                       type="button"
                       onClick={() => pick(biz)}
                       className={cn(
-                        "mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors",
+                        "mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         theme.button,
                       )}
@@ -350,7 +448,10 @@ function SelectPanelPage() {
           {FOOTER_TIPS.map((tip) => (
             <div key={tip.title} className="flex items-start gap-3 rounded-xl px-2 py-2">
               <span
-                className={cn("mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl", tip.tone)}
+                className={cn(
+                  "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+                  tip.tone,
+                )}
               >
                 <tip.icon className="h-4 w-4" strokeWidth={2.25} />
               </span>

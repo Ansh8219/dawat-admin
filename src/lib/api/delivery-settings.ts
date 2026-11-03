@@ -6,9 +6,7 @@ export type DeliverySettingsForm = {
   pickup_address: string;
   latitude: string;
   longitude: string;
-  free_delivery_radius_km: string;
   per_km_rate: string;
-  min_order_for_free_delivery: string;
 };
 
 export function getDeliverySettings(accessToken: string) {
@@ -35,9 +33,7 @@ export function settingsToForm(data: DeliverySettings): DeliverySettingsForm {
     pickup_address: data.pickup_address ?? "",
     latitude: data.latitude == null ? "" : String(data.latitude),
     longitude: data.longitude == null ? "" : String(data.longitude),
-    free_delivery_radius_km: String(data.free_delivery_radius_km ?? 0),
-    per_km_rate: String(data.per_km_rate ?? 0),
-    min_order_for_free_delivery: String(data.min_order_for_free_delivery ?? 0),
+    per_km_rate: formatRate(data.per_km_rate ?? 0),
   };
 }
 
@@ -55,13 +51,22 @@ function parseOptionalCoord(
   return { value: n };
 }
 
-function parseNonNegative(raw: string, label: string): { value: number } | { error: string } {
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function formatRate(n: number): string {
+  return roundMoney(n).toFixed(2);
+}
+
+/** Per-km rate: rupees, >= 0, two decimal places. */
+function parsePerKmRate(raw: string): { value: number } | { error: string } {
   const trimmed = raw.trim();
-  if (trimmed === "") return { error: `${label} is required.` };
+  if (trimmed === "") return { error: "Per-km rate is required." };
   const n = Number(trimmed);
-  if (!Number.isFinite(n)) return { error: `${label} must be a number.` };
-  if (n < 0) return { error: `${label} must be 0 or greater.` };
-  return { value: n };
+  if (!Number.isFinite(n)) return { error: "Per-km rate must be a number." };
+  if (n < 0) return { error: "Per-km rate must be 0 or greater." };
+  return { value: roundMoney(n) };
 }
 
 function sameNullableNumber(a: number | null, b: number | null): boolean {
@@ -107,25 +112,10 @@ export function buildDeliverySettingsPatch(
     payload.longitude = lng.value;
   }
 
-  const radius = parseNonNegative(form.free_delivery_radius_km, "Free delivery radius");
-  if ("error" in radius) return { ok: false, error: radius.error };
-  if (radius.value !== (original.free_delivery_radius_km ?? 0)) {
-    payload.free_delivery_radius_km = radius.value;
-  }
-
-  const rate = parseNonNegative(form.per_km_rate, "Per-km rate");
+  const rate = parsePerKmRate(form.per_km_rate);
   if ("error" in rate) return { ok: false, error: rate.error };
-  if (rate.value !== (original.per_km_rate ?? 0)) {
+  if (rate.value !== roundMoney(original.per_km_rate ?? 0)) {
     payload.per_km_rate = rate.value;
-  }
-
-  const minOrder = parseNonNegative(
-    form.min_order_for_free_delivery,
-    "Min order for free delivery",
-  );
-  if ("error" in minOrder) return { ok: false, error: minOrder.error };
-  if (minOrder.value !== (original.min_order_for_free_delivery ?? 0)) {
-    payload.min_order_for_free_delivery = minOrder.value;
   }
 
   if (Object.keys(payload).length === 0) {

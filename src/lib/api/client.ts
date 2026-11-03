@@ -111,6 +111,10 @@ function humanizeErrorCode(code: string): string {
       return "This refund cannot be retried.";
     case "invalid_pickup_location":
       return "Set both latitude and longitude, or leave both empty.";
+    case "no_cash_pending":
+      return "This driver has no cash to receive.";
+    case "not_found":
+      return "Not found.";
     case "table_number_taken":
     case "dining_table_number_taken":
       return "That table number is already in use.";
@@ -158,6 +162,10 @@ function humanizeErrorCode(code: string): string {
       return "Invoice not found.";
     case "invalid_date_range":
       return "The start date must be on or before the end date.";
+    case "date_range_too_large":
+      return "Date range cannot exceed 366 days.";
+    case "super_admin_required":
+      return "Only a super admin can access this.";
     case "invoice_prefix_locked":
       return "Invoices have already been issued with this prefix, so it can't be changed.";
     case "gst_number_taken":
@@ -225,7 +233,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
     throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");
   }
 
@@ -270,14 +279,24 @@ type BinaryRequestOptions = {
   accept?: string;
 };
 
-/**
- * Fetches a non-JSON response (e.g. image/png). On error responses that are JSON
- * envelopes, parses and throws ApiError like apiRequest.
- */
-export async function apiBinaryRequest(
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const utf = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1].trim());
+    } catch {
+      return utf[1].trim();
+    }
+  }
+  const plain = /filename="([^"]+)"/i.exec(header) ?? /filename=([^;]+)/i.exec(header);
+  return plain?.[1]?.trim().replace(/^["']|["']$/g, "") || null;
+}
+
+async function fetchBinaryResponse(
   path: string,
   options: BinaryRequestOptions = {},
-): Promise<Blob> {
+): Promise<Response> {
   const { method = "GET", accessToken, signal, accept = "*/*" } = options;
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
@@ -299,7 +318,7 @@ export async function apiBinaryRequest(
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.ok) {
     if (contentType.includes("application/json")) {
-      return parseEnvelope<never>(response);
+      await parseEnvelope<never>(response);
     }
     throw new ApiError(
       response.status,
@@ -309,8 +328,33 @@ export async function apiBinaryRequest(
   }
 
   if (contentType.includes("application/json")) {
-    return parseEnvelope<never>(response);
+    await parseEnvelope<never>(response);
+    throw new ApiError(response.status, "invalid_response", "Expected a file download, got JSON.");
   }
 
+  return response;
+}
+
+/**
+ * Fetches a non-JSON response (e.g. image/png). On error responses that are JSON
+ * envelopes, parses and throws ApiError like apiRequest.
+ */
+export async function apiBinaryRequest(
+  path: string,
+  options: BinaryRequestOptions = {},
+): Promise<Blob> {
+  const response = await fetchBinaryResponse(path, options);
   return response.blob();
+}
+
+/** File download that also returns Content-Disposition filename when present. */
+export async function apiFileDownload(
+  path: string,
+  options: BinaryRequestOptions = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetchBinaryResponse(path, options);
+  return {
+    blob: await response.blob(),
+    filename: parseContentDispositionFilename(response.headers.get("content-disposition")),
+  };
 }

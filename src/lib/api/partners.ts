@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import type {
+  PartnerCashReceipt,
   PartnerDetail,
   PartnerDocuments,
   PartnerListData,
@@ -8,6 +9,7 @@ import type {
   PartnerReviewPayload,
   PartnerReviewResult,
   PartnerStatus,
+  PartnerWallet,
 } from "./types";
 
 export const PARTNER_REJECT_FIELDS: { value: PartnerRejectField; label: string; group: string }[] =
@@ -101,6 +103,14 @@ export function normalizePartner(partner: PartnerDetail): PartnerDetail {
       ifsc_code: null,
       upi_id: null,
     },
+    wallet: normalizeWallet(partner.wallet),
+  };
+}
+
+function normalizeWallet(wallet: PartnerWallet | null | undefined): PartnerWallet {
+  return {
+    balance: Number(wallet?.balance ?? 0),
+    cash_pending: Number(wallet?.cash_pending ?? 0),
   };
 }
 
@@ -121,6 +131,20 @@ export function reviewPartner(
     accessToken,
     body: payload,
   });
+}
+
+/** Receives the driver's full cash_pending. No body; partial receive is not supported. */
+export function receivePartnerCash(accessToken: string, publicId: string) {
+  return apiRequest<PartnerCashReceipt>(`/api/admin/partners/${publicId}/cash-receipt/`, {
+    method: "POST",
+    accessToken,
+  });
+}
+
+export function formatRupees(amount: number | null | undefined): string {
+  const n = Number(amount ?? 0);
+  const value = Number.isFinite(n) ? n : 0;
+  return "₹" + value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function formatPartnerPhone(p: {

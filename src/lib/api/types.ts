@@ -50,6 +50,19 @@ export interface Business {
   image: string | null;
   /** When false, customers cannot place new orders for this business. */
   is_accepting_orders: boolean;
+  /** Average customer rating; null when there are no reviews yet. */
+  rating: number | null;
+  review_count: number;
+  menu_items_count: number;
+  available_items_count: number;
+  legal_name: string | null;
+  gst_number: string | null;
+  state: string | null;
+  state_code: string | null;
+  invoice_prefix: string | null;
+  /** Invoices are only issued for this business when true. */
+  is_invoice_ready: boolean;
+  missing_fields: string[];
 }
 
 /** GET /api/admin/dashboard/?business_public_id= */
@@ -69,53 +82,12 @@ export interface DashboardCounts {
 
 export interface DashboardKpis {
   today_sales: number;
-  /** null when comparison is unavailable */
+  /** null when yesterday comparison is unavailable */
   sales_change_pct: number | null;
   orders_today: number;
   avg_ticket: number;
   rating: number | null;
   rating_count: number;
-}
-
-export interface DashboardNewOrderAddress {
-  address_type: string | null;
-  full_name: string | null;
-  phone: string | null;
-  formatted_address: string | null;
-}
-
-export interface DashboardNewOrderItem {
-  public_id: string;
-  name: string | null;
-  quantity: number;
-  unit_price: number;
-  line_total: number;
-}
-
-export interface DashboardNewOrder {
-  public_id: string;
-  status: string;
-  created_at: string;
-  payment_method: "cod" | "online" | string | null;
-  subtotal: number;
-  delivery_fee: number | null;
-  total: number | null;
-  address: DashboardNewOrderAddress | null;
-  items: DashboardNewOrderItem[];
-}
-
-export interface DashboardKitchenDriver {
-  full_name: string | null;
-  phone: string | null;
-}
-
-export interface DashboardKitchenOrder {
-  public_id: string;
-  status: string;
-  total: number | null;
-  customer_name: string | null;
-  item_count: number;
-  driver: DashboardKitchenDriver | null;
 }
 
 export interface DashboardStockAlert {
@@ -133,14 +105,49 @@ export interface DashboardTopSelling {
   sold_today: number;
 }
 
+/** Last 7 days of sales, oldest first. */
+export interface DashboardSalesTrendPoint {
+  date: string;
+  sales: number;
+  orders: number;
+}
+
+/** Today's sales by UTC hour (0..23). */
+export interface DashboardHourlySalesPoint {
+  hour: number;
+  sales: number;
+  orders: number;
+}
+
+export type DashboardPaymentKey = "online" | "cod" | string;
+export type DashboardFulfillmentKey = "delivery" | "takeaway" | "dine_in" | string;
+
+export interface DashboardSplitPoint {
+  key: string;
+  sales: number;
+  orders: number;
+  share_pct: number;
+}
+
+export interface DashboardCategorySales {
+  name: string;
+  sales: number;
+  orders: number;
+  share_pct: number;
+}
+
 export interface AdminDashboardData {
   business: DashboardBusiness;
   counts: DashboardCounts;
   kpis: DashboardKpis;
-  new_orders: DashboardNewOrder[];
-  kitchen_orders: DashboardKitchenOrder[];
+  /** At most 5, most critical first. */
   stock_alerts: DashboardStockAlert[];
   top_selling: DashboardTopSelling[];
+  sales_trend: DashboardSalesTrendPoint[];
+  hourly_sales: DashboardHourlySalesPoint[];
+  payment_split: DashboardSplitPoint[];
+  fulfillment_split: DashboardSplitPoint[];
+  category_sales: DashboardCategorySales[];
 }
 
 export type MenuUnit = "plate" | "pcs" | "kg" | "box" | "cup" | "glass" | "portion";
@@ -513,6 +520,14 @@ export type PartnerRejectField =
   | "ifsc_code"
   | "upi_id";
 
+/** Driver wallet on GET /api/admin/partners/ list and detail. */
+export interface PartnerWallet {
+  /** Delivery earnings the company still owes this driver. */
+  balance: number;
+  /** Cash collected from customers, not yet handed to the restaurant. */
+  cash_pending: number;
+}
+
 export interface PartnerListItem {
   public_id: string;
   full_name: string | null;
@@ -522,6 +537,7 @@ export interface PartnerListItem {
   partner_status: PartnerStatus;
   submitted_at: string | null;
   created_at: string;
+  wallet: PartnerWallet;
 }
 
 export interface PartnerListParams {
@@ -601,12 +617,20 @@ export interface PartnerDetail {
   licence: PartnerLicence | null;
   vehicle: PartnerVehicle | null;
   bank: PartnerBank | null;
+  wallet: PartnerWallet;
   rejected_fields?: PartnerRejectField[] | string[];
   rejected_steps?: string[];
   /** Previous reject reason after partner resubmits (status back to pending). */
   last_rejection_reason?: string | null;
   last_rejected_fields?: PartnerRejectField[] | string[];
   last_rejected_steps?: string[];
+}
+
+/** POST /api/admin/partners/{public_id}/cash-receipt/ — full cash_pending in one shot. */
+export interface PartnerCashReceipt {
+  balance: number;
+  cash_pending: number;
+  submitted_amount: number;
 }
 
 export type PartnerReviewPayload =
@@ -769,25 +793,42 @@ export type UpdateHomeServiceFields = Partial<{
 }>;
 
 export type AdminOrderTab = "new" | "preparing" | "ready" | "past";
+/**
+ * Admin-facing status strings from serialize_order(for_customer=False).
+ * DB `new` → `placed`; DB `ready`/`ready_for_pickup` → `ready_for_pickup`;
+ * DB `past` → `delivered`. Raw keys may still appear on other payloads.
+ */
 export type AdminOrderStatus =
   | "placed"
+  | "new"
   | "accepted"
   | "preparing"
+  | "ready"
   | "ready_for_pickup"
   | "driver_assigned"
   | "driver_at_restaurant"
   | "picked_up"
   | "on_the_way"
   | "delivered"
+  | "past"
   | "rejected"
   | "cancelled";
 
 /** Driver on a ready-tab order after assignment. */
 export interface AdminOrderDriver {
   public_id: string;
+  driver_code?: string | null;
   full_name: string | null;
   phone: string | null;
   profile_picture_url: string | null;
+}
+
+export interface AdminOrderCustomer {
+  public_id: string;
+  full_name: string | null;
+  country_code: string | null;
+  phone_number: string | null;
+  email: string | null;
 }
 
 export interface AdminOrderAddress {
@@ -812,7 +853,7 @@ export interface AdminOrderItem {
   menu_item_public_id: string | null;
   menu_type: string | null;
   name: string | null;
-  /** Item code snapshotted when the order was placed. */
+  /** Item code snapshotted when the order was placed (admin only). */
   item_code?: string | null;
   quantity: number;
   unit_price: number;
@@ -826,34 +867,69 @@ export interface AdminOrderItem {
 export interface AdminOrderTable {
   public_id?: string | null;
   table_number: string | null;
+  seats?: number | null;
+}
+
+export interface AdminOrderAppliedOffer {
+  public_id: string | null;
+  code: string | null;
+  title: string | null;
+}
+
+export interface AdminOrderPickup {
+  name: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface AdminOrderBusiness {
+  public_id?: string;
+  type?: string;
+  name?: string;
+  [key: string]: unknown;
 }
 
 export interface AdminOrder {
   public_id: string;
+  /**
+   * Not returned by admin order serialize today (refunds/partners use ORD{id}).
+   * Kept optional for display helpers that fall back to public_id.
+   */
   order_code?: string | null;
   status: AdminOrderStatus | string;
-  /** delivery | pickup (app), dine_in | takeaway (QR table). */
-  fulfillment_type?: string | null;
-  /** Set on QR table orders only. */
-  table?: AdminOrderTable | null;
+  /** delivery | takeaway (app or QR) | dine_in (QR). */
+  fulfillment_type: string | null;
+  /** Set when the order was placed from a dining-table QR. */
+  table: AdminOrderTable | null;
+  customer: AdminOrderCustomer | null;
   delivery_status: string | null;
   driver: AdminOrderDriver | null;
   driver_accepted_at: string | null;
   payment_method: string | null;
   payment_status: string | null;
   subtotal: number;
+  discount_amount: number;
+  tip_amount: number;
+  tip_source: string | null;
+  applied_offer: AdminOrderAppliedOffer | null;
   distance_km: number | null;
   delivery_fee: number | null;
   total: number | null;
   preparation_minutes: number | null;
+  item_count: number | null;
   reject_reason: string | null;
   /** Set when the customer cancelled before preparing. */
   cancelled_at: string | null;
   cancel_reason: string | null;
+  /** ISO timestamp; admin payload also mirrors this as ordered_at. */
   created_at: string;
+  ordered_at: string | null;
   delivered_at: string | null;
   waiting_seconds: number | null;
   address: AdminOrderAddress | null;
+  pickup: AdminOrderPickup | null;
+  businesses: AdminOrderBusiness[];
   items: AdminOrderItem[] | null;
 }
 
@@ -1024,9 +1100,8 @@ export interface DeliverySettings {
   pickup_address: string | null;
   latitude: number | null;
   longitude: number | null;
-  free_delivery_radius_km: number;
+  /** Rupees per km; delivery fee is always distance × this rate. */
   per_km_rate: number;
-  min_order_for_free_delivery: number;
 }
 
 /** Partial fields for PATCH /api/admin/delivery-settings/. Omit unchanged keys. */
@@ -1357,6 +1432,182 @@ export interface InvoiceDetail {
 export interface OrderInvoicesData {
   order_public_id: string;
   results: InvoiceDetail[];
+}
+
+/** GET /api/admin/analytics/* (super_admin only) */
+export type AnalyticsGroupBy = "day" | "week" | "month";
+export type AnalyticsReport = "sales" | "products" | "inventory" | "financial";
+
+export interface AnalyticsBusinessRef {
+  public_id: string;
+  type: string;
+  name: string;
+}
+
+export interface AnalyticsSplitRow {
+  key: string;
+  sales: number;
+  orders: number;
+  share_pct: number;
+}
+
+export interface AnalyticsBusinessSplitRow {
+  business_public_id: string | null;
+  name: string;
+  sales: number;
+  orders: number;
+  share_pct: number;
+}
+
+export interface AnalyticsSalesSummary {
+  revenue: number;
+  orders: number;
+  avg_order_value: number;
+  discounts: number;
+  delivery_fees: number;
+  tips: number;
+  order_total: number;
+}
+
+export interface AnalyticsSalesData {
+  from: string;
+  to: string;
+  business: AnalyticsBusinessRef | null;
+  summary: AnalyticsSalesSummary;
+  trend: Array<{ period: string; sales: number; orders: number }>;
+  hourly: Array<{ hour: number; sales: number; orders: number }>;
+  by_payment_method: AnalyticsSplitRow[];
+  by_fulfillment: AnalyticsSplitRow[];
+  by_business?: AnalyticsBusinessSplitRow[];
+}
+
+export interface AnalyticsTopItem {
+  public_id: string;
+  name: string;
+  item_code: string | null;
+  category: string | null;
+  quantity: number;
+  revenue: number;
+  cogs: number | null;
+  margin: number | null;
+  margin_pct: number | null;
+}
+
+export interface AnalyticsCategorySale {
+  name: string;
+  sales: number;
+  orders: number;
+  share_pct: number;
+}
+
+export interface AnalyticsSlowItem {
+  public_id: string;
+  name: string;
+  item_code: string | null;
+  category: string | null;
+}
+
+export interface AnalyticsProductsData {
+  from: string;
+  to: string;
+  business: AnalyticsBusinessRef | null;
+  top_items: AnalyticsTopItem[];
+  category_sales: AnalyticsCategorySale[];
+  slow_items: AnalyticsSlowItem[];
+}
+
+export interface AnalyticsLowStockItem {
+  public_id: string;
+  sku: string | null;
+  name: string;
+  unit: string;
+  available: number;
+  reorder_level: number;
+}
+
+export interface AnalyticsMovementRow {
+  entry_type: "in" | "out" | "adjust" | string;
+  reason: string | null;
+  entries: number;
+  quantity: number;
+  value: number;
+}
+
+export interface AnalyticsInventoryData {
+  from: string;
+  to: string;
+  business: AnalyticsBusinessRef | null;
+  stock: { value: number; items: number; low_stock_count: number };
+  low_stock: AnalyticsLowStockItem[];
+  movement: AnalyticsMovementRow[];
+  purchases: {
+    total: number;
+    by_supplier: Array<{ supplier: string; total: number; bills: number }>;
+  };
+}
+
+export interface AnalyticsFinancialData {
+  from: string;
+  to: string;
+  business: AnalyticsBusinessRef | null;
+  revenue: number;
+  orders: number;
+  refunds: { amount: number; count: number };
+  cogs: number;
+  gross_profit: number;
+  gross_margin_pct: number;
+  purchases: number;
+  net_after_purchases: number;
+  notes: { revenue: string; cogs: string };
+}
+
+export interface AnalyticsFilterParams {
+  from?: string;
+  to?: string;
+  business_public_id?: string;
+}
+
+/** Admin inbox — GET/POST /api/admin/notifications/ */
+export type AdminNotificationType = "stock" | "purchase" | "account" | "system" | "wallet" | string;
+
+export interface AdminNotification {
+  public_id: string;
+  type: AdminNotificationType;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string | null;
+  /** Free-form metadata for future deep-links; keys are not fixed yet. */
+  data: Record<string, unknown> | null;
+}
+
+export interface AdminNotificationListParams {
+  is_read?: boolean;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminNotificationListData {
+  count: number;
+  unread_count: number;
+  page: number;
+  page_size: number;
+  results: AdminNotification[];
+}
+
+export interface AdminNotificationUnreadCountData {
+  unread_count: number;
+}
+
+/** POST /api/admin/notifications/{public_id}/read/ */
+export interface AdminNotificationReadData extends AdminNotification {
+  unread_count: number;
+}
+
+/** POST /api/admin/notifications/read-all/ */
+export interface AdminNotificationReadAllData {
+  marked_read: number;
+  unread_count: number;
 }
 
 export class ApiError extends Error {

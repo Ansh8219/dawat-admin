@@ -27,12 +27,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   formatPartnerDate,
   formatPartnerPhone,
+  formatRupees,
   getPartner,
   normalizePartner,
   PARTNER_REJECT_FIELDS,
   partnerRejectFieldLabel,
   partnerRejectStepLabel,
   partnerStatusLabel,
+  receivePartnerCash,
   reviewPartner,
 } from "@/lib/api/partners";
 import { ApiError } from "@/lib/api/types";
@@ -42,6 +44,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Banknote,
   CheckCircle2,
   Eye,
   FileImage,
@@ -119,6 +122,8 @@ function PartnerDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectedFields, setRejectedFields] = useState<PartnerRejectField[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [cashOpen, setCashOpen] = useState(false);
+  const [receivingCash, setReceivingCash] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; label: string } | null>(null);
 
   const handleAuthError = useCallback(
@@ -224,6 +229,36 @@ function PartnerDetailPage() {
     setRejectedFields((prev) =>
       prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
     );
+  }
+
+  async function onReceiveCash() {
+    if (!partner) return;
+    setReceivingCash(true);
+    try {
+      const receipt = await withAuthRetry((token) =>
+        receivePartnerCash(token, partner.public_id),
+      );
+      setPartner((prev) =>
+        prev
+          ? {
+              ...prev,
+              wallet: {
+                balance: receipt.balance,
+                cash_pending: receipt.cash_pending,
+              },
+            }
+          : prev,
+      );
+      setCashOpen(false);
+      toast.success(
+        `Received ${formatRupees(receipt.submitted_amount)}. Cash pending is now ${formatRupees(receipt.cash_pending)}.`,
+      );
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      toast.error(err instanceof ApiError ? err.message : "Unable to receive cash.");
+    } finally {
+      setReceivingCash(false);
+    }
   }
 
   async function onApprove() {
@@ -344,31 +379,48 @@ function PartnerDetailPage() {
                         ? ` · Reviewed ${formatPartnerDate(partner.reviewed_at)}`
                         : ""}
                     </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Owed {formatRupees(partner.wallet?.balance)} · Cash pending{" "}
+                      {formatRupees(partner.wallet?.cash_pending)}
+                    </p>
                   </div>
                 </div>
 
-                {canReview ? (
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {(partner.wallet?.cash_pending ?? 0) > 0 ? (
                     <Button
                       variant="outline"
-                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        setRejectReason("");
-                        setRejectedFields([]);
-                        setRejectOpen(true);
-                      }}
+                      className="rounded-xl gap-2"
+                      onClick={() => setCashOpen(true)}
                     >
-                      <XCircle className="h-4 w-4" /> Reject
+                      <Banknote className="h-4 w-4" /> Mark cash received
                     </Button>
-                    <Button className="rounded-xl gap-2" onClick={() => setApproveOpen(true)}>
-                      <CheckCircle2 className="h-4 w-4" /> Approve
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    Only pending applications can be reviewed.
-                  </div>
-                )}
+                  ) : null}
+                  {canReview ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          setRejectReason("");
+                          setRejectedFields([]);
+                          setRejectOpen(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" /> Reject
+                      </Button>
+                      <Button className="rounded-xl gap-2" onClick={() => setApproveOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4" /> Approve
+                      </Button>
+                    </>
+                  ) : (
+                    (partner.wallet?.cash_pending ?? 0) <= 0 && (
+                      <div className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Only pending applications can be reviewed.
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
             </div>
 
@@ -433,6 +485,31 @@ function PartnerDetailPage() {
                   <UserRound className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-bold">Application details</h3>
                 </div>
+
+                <DetailCard title="Wallet" icon={Wallet}>
+                  <Field label="Owed to driver" value={formatRupees(partner.wallet?.balance)} />
+                  <Field
+                    label="Cash pending"
+                    value={formatRupees(partner.wallet?.cash_pending)}
+                  />
+                  <p className="pt-3 text-xs text-muted-foreground">
+                    Balance is delivery earnings still owed to this driver. Cash pending is cash
+                    collected from customers and not yet handed to the restaurant. Cash orders add
+                    the full collected amount to pending; the delivery fee stays in balance. Online
+                    orders only increase balance. Payouts are not available yet.
+                  </p>
+                  {(partner.wallet?.cash_pending ?? 0) > 0 ? (
+                    <div className="pt-3">
+                      <Button
+                        type="button"
+                        className="rounded-xl gap-2"
+                        onClick={() => setCashOpen(true)}
+                      >
+                        <Banknote className="h-4 w-4" /> Receive cash
+                      </Button>
+                    </div>
+                  ) : null}
+                </DetailCard>
 
                 <DetailCard
                   title="Personal"
@@ -654,6 +731,41 @@ function PartnerDetailPage() {
           </>
         ) : null}
       </div>
+
+      <AlertDialog open={cashOpen} onOpenChange={setCashOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark cash received?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This settles the full pending cash of{" "}
+              {formatRupees(partner?.wallet?.cash_pending)} from{" "}
+              {partner?.profile?.full_name || "this driver"} in one shot. Partial receive is not
+              supported. Earnings in balance are unchanged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={receivingCash}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              disabled={receivingCash}
+              onClick={(e) => {
+                e.preventDefault();
+                void onReceiveCash();
+              }}
+            >
+              {receivingCash ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Receiving…
+                </>
+              ) : (
+                "Receive cash"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
         <AlertDialogContent className="rounded-2xl">

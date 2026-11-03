@@ -306,9 +306,7 @@ const EMPTY_DELIVERY_FORM: DeliveryFormState = {
   pickup_address: "",
   latitude: "",
   longitude: "",
-  free_delivery_radius_km: "0",
-  per_km_rate: "0",
-  min_order_for_free_delivery: "0",
+  per_km_rate: "0.00",
 };
 
 function DeliverySettingsForm() {
@@ -417,7 +415,8 @@ function DeliverySettingsForm() {
       <div>
         <div className="text-sm font-semibold">Delivery settings</div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Search a place or drop a pin to set pickup, then set delivery charges.
+          Search a place or drop a pin to set pickup. Delivery fee is always distance × per-km
+          rate. There is no free delivery.
         </p>
       </div>
 
@@ -460,43 +459,20 @@ function DeliverySettingsForm() {
         }}
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div>
-          <Label htmlFor="free-radius">Free delivery radius (km)</Label>
-          <Input
-            id="free-radius"
-            type="number"
-            min={0}
-            step="any"
-            value={form.free_delivery_radius_km}
-            onChange={(e) => setField("free_delivery_radius_km", e.target.value)}
-            className="mt-1 rounded-xl"
-          />
-        </div>
-        <div>
-          <Label htmlFor="per-km-rate">Per-km rate (₹)</Label>
-          <Input
-            id="per-km-rate"
-            type="number"
-            min={0}
-            step="any"
-            value={form.per_km_rate}
-            onChange={(e) => setField("per_km_rate", e.target.value)}
-            className="mt-1 rounded-xl"
-          />
-        </div>
-        <div>
-          <Label htmlFor="min-order">Min order for free delivery (₹)</Label>
-          <Input
-            id="min-order"
-            type="number"
-            min={0}
-            step="any"
-            value={form.min_order_for_free_delivery}
-            onChange={(e) => setField("min_order_for_free_delivery", e.target.value)}
-            className="mt-1 rounded-xl"
-          />
-        </div>
+      <div>
+        <Label htmlFor="per-km-rate">Per-km rate (₹)</Label>
+        <Input
+          id="per-km-rate"
+          type="number"
+          min={0}
+          step="0.01"
+          value={form.per_km_rate}
+          onChange={(e) => setField("per_km_rate", e.target.value)}
+          className="mt-1 max-w-xs rounded-xl"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Rupees per kilometre, 0 or greater, two decimal places.
+        </p>
       </div>
 
       {formError && (

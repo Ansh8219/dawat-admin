@@ -18,12 +18,10 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppTableQrRouteImport } from './routes/_app.table-qr'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppRewardsRouteImport } from './routes/_app.rewards'
-import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppRefundsRouteImport } from './routes/_app.refunds'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPeopleRouteImport } from './routes/_app.people'
 import { Route as AppPartnersRouteImport } from './routes/_app.partners'
-import { Route as AppOutletStatusRouteImport } from './routes/_app.outlet-status'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMenuCategoriesRouteImport } from './routes/_app.menu-categories'
@@ -32,10 +30,11 @@ import { Route as AppMarketingRouteImport } from './routes/_app.marketing'
 import { Route as AppInvoicesRouteImport } from './routes/_app.invoices'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
-import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
+import { Route as AppBusinessesRouteImport } from './routes/_app.businesses'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
+import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners_.$partnerId'
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app.invoices_.$invoiceId'
 import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
@@ -85,11 +84,6 @@ const AppRewardsRoute = AppRewardsRouteImport.update({
   path: '/rewards',
   getParentRoute: () => AppRoute,
 } as any)
-const AppReportsRoute = AppReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppRefundsRoute = AppRefundsRouteImport.update({
   id: '/refunds',
   path: '/refunds',
@@ -108,11 +102,6 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
 const AppPartnersRoute = AppPartnersRouteImport.update({
   id: '/partners',
   path: '/partners',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOutletStatusRoute = AppOutletStatusRouteImport.update({
-  id: '/outlet-status',
-  path: '/outlet-status',
   getParentRoute: () => AppRoute,
 } as any)
 const AppOrdersRoute = AppOrdersRouteImport.update({
@@ -155,11 +144,6 @@ const AppHomeServicesRoute = AppHomeServicesRouteImport.update({
   path: '/home-services',
   getParentRoute: () => AppRoute,
 } as any)
-const AppFinanceRoute = AppFinanceRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppCustomersRoute = AppCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -170,9 +154,19 @@ const AppCustomerLevelsRoute = AppCustomerLevelsRouteImport.update({
   path: '/customer-levels',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBusinessesRoute = AppBusinessesRouteImport.update({
+  id: '/businesses',
+  path: '/businesses',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBookingsRoute = AppBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPartnersPartnerIdRoute = AppPartnersPartnerIdRouteImport.update({
@@ -204,10 +198,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/bookings': typeof AppBookingsRoute
+  '/businesses': typeof AppBusinessesRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
-  '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/invoices': typeof AppInvoicesRoute
@@ -216,12 +211,10 @@ export interface FileRoutesByFullPath {
   '/menu-categories': typeof AppMenuCategoriesRoute
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
-  '/outlet-status': typeof AppOutletStatusRoute
   '/partners': typeof AppPartnersRoute
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/refunds': typeof AppRefundsRoute
-  '/reports': typeof AppReportsRoute
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
@@ -235,10 +228,11 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/bookings': typeof AppBookingsRoute
+  '/businesses': typeof AppBusinessesRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
-  '/finance': typeof AppFinanceRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/invoices': typeof AppInvoicesRoute
@@ -247,12 +241,10 @@ export interface FileRoutesByTo {
   '/menu-categories': typeof AppMenuCategoriesRoute
   '/notifications': typeof AppNotificationsRoute
   '/orders': typeof AppOrdersRoute
-  '/outlet-status': typeof AppOutletStatusRoute
   '/partners': typeof AppPartnersRoute
   '/people': typeof AppPeopleRoute
   '/pos': typeof AppPosRoute
   '/refunds': typeof AppRefundsRoute
-  '/reports': typeof AppReportsRoute
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
@@ -269,10 +261,11 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/select-panel': typeof SelectPanelRoute
+  '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/bookings': typeof AppBookingsRoute
+  '/_app/businesses': typeof AppBusinessesRoute
   '/_app/customer-levels': typeof AppCustomerLevelsRoute
   '/_app/customers': typeof AppCustomersRoute
-  '/_app/finance': typeof AppFinanceRoute
   '/_app/home-services': typeof AppHomeServicesRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/invoices': typeof AppInvoicesRoute
@@ -281,12 +274,10 @@ export interface FileRoutesById {
   '/_app/menu-categories': typeof AppMenuCategoriesRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/orders': typeof AppOrdersRoute
-  '/_app/outlet-status': typeof AppOutletStatusRoute
   '/_app/partners': typeof AppPartnersRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/refunds': typeof AppRefundsRoute
-  '/_app/reports': typeof AppReportsRoute
   '/_app/rewards': typeof AppRewardsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/table-qr': typeof AppTableQrRoute
@@ -304,10 +295,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/select-panel'
+    | '/analytics'
     | '/bookings'
+    | '/businesses'
     | '/customer-levels'
     | '/customers'
-    | '/finance'
     | '/home-services'
     | '/inventory'
     | '/invoices'
@@ -316,12 +308,10 @@ export interface FileRouteTypes {
     | '/menu-categories'
     | '/notifications'
     | '/orders'
-    | '/outlet-status'
     | '/partners'
     | '/people'
     | '/pos'
     | '/refunds'
-    | '/reports'
     | '/rewards'
     | '/settings'
     | '/table-qr'
@@ -335,10 +325,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/select-panel'
+    | '/analytics'
     | '/bookings'
+    | '/businesses'
     | '/customer-levels'
     | '/customers'
-    | '/finance'
     | '/home-services'
     | '/inventory'
     | '/invoices'
@@ -347,12 +338,10 @@ export interface FileRouteTypes {
     | '/menu-categories'
     | '/notifications'
     | '/orders'
-    | '/outlet-status'
     | '/partners'
     | '/people'
     | '/pos'
     | '/refunds'
-    | '/reports'
     | '/rewards'
     | '/settings'
     | '/table-qr'
@@ -368,10 +357,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/select-panel'
+    | '/_app/analytics'
     | '/_app/bookings'
+    | '/_app/businesses'
     | '/_app/customer-levels'
     | '/_app/customers'
-    | '/_app/finance'
     | '/_app/home-services'
     | '/_app/inventory'
     | '/_app/invoices'
@@ -380,12 +370,10 @@ export interface FileRouteTypes {
     | '/_app/menu-categories'
     | '/_app/notifications'
     | '/_app/orders'
-    | '/_app/outlet-status'
     | '/_app/partners'
     | '/_app/people'
     | '/_app/pos'
     | '/_app/refunds'
-    | '/_app/reports'
     | '/_app/rewards'
     | '/_app/settings'
     | '/_app/table-qr'
@@ -469,13 +457,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRewardsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/reports': {
-      id: '/_app/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AppReportsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/refunds': {
       id: '/_app/refunds'
       path: '/refunds'
@@ -502,13 +483,6 @@ declare module '@tanstack/react-router' {
       path: '/partners'
       fullPath: '/partners'
       preLoaderRoute: typeof AppPartnersRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/outlet-status': {
-      id: '/_app/outlet-status'
-      path: '/outlet-status'
-      fullPath: '/outlet-status'
-      preLoaderRoute: typeof AppOutletStatusRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/orders': {
@@ -567,13 +541,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHomeServicesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/finance': {
-      id: '/_app/finance'
-      path: '/finance'
-      fullPath: '/finance'
-      preLoaderRoute: typeof AppFinanceRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/customers': {
       id: '/_app/customers'
       path: '/customers'
@@ -588,11 +555,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomerLevelsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/businesses': {
+      id: '/_app/businesses'
+      path: '/businesses'
+      fullPath: '/businesses'
+      preLoaderRoute: typeof AppBusinessesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/bookings': {
       id: '/_app/bookings'
       path: '/bookings'
       fullPath: '/bookings'
       preLoaderRoute: typeof AppBookingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/analytics': {
+      id: '/_app/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/partners_/$partnerId': {
@@ -627,10 +608,11 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppBookingsRoute: typeof AppBookingsRoute
+  AppBusinessesRoute: typeof AppBusinessesRoute
   AppCustomerLevelsRoute: typeof AppCustomerLevelsRoute
   AppCustomersRoute: typeof AppCustomersRoute
-  AppFinanceRoute: typeof AppFinanceRoute
   AppHomeServicesRoute: typeof AppHomeServicesRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppInvoicesRoute: typeof AppInvoicesRoute
@@ -639,12 +621,10 @@ interface AppRouteChildren {
   AppMenuCategoriesRoute: typeof AppMenuCategoriesRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppOrdersRoute: typeof AppOrdersRoute
-  AppOutletStatusRoute: typeof AppOutletStatusRoute
   AppPartnersRoute: typeof AppPartnersRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPosRoute: typeof AppPosRoute
   AppRefundsRoute: typeof AppRefundsRoute
-  AppReportsRoute: typeof AppReportsRoute
   AppRewardsRoute: typeof AppRewardsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTableQrRoute: typeof AppTableQrRoute
@@ -656,10 +636,11 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppBookingsRoute: AppBookingsRoute,
+  AppBusinessesRoute: AppBusinessesRoute,
   AppCustomerLevelsRoute: AppCustomerLevelsRoute,
   AppCustomersRoute: AppCustomersRoute,
-  AppFinanceRoute: AppFinanceRoute,
   AppHomeServicesRoute: AppHomeServicesRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppInvoicesRoute: AppInvoicesRoute,
@@ -668,12 +649,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppMenuCategoriesRoute: AppMenuCategoriesRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppOrdersRoute: AppOrdersRoute,
-  AppOutletStatusRoute: AppOutletStatusRoute,
   AppPartnersRoute: AppPartnersRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPosRoute: AppPosRoute,
   AppRefundsRoute: AppRefundsRoute,
-  AppReportsRoute: AppReportsRoute,
   AppRewardsRoute: AppRewardsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTableQrRoute: AppTableQrRoute,

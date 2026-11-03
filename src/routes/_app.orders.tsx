@@ -11,10 +11,13 @@ import { OrderInvoices } from "@/components/app/order-invoices";
 import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
 import {
   acceptAdminOrder,
+  canCollectOrder,
   canHandoverOrder,
+  collectAdminOrder,
   formatOrderMoney,
   getAdminOrder,
   handoverAdminOrder,
+  isAppTakeawayOrder,
   isQrTableOrder,
   orderTableLabel,
   isPlacedStatus,
@@ -178,9 +181,7 @@ function OrdersPage() {
       }
       try {
         const [active, ...rest] = await Promise.all([
-          withAuthRetry((token) =>
-            listAdminOrders(token, { tab, page, page_size: PAGE_SIZE }),
-          ),
+          withAuthRetry((token) => listAdminOrders(token, { tab, page, page_size: PAGE_SIZE })),
           ...TABS.filter((item) => item.id !== tab).map((item) =>
             withAuthRetry((token) =>
               listAdminOrders(token, { tab: item.id, page: 1, page_size: 1 }),
@@ -315,7 +316,8 @@ function OrdersPage() {
     ? ""
     : showsSincePlacedClock(tab) && selectedSince != null
       ? `Since placed ${formatDuration(selectedSince)}`
-      : (formatDeliveredAt(selected.delivered_at) ?? `Placed ${formatPlacedAt(selected.created_at)}`);
+      : (formatDeliveredAt(selected.delivered_at) ??
+        `Placed ${formatPlacedAt(selected.created_at)}`);
 
   function handleActionError(err: unknown, fallback: string) {
     if (handleAuthError(err)) return;
@@ -351,9 +353,7 @@ function OrdersPage() {
     }
     setActingId(acceptTarget.public_id);
     try {
-      await withAuthRetry((token) =>
-        acceptAdminOrder(token, acceptTarget.public_id, prepMinutes),
-      );
+      await withAuthRetry((token) => acceptAdminOrder(token, acceptTarget.public_id, prepMinutes));
       toast.success(`${orderDisplayCode(acceptTarget)} accepted · prep ${prepMinutes} min`);
       setAcceptTarget(null);
       setSelected(null);
@@ -376,9 +376,7 @@ function OrdersPage() {
     }
     setActingId(rejectTarget.public_id);
     try {
-      await withAuthRetry((token) =>
-        rejectAdminOrder(token, rejectTarget.public_id, rejectReason),
-      );
+      await withAuthRetry((token) => rejectAdminOrder(token, rejectTarget.public_id, rejectReason));
       toast.success(`${orderDisplayCode(rejectTarget)} rejected`);
       setRejectTarget(null);
       setSelected(null);
@@ -448,6 +446,25 @@ function OrdersPage() {
     }
   }
 
+  /** App takeaway: customer picks up at the counter → delivered; invoice issued. */
+  async function markCollected(order: AdminOrder) {
+    if (!canCollectOrder(order)) return;
+    setActingId(order.public_id);
+    try {
+      await withAuthRetry((token) => collectAdminOrder(token, order.public_id));
+      toast.success(`${orderDisplayCode(order)} collected · invoice issued`);
+      setOrders((prev) => prev.filter((o) => o.public_id !== order.public_id));
+      setCount((c) => Math.max(0, c - 1));
+      setSelected(null);
+      void queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
+      void refresh();
+    } catch (err) {
+      handleActionError(err, "Unable to mark order collected");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -462,9 +479,7 @@ function OrdersPage() {
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {meta.label} · kitchen board
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{meta.label} · kitchen board</p>
           </div>
 
           <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/pos" })}>
@@ -537,7 +552,9 @@ function OrdersPage() {
               <div className="font-semibold text-foreground">
                 {tabCounts.new} new {tabCounts.new === 1 ? "order" : "orders"} waiting
               </div>
-              <div className="text-xs text-muted-foreground">Accept quickly to keep prep times accurate</div>
+              <div className="text-xs text-muted-foreground">
+                Accept quickly to keep prep times accurate
+              </div>
             </div>
           </div>
         )}
@@ -552,7 +569,12 @@ function OrdersPage() {
             <div className="max-w-md rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {loadError}
             </div>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => void refresh({ showLoading: true })}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => void refresh({ showLoading: true })}
+            >
               Try again
             </Button>
           </div>
@@ -562,7 +584,9 @@ function OrdersPage() {
               <ChefHat className="h-7 w-7 text-muted-foreground" />
             </div>
             <h2 className="text-lg font-semibold">
-              {tab === "new" ? "No new orders" : `No ${TABS.find((item) => item.id === tab)?.label.toLowerCase()}`}
+              {tab === "new"
+                ? "No new orders"
+                : `No ${TABS.find((item) => item.id === tab)?.label.toLowerCase()}`}
             </h2>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
               {tab === "new"
@@ -588,6 +612,7 @@ function OrdersPage() {
                   onStartPreparing={() => void startPreparing(order)}
                   onReady={() => void markReady(order)}
                   onHandover={() => void handover(order)}
+                  onCollect={() => void markCollected(order)}
                 />
               ))}
             </div>
@@ -634,7 +659,8 @@ function OrdersPage() {
               <div className="rounded-xl border bg-muted/30 p-3">
                 <div className="text-sm font-semibold">{orderDisplayCode(acceptTarget)}</div>
                 <div className="text-xs text-muted-foreground">
-                  {orderCustomerName(acceptTarget)} · {orderItemCount(acceptTarget)} items ·{" "}
+                  {orderCustomerName(acceptTarget)} · {orderItemCount(acceptTarget)}{" "}
+                  {orderItemCount(acceptTarget) === 1 ? "item" : "items"} ·{" "}
                   {formatOrderMoney(orderBillTotal(acceptTarget))}
                 </div>
               </div>
@@ -683,7 +709,9 @@ function OrdersPage() {
                   disabled={actingId === acceptTarget.public_id}
                   onClick={() => void confirmAccept()}
                 >
-                  {actingId === acceptTarget.public_id ? "Accepting…" : `Accept · ${prepMinutes || "—"} min`}
+                  {actingId === acceptTarget.public_id
+                    ? "Accepting…"
+                    : `Accept · ${prepMinutes || "—"} min`}
                 </Button>
               </div>
             </div>
@@ -703,7 +731,8 @@ function OrdersPage() {
               </p>
               {isAutoRefundPayment(rejectTarget.payment_method) && (
                 <p className="rounded-xl border border-info/30 bg-info/10 px-3 py-2 text-sm text-info">
-                  Customer will be refunded automatically (wallet: instantly, online: 5–7 working days).
+                  Customer will be refunded automatically (wallet: instantly, online: 5–7 working
+                  days).
                 </p>
               )}
               <Textarea
@@ -717,7 +746,11 @@ function OrdersPage() {
                 {rejectReason.length}/255
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setRejectTarget(null)}>
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-xl"
+                  onClick={() => setRejectTarget(null)}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -735,7 +768,7 @@ function OrdersPage() {
       </Dialog>
 
       <Sheet open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+        <SheetContent className="w-full overflow-y-auto px-4 pb-6 sm:max-w-lg">
           {selected && (
             <>
               <SheetHeader>
@@ -791,7 +824,9 @@ function OrdersPage() {
 
                 {selected.reject_reason && (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                    <div className="text-xs font-semibold uppercase text-destructive">Reject reason</div>
+                    <div className="text-xs font-semibold uppercase text-destructive">
+                      Reject reason
+                    </div>
                     <div className="mt-1">{selected.reject_reason}</div>
                   </div>
                 )}
@@ -822,6 +857,16 @@ function OrdersPage() {
                       {actingId === selected.public_id ? "Handing over…" : "Hand over"}
                     </Button>
                   )}
+                  {canCollectOrder(selected) && (
+                    <Button
+                      className="gap-2 rounded-xl"
+                      disabled={actingId === selected.public_id}
+                      onClick={() => void markCollected(selected)}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      {actingId === selected.public_id ? "Collecting…" : "Mark collected"}
+                    </Button>
+                  )}
                   {isPlacedStatus(selected.status) && (
                     <Button
                       variant="outline"
@@ -834,14 +879,21 @@ function OrdersPage() {
                 </div>
 
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Items</div>
+                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                    Items
+                  </div>
                   <div className="space-y-1.5">
                     {(selected.items ?? []).map((item) => (
-                      <div key={item.public_id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
-                        <span>
+                      <div
+                        key={item.public_id}
+                        className="flex items-start justify-between gap-3 rounded-lg border p-2 text-sm"
+                      >
+                        <span className="min-w-0 break-words">
                           {item.quantity}× {itemLabel(item)}
                         </span>
-                        <span className="font-medium">{formatOrderMoney(item.line_total)}</span>
+                        <span className="shrink-0 font-medium">
+                          {formatOrderMoney(item.line_total)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -862,12 +914,21 @@ function OrdersPage() {
 }
 
 function OrderCharges({ order }: { order: AdminOrder }) {
+  const discount = order.discount_amount ?? 0;
+  const tip = order.tip_amount ?? 0;
+  const offerLabel = order.applied_offer?.code || order.applied_offer?.title;
   return (
     <div className="space-y-1.5 rounded-xl bg-primary/5 p-3 text-sm">
       <div className="flex items-center justify-between text-muted-foreground">
         <span>Subtotal</span>
         <span>{formatOrderMoney(order.subtotal)}</span>
       </div>
+      {discount > 0 && (
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span>Discount{offerLabel ? ` · ${offerLabel}` : ""}</span>
+          <span>−{formatOrderMoney(discount)}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between text-muted-foreground">
         <span>
           Delivery
@@ -875,11 +936,19 @@ function OrderCharges({ order }: { order: AdminOrder }) {
         </span>
         <span>{order.delivery_fee == null ? "—" : formatOrderMoney(order.delivery_fee)}</span>
       </div>
+      {tip > 0 && (
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span>Tip{order.tip_source ? ` · ${order.tip_source}` : ""}</span>
+          <span>{formatOrderMoney(tip)}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between border-t border-primary/15 pt-2">
         <span>
           Total · {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
         </span>
-        <span className="text-lg font-bold text-primary">{formatOrderMoney(orderBillTotal(order))}</span>
+        <span className="text-lg font-bold text-primary">
+          {formatOrderMoney(orderBillTotal(order))}
+        </span>
       </div>
     </div>
   );
@@ -898,6 +967,7 @@ function OrderTicket({
   onStartPreparing,
   onReady,
   onHandover,
+  onCollect,
 }: {
   order: AdminOrder;
   tab: AdminOrderTab;
@@ -911,13 +981,14 @@ function OrderTicket({
   onStartPreparing: () => void;
   onReady: () => void;
   onHandover: () => void;
+  onCollect: () => void;
 }) {
   const isPlaced = isPlacedStatus(order.status);
   const isAccepted = order.status === "accepted";
   const isPreparing = order.status === "preparing";
   const isReadyTrack = isReadyTrackStatus(order.status);
   const isRejected = order.status === "rejected";
-  const isDelivered = order.status === "delivered";
+  const isDelivered = order.status === "delivered" || order.status === "past";
   const isCancelled = isCancelledStatus(order.status);
   const liveClock = showsSincePlacedClock(tab);
   const waiting = liveClock ? sincePlacedSeconds(order, now, loadedAt) : null;
@@ -926,6 +997,7 @@ function OrderTicket({
   const itemCount = orderItemCount(order);
   const tableLabel = orderTableLabel(order);
   const canHandover = canHandoverOrder(order);
+  const canCollect = canCollectOrder(order);
 
   return (
     <article
@@ -1013,18 +1085,20 @@ function OrderTicket({
         <div className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
           {(order.items ?? []).map((item) => (
             <div key={item.public_id} className="flex items-start justify-between gap-3 text-sm">
-              <span className="text-foreground">
+              <span className="min-w-0 break-words text-foreground">
                 <span className="mr-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted px-1 text-xs font-bold text-muted-foreground">
                   {item.quantity}
                 </span>
                 {itemLabel(item)}
               </span>
-              <span className="shrink-0 text-xs text-muted-foreground">{formatOrderMoney(item.line_total)}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {formatOrderMoney(item.line_total)}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="mt-auto flex items-end justify-between border-t border-border/60 pt-3">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-2 border-t border-border/60 pt-3">
           <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
           </span>
@@ -1080,6 +1154,16 @@ function OrderTicket({
           >
             <HandPlatter className="h-4 w-4" />
             {busy ? "Handing over…" : "Hand over"}
+          </button>
+        ) : canCollect ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCollect}
+            className="flex flex-1 items-center justify-center gap-2 bg-success px-3 py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-success/90 disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {busy ? "Collecting…" : "Mark collected"}
           </button>
         ) : isPreparing ? (
           <button
@@ -1148,7 +1232,7 @@ function ReadyTrack({ order, compact = false }: { order: AdminOrder; compact?: b
     <div
       className={cn(
         "rounded-xl border border-success/25 bg-success/5",
-        compact ? "mx-4 mb-3 px-2.5 py-2" : "p-3",
+        compact ? "mt-3 px-2.5 py-2" : "p-3",
       )}
     >
       <div className="text-[10px] font-semibold uppercase tracking-wide text-success">
@@ -1156,11 +1240,15 @@ function ReadyTrack({ order, compact = false }: { order: AdminOrder; compact?: b
       </div>
       {isQrTableOrder(order) ? (
         <p className="mt-1 text-xs text-muted-foreground">
-          {order.status === "ready_for_pickup"
+          {order.status === "ready_for_pickup" || order.status === "ready"
             ? order.fulfillment_type === "takeaway"
               ? "Ready at the counter. Hand over when the guest collects it."
               : "Ready to serve. Hand over once it reaches the table."
             : "With the guest."}
+        </p>
+      ) : isAppTakeawayOrder(order) ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ready for pickup. Mark collected when the customer takes it.
         </p>
       ) : driver ? (
         <div className="mt-2 flex items-center gap-2.5">

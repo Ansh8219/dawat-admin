@@ -69,6 +69,9 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
 
     let stopped = false;
     let socket: AdminOrdersSocket | null = null;
+    /** De-dupe identical WS payloads (type + order + at) within a short window. */
+    const seenEvents = new Map<string, number>();
+    const DEDUP_TTL_MS = 15_000;
 
     const invalidateQueries = async (event: AdminOrderWsEvent | null) => {
       await queryClient.invalidateQueries({ queryKey: adminOrdersKeys.all });
@@ -94,7 +97,20 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       return shortId(publicId);
     };
 
+    const isDuplicateEvent = (event: AdminOrderWsEvent): boolean => {
+      const key = `${event.type}:${event.order_public_id}:${event.at}`;
+      const now = Date.now();
+      for (const [seenKey, seenAt] of seenEvents) {
+        if (now - seenAt > DEDUP_TTL_MS) seenEvents.delete(seenKey);
+      }
+      if (seenEvents.has(key)) return true;
+      seenEvents.set(key, now);
+      return false;
+    };
+
     const handleEvent = (event: AdminOrderWsEvent) => {
+      if (isDuplicateEvent(event)) return;
+
       const code = isCancelledStatus(event.status) ? cachedOrderCode(event.order_public_id) : "";
       void invalidateQueries(event);
 

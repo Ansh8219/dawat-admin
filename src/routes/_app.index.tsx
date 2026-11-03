@@ -1,22 +1,25 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { listBusinesses, setBusinessAcceptingOrders } from "@/lib/api/businesses";
 import { getAdminDashboard } from "@/lib/api/dashboard";
-import {
-  acceptAdminOrder,
-  formatOrderMoney,
-  isOrderStatusConflict,
-  orderStatusLabel,
-  paymentLabel,
-  rejectAdminOrder,
-} from "@/lib/api/orders";
+import { formatOrderMoney } from "@/lib/api/orders";
 import { ApiError } from "@/lib/api/types";
 import type {
   AdminDashboardData,
   Business,
-  DashboardNewOrder,
+  DashboardCategorySales,
+  DashboardHourlySalesPoint,
+  DashboardSalesTrendPoint,
+  DashboardSplitPoint,
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
@@ -35,13 +38,25 @@ import {
   ChefHat,
   CheckCircle2,
   Star,
-  Bike,
-  UtensilsCrossed,
   Loader2,
   CircleDot,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
@@ -50,6 +65,15 @@ export const Route = createFileRoute("/_app/")({
 
 const ORDERABLE_TYPES = new Set(["restaurant", "bakery"]);
 const POLL_MS = 45_000;
+const IST = "Asia/Kolkata";
+
+const CHART_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+];
 
 const stageMeta: {
   id: "new" | "preparing" | "ready" | "done_today";
@@ -96,10 +120,61 @@ function typeLabel(type: string): string {
 }
 
 function salesChangeHint(pct: number | null): string {
-  if (pct == null || Number.isNaN(pct)) return "vs yesterday unavailable";
+  if (pct == null || Number.isNaN(pct)) return "—";
   const rounded = Math.round(pct * 10) / 10;
   const sign = rounded > 0 ? "+" : "";
   return `${sign}${rounded}% vs yesterday`;
+}
+
+function paymentSplitLabel(key: string): string {
+  const known: Record<string, string> = {
+    online: "Online",
+    cod: "Cash on delivery",
+  };
+  return known[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function fulfillmentSplitLabel(key: string): string {
+  const known: Record<string, string> = {
+    delivery: "Delivery",
+    takeaway: "Takeaway",
+    dine_in: "Dine-in",
+  };
+  return known[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Format a UTC hour (0–23) as a local IST clock label. */
+function formatUtcHourIst(hour: number): string {
+  const safe = Math.max(0, Math.min(23, Math.floor(hour)));
+  const d = new Date(Date.UTC(2026, 0, 1, safe, 0, 0));
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(d);
+}
+
+function formatTrendDate(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(d);
+}
+
+function tooltipSurface(style?: CSSProperties): CSSProperties {
+  return {
+    background: "var(--color-card)",
+    border: "1px solid var(--color-border)",
+    borderRadius: 12,
+    color: "var(--color-card-foreground)",
+    fontSize: 12,
+    ...style,
+  };
 }
 
 function Dashboard() {
@@ -124,7 +199,6 @@ function FoodDashboard() {
   const [listError, setListError] = useState("");
   const [dashError, setDashError] = useState("");
   const [toggling, setToggling] = useState(false);
-  const [actingId, setActingId] = useState<string | null>(null);
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -219,14 +293,10 @@ function FoodDashboard() {
     const previous = biz.is_accepting_orders;
     setToggling(true);
     setData((prev) =>
-      prev
-        ? { ...prev, business: { ...prev.business, is_accepting_orders: next } }
-        : prev,
+      prev ? { ...prev, business: { ...prev.business, is_accepting_orders: next } } : prev,
     );
     setBusinesses((prev) =>
-      prev.map((b) =>
-        b.public_id === biz.public_id ? { ...b, is_accepting_orders: next } : b,
-      ),
+      prev.map((b) => (b.public_id === biz.public_id ? { ...b, is_accepting_orders: next } : b)),
     );
     try {
       const updated = await withAuthRetry((token) =>
@@ -248,9 +318,7 @@ function FoodDashboard() {
       toast.success(next ? `${label} — Accepting orders` : `${label} — Closed`);
     } catch (err) {
       setData((prev) =>
-        prev
-          ? { ...prev, business: { ...prev.business, is_accepting_orders: previous } }
-          : prev,
+        prev ? { ...prev, business: { ...prev.business, is_accepting_orders: previous } } : prev,
       );
       setBusinesses((prev) =>
         prev.map((b) =>
@@ -264,42 +332,33 @@ function FoodDashboard() {
     }
   }
 
-  async function acceptOrder(order: DashboardNewOrder) {
-    setActingId(order.public_id);
-    try {
-      await withAuthRetry((token) => acceptAdminOrder(token, order.public_id, 20));
-      toast.success(`${order.public_id.slice(0, 8)} accepted · prep 20 min`);
-      if (selectedId) await loadDashboard(selectedId, { silent: true });
-    } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to accept order");
-      if (isOrderStatusConflict(err) && selectedId) {
-        void loadDashboard(selectedId, { silent: true });
-      }
-    } finally {
-      setActingId(null);
-    }
-  }
-
-  async function rejectOrder(order: DashboardNewOrder) {
-    setActingId(order.public_id);
-    try {
-      await withAuthRetry((token) => rejectAdminOrder(token, order.public_id));
-      toast.success(`${order.public_id.slice(0, 8)} rejected`);
-      if (selectedId) await loadDashboard(selectedId, { silent: true });
-    } catch (err) {
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to reject order");
-      if (isOrderStatusConflict(err) && selectedId) {
-        void loadDashboard(selectedId, { silent: true });
-      }
-    } finally {
-      setActingId(null);
-    }
-  }
-
   const title = data?.business.name || meta.label;
   const accepting = data?.business.is_accepting_orders ?? false;
+
+  const salesTrend = useMemo(
+    () => (data?.sales_trend ?? []).map((p) => ({ ...p, label: formatTrendDate(p.date) })),
+    [data?.sales_trend],
+  );
+
+  const hourlySales = useMemo(() => {
+    const rows = data?.hourly_sales ?? [];
+    let peakHour: number | null = null;
+    let peakSales = -1;
+    for (const row of rows) {
+      if (row.sales > peakSales) {
+        peakSales = row.sales;
+        peakHour = row.hour;
+      }
+    }
+    return {
+      peakHour: peakSales > 0 ? peakHour : null,
+      rows: rows.map((p) => ({
+        ...p,
+        label: formatUtcHourIst(p.hour),
+        isPeak: peakSales > 0 && p.hour === peakHour,
+      })),
+    };
+  }, [data?.hourly_sales]);
 
   if (loadingList) {
     return (
@@ -486,237 +545,115 @@ function FoodDashboard() {
               />
               <Kpi
                 label="Rating"
-                value={data.kpis.rating != null ? String(data.kpis.rating) : "—"}
+                value={data.kpis.rating != null ? String(data.kpis.rating) : "No ratings yet"}
                 icon={Star}
-                hint={`${data.kpis.rating_count} reviews`}
+                hint={
+                  data.kpis.rating_count > 0
+                    ? `${data.kpis.rating_count} reviews`
+                    : "No ratings yet"
+                }
               />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
-              <section className="xl:col-span-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold">New Orders</h2>
-                    {data.counts.new > 0 && (
-                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-                        {data.counts.new}
-                      </span>
-                    )}
-                  </div>
-                  <Link
-                    to="/orders"
-                    className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:underline"
-                  >
-                    Open board <ChevronRight className="h-3 w-3" />
-                  </Link>
-                </div>
+              <ChartCard title="Sales — last 7 days" className="xl:col-span-3">
+                <SalesTrendChart data={salesTrend} />
+              </ChartCard>
+              <ChartCard
+                title="Sales by hour (today)"
+                className="xl:col-span-2"
+                hint={
+                  hourlySales.peakHour != null
+                    ? `Peak ${formatUtcHourIst(hourlySales.peakHour)} IST`
+                    : undefined
+                }
+              >
+                <HourlySalesChart data={hourlySales.rows} />
+              </ChartCard>
+            </div>
 
-                {data.new_orders.length === 0 ? (
-                  <EmptyBlock
-                    icon={UtensilsCrossed}
-                    title="No new orders right now"
-                    subtitle="Incoming orders will appear here to accept."
-                  />
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <ChartCard title="Payment methods">
+                <SplitDonut
+                  data={data.payment_split}
+                  labelFor={paymentSplitLabel}
+                  emptyTitle="No sales yet today"
+                />
+              </ChartCard>
+              <ChartCard title="Order types">
+                <SplitDonut
+                  data={data.fulfillment_split}
+                  labelFor={fulfillmentSplitLabel}
+                  emptyTitle="No sales yet today"
+                />
+              </ChartCard>
+              <ChartCard title="Top categories today" className="md:col-span-2 xl:col-span-1">
+                <CategoryBars data={data.category_sales} />
+              </ChartCard>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <section className="rounded-2xl border bg-card p-4 shadow-soft">
+                <h2 className="mb-3 text-sm font-bold">Top Selling</h2>
+                {data.top_selling.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-muted-foreground">
+                    No sales yet today
+                  </p>
                 ) : (
-                  <div className="space-y-3">
-                    {data.new_orders.map((order) => (
-                      <article
-                        key={order.public_id}
-                        className="overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-soft ring-1 ring-primary/10"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3 p-4">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                                {order.address?.address_type || "Delivery"}
-                              </span>
-                              <span className="text-sm font-bold">
-                                {order.public_id.slice(0, 8)}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {orderStatusLabel(order.status)}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {order.created_at
-                                  ? new Date(order.created_at).toLocaleString("en-IN", {
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                    })
-                                  : ""}
-                              </span>
-                            </div>
-                            <div className="mt-1 text-sm font-semibold">
-                              {order.address?.full_name?.trim() || "Customer"}
-                            </div>
-                            {order.address?.phone && (
-                              <div className="text-xs text-muted-foreground">
-                                {order.address.phone}
-                              </div>
-                            )}
-                            <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
-                              {(order.items ?? []).map((it) => (
-                                <li key={it.public_id}>
-                                  <span className="font-semibold text-foreground">
-                                    {it.quantity}×
-                                  </span>{" "}
-                                  {it.name || "Item"}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold">
-                              {formatOrderMoney(order.total ?? order.subtotal ?? 0)}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {paymentLabel(order.payment_method)}
-                            </div>
+                  <div className="space-y-2">
+                    {data.top_selling.map((m, i) => (
+                      <div key={m.public_id} className="flex items-center gap-3">
+                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                          {i + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">{m.name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {m.category || "—"}
                           </div>
                         </div>
-                        <div className="flex border-t">
-                          <button
-                            type="button"
-                            disabled={actingId === order.public_id}
-                            onClick={() => void rejectOrder(order)}
-                            className="flex-1 bg-muted/40 py-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actingId === order.public_id}
-                            onClick={() => void acceptOrder(order)}
-                            className="flex-[1.4] bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                          >
-                            Accept
-                          </button>
-                        </div>
-                      </article>
+                        <div className="text-xs font-semibold">{m.sold_today} sold</div>
+                      </div>
                     ))}
                   </div>
                 )}
               </section>
 
-              <aside className="space-y-5 xl:col-span-2">
-                <section className="rounded-2xl border bg-card p-4 shadow-soft">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-bold">In Kitchen</h2>
-                    <Link
-                      to="/orders"
-                      className="text-xs font-semibold text-primary hover:underline"
-                    >
-                      View all
-                    </Link>
-                  </div>
-                  {data.kitchen_orders.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-muted-foreground">
-                      Nothing preparing right now
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {data.kitchen_orders.map((o) => {
-                        const preparing =
-                          o.status === "preparing" || o.status === "accepted";
-                        return (
-                          <button
-                            key={o.public_id}
-                            type="button"
-                            onClick={() => void navigate({ to: "/orders" })}
-                            className="flex w-full items-center gap-3 rounded-xl border border-border/70 p-3 text-left hover:bg-muted/40"
-                          >
-                            <div
-                              className={cn(
-                                "grid h-9 w-9 place-items-center rounded-lg",
-                                preparing
-                                  ? "bg-info/10 text-info"
-                                  : "bg-success/10 text-success",
-                              )}
-                            >
-                              {preparing ? (
-                                <ChefHat className="h-4 w-4" />
-                              ) : (
-                                <Bike className="h-4 w-4" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-semibold">
-                                {o.public_id.slice(0, 8)}
-                              </div>
-                              <div className="truncate text-xs text-muted-foreground">
-                                {o.driver?.full_name
-                                  ? `${o.driver.full_name} · ${o.driver.phone || "—"}`
-                                  : `${o.customer_name || "Customer"} · ${o.item_count} items`}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-xs font-semibold">
-                                {orderStatusLabel(o.status)}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                {formatOrderMoney(o.total ?? 0)}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-
-                <section className="rounded-2xl border bg-card p-4 shadow-soft">
-                  <div className="mb-3 flex items-center gap-2">
+              <section className="rounded-2xl border bg-card p-4 shadow-soft">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
                     <PackageX className="h-4 w-4 text-warning" />
                     <h2 className="text-sm font-bold">Stock Alerts</h2>
                   </div>
-                  {data.stock_alerts.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      Stock looks healthy
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {data.stock_alerts.map((i) => (
-                        <div
-                          key={i.public_id}
-                          className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{i.name}</div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {i.available} {i.unit} left · reorder at {i.reorder_level}
-                            </div>
+                  <Link
+                    to="/inventory"
+                    className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:underline"
+                  >
+                    View all <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                {data.stock_alerts.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-muted-foreground">
+                    Stock looks healthy
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.stock_alerts.map((i) => (
+                      <div
+                        key={i.public_id}
+                        className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{i.name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {i.available} {i.unit} left · reorder at {i.reorder_level}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="rounded-2xl border bg-card p-4 shadow-soft">
-                  <h2 className="mb-3 text-sm font-bold">Top Selling</h2>
-                  {data.top_selling.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      No sales yet today
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {data.top_selling.map((m, i) => (
-                        <div key={m.public_id} className="flex items-center gap-3">
-                          <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                            {i + 1}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium">{m.name}</div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {m.category || "—"}
-                            </div>
-                          </div>
-                          <div className="text-xs font-semibold">{m.sold_today} sold</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </aside>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           </>
         ) : null}
@@ -725,20 +662,233 @@ function FoodDashboard() {
   );
 }
 
-function EmptyBlock({
-  icon: Icon,
+function ChartCard({
   title,
-  subtitle,
+  hint,
+  className,
+  children,
 }: {
-  icon: typeof UtensilsCrossed;
   title: string;
-  subtitle: string;
+  hint?: string;
+  className?: string;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 py-12 text-center">
-      <Icon className="mb-2 h-8 w-8 text-muted-foreground" />
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+    <section className={cn("rounded-2xl border bg-card p-4 shadow-soft", className)}>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h2 className="text-sm font-bold">{title}</h2>
+        {hint ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ChartEmpty({ title }: { title: string }) {
+  return (
+    <div className="flex h-48 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground">
+      {title}
+    </div>
+  );
+}
+
+function SalesTrendChart({ data }: { data: Array<DashboardSalesTrendPoint & { label: string }> }) {
+  if (data.length === 0) {
+    return <ChartEmpty title="No sales yet today" />;
+  }
+  return (
+    <div className="h-56 w-full sm:h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="dashSalesTrend" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <XAxis
+            dataKey="label"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--color-muted-foreground)"
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--color-muted-foreground)"
+            width={44}
+            tickFormatter={(v: number) =>
+              v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)
+            }
+          />
+          <Tooltip
+            contentStyle={tooltipSurface()}
+            formatter={(value: number, _name, item) => {
+              const orders = (item?.payload as DashboardSalesTrendPoint | undefined)?.orders ?? 0;
+              return [`${formatOrderMoney(value)} · ${orders} orders`, "Sales"];
+            }}
+            labelFormatter={(label) => String(label)}
+          />
+          <Area
+            type="monotone"
+            dataKey="sales"
+            stroke="var(--color-primary)"
+            strokeWidth={2.5}
+            fill="url(#dashSalesTrend)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function HourlySalesChart({
+  data,
+}: {
+  data: Array<DashboardHourlySalesPoint & { label: string; isPeak: boolean }>;
+}) {
+  if (data.length === 0) {
+    return <ChartEmpty title="No sales yet today" />;
+  }
+  return (
+    <div className="h-56 w-full sm:h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <XAxis
+            dataKey="label"
+            fontSize={9}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--color-muted-foreground)"
+            interval={3}
+            minTickGap={8}
+          />
+          <YAxis
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--color-muted-foreground)"
+            width={40}
+            tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
+          />
+          <Tooltip
+            contentStyle={tooltipSurface()}
+            formatter={(value: number, _name, item) => {
+              const orders = (item?.payload as DashboardHourlySalesPoint | undefined)?.orders ?? 0;
+              return [`${formatOrderMoney(value)} · ${orders} orders`, "Sales"];
+            }}
+            labelFormatter={(label) => `${label} IST`}
+          />
+          <Bar dataKey="sales" radius={[4, 4, 0, 0]}>
+            {data.map((entry) => (
+              <Cell
+                key={entry.hour}
+                fill={entry.isPeak ? "var(--color-primary)" : "var(--color-chart-2)"}
+                fillOpacity={entry.isPeak ? 1 : 0.45}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function SplitDonut({
+  data,
+  labelFor,
+  emptyTitle,
+}: {
+  data: DashboardSplitPoint[];
+  labelFor: (key: string) => string;
+  emptyTitle: string;
+}) {
+  if (data.length === 0) {
+    return <ChartEmpty title={emptyTitle} />;
+  }
+  const rows = data.map((d) => ({
+    ...d,
+    name: labelFor(d.key),
+  }));
+  return (
+    <div className="flex h-48 flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mx-auto h-40 w-40 shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={rows}
+              dataKey="sales"
+              nameKey="name"
+              innerRadius="58%"
+              outerRadius="88%"
+              paddingAngle={2}
+              stroke="var(--color-card)"
+            >
+              {rows.map((entry, i) => (
+                <Cell key={entry.key} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={tooltipSurface()}
+              formatter={(value: number, _name, item) => {
+                const payload = item?.payload as DashboardSplitPoint | undefined;
+                const orders = payload?.orders ?? 0;
+                const share = payload?.share_pct ?? 0;
+                return [`${formatOrderMoney(value)} · ${orders} orders · ${share}%`, "Sales"];
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="min-w-0 flex-1 space-y-1.5">
+        {rows.map((row, i) => (
+          <li key={row.key} className="flex items-center justify-between gap-2 text-xs">
+            <span className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
+              />
+              <span className="truncate font-medium">{row.name}</span>
+            </span>
+            <span className="shrink-0 text-muted-foreground">{row.share_pct}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CategoryBars({ data }: { data: DashboardCategorySales[] }) {
+  if (data.length === 0) {
+    return <ChartEmpty title="No sales yet today" />;
+  }
+  const max = Math.max(...data.map((d) => d.sales), 1);
+  return (
+    <div className="space-y-3">
+      {data.map((row) => {
+        const pct = Math.max(4, Math.round((row.sales / max) * 100));
+        return (
+          <div key={row.name} className="space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="truncate font-medium">{row.name}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {formatOrderMoney(row.sales)} · {row.share_pct}%
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

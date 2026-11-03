@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   formatPartnerDate,
   formatPartnerPhone,
+  formatRupees,
   listPartners,
   partnerStatusLabel,
 } from "@/lib/api/partners";
@@ -324,12 +325,13 @@ function PeoplePage() {
               rangeEnd={rangeEnd}
               onPrev={() => setPage((p) => Math.max(1, p - 1))}
               onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-              colSpan={6}
+              colSpan={7}
               headers={
                 <>
                   <th className="px-4 py-3 text-left font-medium">Partner</th>
                   <th className="px-4 py-3 text-left font-medium">Phone</th>
                   <th className="px-4 py-3 text-left font-medium">Email</th>
+                  <th className="px-4 py-3 text-left font-medium">Wallet</th>
                   <th className="px-4 py-3 text-left font-medium">Submitted</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
                   <th className="px-4 py-3 text-right font-medium">Action</th>
@@ -373,6 +375,16 @@ function PeoplePage() {
                       <Mail className="h-3 w-3 shrink-0" />
                       <span className="max-w-[200px] truncate">{p.email || "—"}</span>
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    <div className="font-medium text-foreground">
+                      {formatRupees(p.wallet?.balance)}
+                    </div>
+                    <div className="text-muted-foreground">owed</div>
+                    <div className="mt-1 font-medium text-foreground">
+                      {formatRupees(p.wallet?.cash_pending)}
+                    </div>
+                    <div className="text-muted-foreground">cash pending</div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">

@@ -14,22 +14,32 @@ function normalizeOrder(order: AdminOrder): AdminOrder {
     payment_method: order.payment_method ?? null,
     payment_status: order.payment_status ?? null,
     subtotal: order.subtotal ?? 0,
+    discount_amount: order.discount_amount ?? 0,
+    tip_amount: order.tip_amount ?? 0,
+    tip_source: order.tip_source ?? null,
+    applied_offer: order.applied_offer ?? null,
     distance_km: order.distance_km ?? null,
     delivery_fee: order.delivery_fee ?? null,
     total: order.total ?? null,
     fulfillment_type: order.fulfillment_type ?? null,
     table: order.table ?? null,
+    customer: order.customer ?? null,
     preparation_minutes: order.preparation_minutes ?? null,
+    item_count: order.item_count ?? null,
     order_code: order.order_code ?? null,
     reject_reason: order.reject_reason ?? null,
     cancelled_at: order.cancelled_at ?? null,
     cancel_reason: order.cancel_reason ?? null,
+    created_at: order.created_at ?? order.ordered_at ?? "",
+    ordered_at: order.ordered_at ?? order.created_at ?? null,
     delivered_at: order.delivered_at ?? null,
     waiting_seconds: order.waiting_seconds ?? null,
     delivery_status: order.delivery_status ?? null,
     driver_accepted_at: order.driver_accepted_at ?? null,
     driver: order.driver ?? null,
     address: order.address ?? null,
+    pickup: order.pickup ?? null,
+    businesses: order.businesses ?? [],
     items: order.items ?? [],
   };
 }
@@ -65,7 +75,7 @@ export function rejectAdminOrder(accessToken: string, publicId: string, reason?:
   return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/reject/`, {
     method: "POST",
     accessToken,
-    body: trimmed ? { reason: trimmed } : {},
+    body: { reason: trimmed ? trimmed : null },
   }).then(normalizeOrder);
 }
 
@@ -84,6 +94,17 @@ export function startAdminOrderPreparing(accessToken: string, publicId: string) 
 }
 
 /**
+ * POST /api/admin/orders/{public_id}/collected/ — completes a ready app takeaway
+ * order (no dining table). Status → delivered; GST invoice is issued.
+ */
+export function collectAdminOrder(accessToken: string, publicId: string) {
+  return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/collected/`, {
+    method: "POST",
+    accessToken,
+  }).then(normalizeOrder);
+}
+
+/**
  * POST /api/admin/orders/{public_id}/handover/ — completes a ready QR table order
  * (status → delivered). The GST invoice is issued at this moment.
  */
@@ -95,8 +116,8 @@ export function handoverAdminOrder(accessToken: string, publicId: string) {
 }
 
 /**
- * GET /api/admin/orders/{public_id}/ — used to open an order linked from an invoice.
- * Not in the invoices handoff; callers must handle failure.
+ * There is no GET /api/admin/orders/{public_id}/ on the backend today.
+ * Callers (invoice deep-link) must handle 404 and fall back to the board.
  */
 export function getAdminOrder(accessToken: string, publicId: string) {
   return apiRequest<AdminOrder>(`/api/admin/orders/${publicId}/`, {
@@ -105,17 +126,39 @@ export function getAdminOrder(accessToken: string, publicId: string) {
   }).then(normalizeOrder);
 }
 
-/** QR table order: dine-in or counter takeaway placed from a table QR. */
-export function isQrTableOrder(order: Pick<AdminOrder, "table" | "fulfillment_type">): boolean {
-  if (order.table) return true;
-  return order.fulfillment_type === "dine_in" || order.fulfillment_type === "takeaway";
+/** QR table order: placed from a dining-table QR (dine-in or counter takeaway). */
+export function isQrTableOrder(order: Pick<AdminOrder, "table">): boolean {
+  return Boolean(order.table);
 }
 
-/** Only ready QR table orders are handed over by staff; delivery and app pickup are not. */
+/**
+ * App takeaway / pickup: takeaway fulfillment with no dining table.
+ * Staff mark these collected at the counter (not handover, not driver).
+ */
+export function isAppTakeawayOrder(order: Pick<AdminOrder, "table" | "fulfillment_type">): boolean {
+  return order.fulfillment_type === "takeaway" && !order.table;
+}
+
+export function isDeliveryOrder(order: Pick<AdminOrder, "fulfillment_type">): boolean {
+  return order.fulfillment_type === "delivery";
+}
+
+/** Only ready QR table orders are handed over by staff. */
 export function canHandoverOrder(
   order: Pick<AdminOrder, "status" | "table" | "fulfillment_type">,
 ): boolean {
-  return order.status === "ready_for_pickup" && isQrTableOrder(order);
+  return isReadyForStaffComplete(order.status) && isQrTableOrder(order);
+}
+
+/** Only ready app takeaway orders are marked collected by staff. */
+export function canCollectOrder(
+  order: Pick<AdminOrder, "status" | "table" | "fulfillment_type">,
+): boolean {
+  return isReadyForStaffComplete(order.status) && isAppTakeawayOrder(order);
+}
+
+function isReadyForStaffComplete(status: string | undefined): boolean {
+  return status === "ready_for_pickup" || status === "ready";
 }
 
 export function fulfillmentLabel(type: string | null | undefined): string {
@@ -140,7 +183,7 @@ export function orderTableLabel(
   return number ? `Table ${number} · ${kind}` : kind;
 }
 
-/** Order code (e.g. ORD123) when the API sends one, else a short public id. */
+/** Order code when present, else a short public id. */
 export function orderDisplayCode(order: Pick<AdminOrder, "public_id" | "order_code">): string {
   return order.order_code?.trim() || order.public_id.slice(0, 8);
 }
@@ -170,11 +213,16 @@ export function formatCancelledAt(value: string | null | undefined): string | nu
 }
 
 export function orderCustomerName(order: AdminOrder): string {
-  return order.address?.full_name?.trim() || "Customer";
+  return order.customer?.full_name?.trim() || order.address?.full_name?.trim() || "Customer";
 }
 
 export function orderPhone(order: AdminOrder): string {
-  return order.address?.phone?.trim() || "—";
+  const fromAddress = order.address?.phone?.trim();
+  if (fromAddress) return fromAddress;
+  const code = order.customer?.country_code?.trim() ?? "";
+  const number = order.customer?.phone_number?.trim() ?? "";
+  const combined = `${code}${number}`.trim();
+  return combined || "—";
 }
 
 export function orderAddressLine(order: AdminOrder): string {
@@ -187,15 +235,18 @@ export function orderAddressLine(order: AdminOrder): string {
 }
 
 export function orderItemCount(order: AdminOrder): number {
+  if (order.item_count != null) return order.item_count;
   return (order.items ?? []).reduce((sum, item) => sum + (item.quantity || 0), 0);
 }
 
+/** Admin-facing "new" tab status (DB `new` is mapped to `placed`). */
 export function isPlacedStatus(status: string | undefined): boolean {
-  return status === "placed";
+  return status === "placed" || status === "new";
 }
 
 export function isReadyTrackStatus(status: string | undefined): boolean {
   return (
+    status === "ready" ||
     status === "ready_for_pickup" ||
     status === "driver_assigned" ||
     status === "driver_at_restaurant" ||
@@ -210,11 +261,12 @@ export function showsSincePlacedClock(tab: AdminOrderTab): boolean {
 }
 
 export function sincePlacedSeconds(
-  order: Pick<AdminOrder, "created_at" | "waiting_seconds">,
+  order: Pick<AdminOrder, "created_at" | "ordered_at" | "waiting_seconds">,
   now: number,
   loadedAt: number,
 ): number | null {
-  const created = new Date(order.created_at).getTime();
+  const raw = order.created_at || order.ordered_at;
+  const created = raw ? new Date(raw).getTime() : NaN;
   if (!Number.isNaN(created)) {
     return Math.max(0, Math.floor((now - created) / 1000));
   }
@@ -249,7 +301,9 @@ export function paymentStatusLabel(status: string | null | undefined): string {
   const key = status?.trim().toLowerCase();
   if (!key) return "—";
   if (key === "unpaid") return "Unpaid";
+  if (key === "pending") return "Pending";
   if (key === "paid") return "Paid";
+  if (key === "failed") return "Failed";
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -264,11 +318,13 @@ export function formatDeliveredAt(value: string | null | undefined): string | nu
 export function orderStatusLabel(status: AdminOrderStatus | string | undefined): string {
   switch (status) {
     case "placed":
-      return "Placed";
+    case "new":
+      return "New";
     case "accepted":
       return "Accepted";
     case "preparing":
       return "Preparing";
+    case "ready":
     case "ready_for_pickup":
       return "Ready for pickup";
     case "driver_assigned":
@@ -282,11 +338,15 @@ export function orderStatusLabel(status: AdminOrderStatus | string | undefined):
     case "rejected":
       return "Rejected";
     case "delivered":
+    case "past":
       return "Delivered";
     case "cancelled":
       return "Cancelled";
-    default:
-      return status?.replace(/_/g, " ").trim() || "Unknown";
+    default: {
+      const raw = status?.replace(/_/g, " ").trim();
+      if (!raw) return "Unknown";
+      return raw.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
   }
 }
 
@@ -294,6 +354,13 @@ export function tabForStatus(status: string): AdminOrderTab | null {
   if (isPlacedStatus(status)) return "new";
   if (status === "accepted" || status === "preparing") return "preparing";
   if (isReadyTrackStatus(status)) return "ready";
-  if (status === "rejected" || status === "delivered" || status === "cancelled") return "past";
+  if (
+    status === "rejected" ||
+    status === "delivered" ||
+    status === "cancelled" ||
+    status === "past"
+  ) {
+    return "past";
+  }
   return null;
 }

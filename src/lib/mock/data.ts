@@ -476,7 +476,7 @@ export const staff = [
 ];
 
 export const roles = ["Admin","Manager","Store Keeper","Cashier","Driver","Chef"];
-export const modules = ["Dashboard","Orders","POS","Menu","Inventory","Bookings","Customers","Marketing","People","Finance","Reports","Settings"];
+export const modules = ["Dashboard","Orders","POS","Menu","Inventory","Bookings","Customers","Marketing","People","Analytics","Settings"];
 
 export const notifications = [
   { id: 1, type: "inventory", title: "Cocoa Powder is critically low", body: "4 Kg remaining · Reorder level 8 Kg", time: "10 min ago", priority: "high",   read: false, group: "Today" },
