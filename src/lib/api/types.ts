@@ -351,15 +351,25 @@ export interface CustomerSummary {
 export interface Customer {
   public_id: string;
   full_name: string | null;
-  country_code: string;
-  phone_number: string;
-  /** Level key, e.g. "foodie". */
-  tier: string;
-  /** Level display name, e.g. "Foodie". */
-  tier_name: string;
+  country_code: string | null;
+  phone_number: string | null;
+  email: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  joined_at: string | null;
+  last_login: string | null;
+  /** Level key, e.g. "foodie". Null if the profile is incomplete. */
+  tier: string | null;
+  /** Level display name, e.g. "Foodie". Null if the profile is incomplete. */
+  tier_name: string | null;
   profile_picture_url: string | null;
-  orders_count: number | null;
-  ltv: number | null;
+  /** Completed (delivered/past) orders only. 0 if none. */
+  orders_count: number;
+  /** Sum of completed order totals. 0.0 if none. */
+  ltv: number;
+  /** ltv / orders_count. 0.0 if no orders. */
+  avg_order_value: number;
+  /** YYYY-MM-DD of last completed order, or null. */
   last_order_date: string | null;
   is_active: boolean;
 }
@@ -1220,26 +1230,30 @@ export interface OfferListData {
   results: Offer[];
 }
 
+/** Form fields for POST /api/admin/offers/ (multipart). Image is a separate file. */
 export interface CreateOfferPayload {
   code: string;
   title: string;
-  description: string;
+  description?: string;
   terms?: string | null;
-  image?: string | null;
   discount_type: OfferDiscountType;
   discount_value: number;
   max_discount?: number | null;
-  min_order_amount: number;
-  usage_limit: number | null;
-  per_user_limit: number;
+  min_order_amount?: number;
+  usage_limit?: number | null;
+  per_user_limit?: number;
   valid_from: string;
   valid_until: string;
   channels: OfferChannel[];
-  is_active: boolean;
+  is_active?: boolean;
   sort_order?: number;
 }
 
-export type UpdateOfferPayload = Partial<CreateOfferPayload>;
+/** PATCH /api/admin/offers/{public_id}/ — multipart; image file is passed separately. */
+export type UpdateOfferPayload = Partial<CreateOfferPayload> & {
+  /** When true (and no new image file), the existing offer image is removed. */
+  remove_image?: boolean;
+};
 
 export interface ToggleOfferActivePayload {
   is_active: boolean;

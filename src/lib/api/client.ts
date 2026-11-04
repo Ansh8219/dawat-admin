@@ -22,10 +22,14 @@ type FormRequestOptions = {
   signal?: AbortSignal;
 };
 
+function isFastApiDetailBody(raw: unknown): raw is { detail: unknown } {
+  return Boolean(raw && typeof raw === "object" && !("success" in raw) && "detail" in raw);
+}
+
 async function parseEnvelope<T>(response: Response): Promise<T> {
-  let envelope: ApiEnvelope<T> | null = null;
+  let raw: unknown = null;
   try {
-    envelope = (await response.json()) as ApiEnvelope<T>;
+    raw = await response.json();
   } catch {
     throw new ApiError(
       response.status,
@@ -33,6 +37,17 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
       `Unexpected response (${response.status}).`,
     );
   }
+
+  if (isFastApiDetailBody(raw)) {
+    const detail = raw.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : formatValidationDetails(detail) || `Unexpected response (${response.status}).`;
+    throw new ApiError(response.status, "validation_error", message, detail);
+  }
+
+  const envelope = raw as ApiEnvelope<T>;
 
   if (envelope.success && envelope.data !== null) {
     return envelope.data;
@@ -196,7 +211,11 @@ function formatValidationDetails(details: unknown): string | null {
   if (!details) return null;
   if (typeof details === "string") return details;
   if (Array.isArray(details)) {
-    const parts = details.map((d) => (typeof d === "string" ? d : JSON.stringify(d)));
+    const parts = details.map((d) => {
+      if (typeof d === "string") return d;
+      if (d && typeof d === "object" && "msg" in d) return String((d as { msg: unknown }).msg);
+      return JSON.stringify(d);
+    });
     return parts.filter(Boolean).join(" ");
   }
   if (typeof details === "object") {

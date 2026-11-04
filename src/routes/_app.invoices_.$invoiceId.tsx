@@ -2,15 +2,24 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { useCallback, useEffect, useState } from "react";
 import { InvoiceDocument } from "@/components/app/invoice-document";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { downloadInvoiceDetailCsv } from "@/lib/invoice-export";
 import { getInvoice } from "@/lib/api/invoices";
 import { ApiError } from "@/lib/api/types";
 import type { InvoiceDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { ArrowLeft, ExternalLink, Loader2, Printer } from "lucide-react";
+import { z } from "zod";
+import { ArrowLeft, Download, ExternalLink, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/invoices_/$invoiceId")({
   component: InvoiceDetailPage,
+  validateSearch: z.object({ print: z.boolean().optional().catch(undefined) }),
   head: () => ({ meta: [{ title: "Tax Invoice — Daawat Baker's" }] }),
 });
 
@@ -54,6 +63,14 @@ function InvoiceDetailPage() {
     };
   }, [invoice]);
 
+  // Opened via the list's "PDF" action: open the print dialog once loaded.
+  const autoPrint = Route.useSearch().print;
+  useEffect(() => {
+    if (!autoPrint || !invoice) return;
+    const t = window.setTimeout(() => window.print(), 400);
+    return () => window.clearTimeout(t);
+  }, [autoPrint, invoice]);
+
   function goBack() {
     if (window.history.length > 1) router.history.back();
     else void navigate({ to: "/invoices" });
@@ -73,9 +90,19 @@ function InvoiceDetailPage() {
               </Link>
             </Button>
           )}
-          <Button className="gap-2 rounded-xl" disabled={!invoice} onClick={() => window.print()}>
-            <Printer className="h-4 w-4" /> Print
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="gap-2 rounded-xl" disabled={!invoice}>
+                <Download className="h-4 w-4" /> Download
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => invoice && downloadInvoiceDetailCsv(invoice)}>
+                CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => window.print()}>PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

@@ -39,9 +39,11 @@ import { ApiError } from "@/lib/api/types";
 import type { Customer, CustomerSort, CustomerSummary, RewardTier } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { inr } from "@/lib/mock/data";
 import { cn } from "@/lib/utils";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Search,
   Users,
   Star,
@@ -95,14 +97,43 @@ function initials(name: string | null | undefined): string {
     .toUpperCase();
 }
 
-function formatLastOrder(value: string | null): string {
+function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
-  const d = new Date(value);
+  const raw = value.slice(0, 10);
+  const d = new Date(`${raw}T00:00:00`);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
+  });
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatGender(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "—";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+function inrMoney(n: number): string {
+  return n.toLocaleString("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -233,10 +264,14 @@ function CustomersPage() {
         updateCustomer(token, customer.public_id, { is_active: next }),
       );
       setResults((prev) =>
-        prev.map((c) => (c.public_id === customer.public_id ? { ...c, ...updated } : c)),
+        prev.map((c) =>
+          c.public_id === customer.public_id ? { ...c, is_active: updated.is_active } : c,
+        ),
       );
       setSel((prev) =>
-        prev?.public_id === customer.public_id ? { ...prev, ...updated } : prev,
+        prev?.public_id === customer.public_id
+          ? { ...prev, is_active: updated.is_active }
+          : prev,
       );
       toast.success(
         next
@@ -368,15 +403,35 @@ function CustomersPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[1180px] text-sm">
                     <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                       <tr>
                         <th className="px-4 py-3 text-left font-medium">Customer</th>
                         <th className="px-4 py-3 text-left font-medium">Contact</th>
-                        <th className="px-4 py-3 text-right font-medium">Orders</th>
+                        <th className="px-4 py-3 text-right font-medium">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 font-medium uppercase hover:text-foreground"
+                            onClick={() =>
+                              setSort((s) => (s === "orders_desc" ? "orders_asc" : "orders_desc"))
+                            }
+                          >
+                            Orders
+                            {sort === "orders_desc" ? (
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            ) : sort === "orders_asc" ? (
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                            )}
+                          </button>
+                        </th>
                         <th className="px-4 py-3 text-right font-medium">LTV</th>
+                        <th className="px-4 py-3 text-right font-medium">Avg order</th>
+                        <th className="px-4 py-3 text-left font-medium">Last order</th>
+                        <th className="px-4 py-3 text-left font-medium">Joined</th>
+                        <th className="px-4 py-3 text-left font-medium">Last login</th>
                         <th className="px-4 py-3 text-left font-medium">Level</th>
-                        <th className="px-4 py-3 text-left font-medium">Last Order</th>
                         <th className="px-4 py-3 text-left font-medium">Status</th>
                         <th className="px-4 py-3 text-right font-medium">Actions</th>
                       </tr>
@@ -385,7 +440,7 @@ function CustomersPage() {
                       {results.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={11}
                             className="px-4 py-16 text-center text-sm text-muted-foreground"
                           >
                             No customers found.
@@ -423,19 +478,28 @@ function CustomersPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">
-                              {formatCustomerPhone(c)}
+                              {formatCustomerPhone(c) || "—"}
                             </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {c.orders_count ?? "—"}
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {c.orders_count}
                             </td>
-                            <td className="px-4 py-3 text-right font-semibold">
-                              {c.ltv == null ? "—" : inr(c.ltv)}
+                            <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                              {inrMoney(c.ltv)}
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                              {inrMoney(c.avg_order_value)}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDate(c.last_order_date)}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDateTime(c.joined_at)}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDateTime(c.last_login)}
                             </td>
                             <td className="px-4 py-3">
                               <StatusBadge status={levelName(c)} />
-                            </td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">
-                              {formatLastOrder(c.last_order_date)}
                             </td>
                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
@@ -592,27 +656,57 @@ function CustomersPage() {
                       </Avatar>
                       <div>
                         <div className="text-sm text-muted-foreground">
-                          {formatCustomerPhone(sel)}
+                          {formatCustomerPhone(sel) || "—"}
                         </div>
                         <div className="mt-1">
                           <StatusBadge status={sel.is_active ? "Active" : "Inactive"} />
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Stat
-                        label="Orders"
-                        value={sel.orders_count == null ? "—" : String(sel.orders_count)}
-                      />
-                      <Stat label="LTV" value={sel.ltv == null ? "—" : inr(sel.ltv)} />
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Stat label="Orders" value={String(sel.orders_count)} />
+                      <Stat label="LTV" value={inrMoney(sel.ltv)} />
+                      <Stat label="Avg order" value={inrMoney(sel.avg_order_value)} />
                       <Stat label="Level" value={levelName(sel)} />
                     </div>
-                    <div className="rounded-xl border p-3 text-sm">
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">
-                        Last order
+                    <dl className="grid grid-cols-2 gap-3 rounded-xl border p-3 text-sm">
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Email
+                        </dt>
+                        <dd className="mt-1 break-all">{sel.email?.trim() || "—"}</dd>
                       </div>
-                      <div className="mt-1">{formatLastOrder(sel.last_order_date)}</div>
-                    </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Gender
+                        </dt>
+                        <dd className="mt-1">{formatGender(sel.gender)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Date of birth
+                        </dt>
+                        <dd className="mt-1">{formatDate(sel.date_of_birth)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Last order
+                        </dt>
+                        <dd className="mt-1">{formatDate(sel.last_order_date)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Joined
+                        </dt>
+                        <dd className="mt-1">{formatDateTime(sel.joined_at)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          Last login
+                        </dt>
+                        <dd className="mt-1">{formatDateTime(sel.last_login)}</dd>
+                      </div>
+                    </dl>
                     <div className="flex items-center justify-between rounded-xl border p-3">
                       <div>
                         <div className="text-sm font-medium">Account active</div>

@@ -11,6 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { getInvoice } from "@/lib/api/invoices";
 import { listBusinesses } from "@/lib/api/businesses";
 import {
   formatInvoiceAmount,
@@ -25,7 +32,24 @@ import type { Business, InvoiceListData } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, FileText, Loader2, RefreshCw, Search, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  downloadInvoiceDetailCsv,
+  downloadInvoicesCsv,
+  fetchAllInvoices,
+  printInvoicePdf,
+  printInvoicesPdf,
+} from "@/lib/invoice-export";
+import { toast } from "sonner";
 import { z } from "zod";
 
 const ymd = z
@@ -74,6 +98,8 @@ function InvoicesPage() {
   const [data, setData] = useState<InvoiceListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
 
   const rangeError =
     search.from && search.to && search.from > search.to
@@ -176,6 +202,47 @@ function InvoicesPage() {
     void load();
   }, [load]);
 
+  const downloadOne = async (publicId: string) => {
+    try {
+      const inv = await withAuthRetry((token) => getInvoice(token, publicId));
+      downloadInvoiceDetailCsv(inv);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      toast.error(err instanceof ApiError ? err.message : "Download failed.");
+    }
+  };
+
+  const exportInvoices = async (kind: "csv" | "pdf") => {
+    setExporting(kind);
+    try {
+      const { rows, totals: allTotals } = await withAuthRetry((token) =>
+        fetchAllInvoices(token, {
+          business_public_id: search.business,
+          date_from: search.from,
+          date_to: search.to,
+          search: search.q,
+        }),
+      );
+      if (rows.length === 0) {
+        toast.error("No invoices to export.");
+        return;
+      }
+      if (kind === "csv") downloadInvoicesCsv(rows);
+      else {
+        const biz =
+          businesses.find((b) => b.public_id === search.business)?.name ?? "All businesses";
+        const range =
+          search.from || search.to ? `${search.from ?? "…"} to ${search.to ?? "…"}` : "All dates";
+        printInvoicesPdf(rows, allTotals, `${biz} · ${range}`);
+      }
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      toast.error(err instanceof ApiError ? err.message : "Export failed.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   const count = data?.count ?? 0;
   const totals = data?.totals;
   const results = data?.results ?? [];
@@ -192,14 +259,36 @@ function InvoicesPage() {
         crumbs={["Admin", "Invoices"]}
         description="GST tax invoices issued automatically when food orders are completed. Invoices can't be edited once issued."
         action={
-          <Button
-            variant="outline"
-            className="gap-2 rounded-xl"
-            disabled={loading}
-            onClick={() => void load()}
-          >
-            <RefreshCw className="h-4 w-4" /> Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="gap-2 rounded-xl"
+                  disabled={!!exporting || !!rangeError}
+                >
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}{" "}
+                  Download
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void exportInvoices("csv")}>CSV</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportInvoices("pdf")}>PDF</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              className="gap-2 rounded-xl"
+              disabled={loading}
+              onClick={() => void load()}
+            >
+              <RefreshCw className="h-4 w-4" /> Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -356,12 +445,13 @@ function InvoicesPage() {
                       <th className="px-4 py-3 text-right font-medium">GST</th>
                       <th className="px-4 py-3 text-right font-medium">Total</th>
                       <th className="px-4 py-3 text-left font-medium">Order</th>
+                      <th className="px-4 py-3 text-right font-medium">Download</th>
                     </tr>
                   </thead>
                   <tbody>
                     {results.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-16 text-center text-muted-foreground">
+                        <td colSpan={11} className="px-4 py-16 text-center text-muted-foreground">
                           <FileText className="mx-auto mb-2 h-7 w-7" />
                           {rangeError
                             ? "Fix the date range to see invoices."
@@ -438,6 +528,32 @@ function InvoicesPage() {
                             >
                               {inv.order_public_id.slice(0, 8)}
                             </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  title="Download invoice"
+                                  aria-label="Download invoice"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onSelect={() => void downloadOne(inv.public_id)}>
+                                  CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => printInvoicePdf(inv.public_id)}>
+                                  PDF
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))

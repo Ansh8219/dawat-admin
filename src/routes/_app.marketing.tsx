@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -54,12 +54,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  ImagePlus,
   IndianRupee,
   Loader2,
   Percent,
   Plus,
   Search,
   Ticket,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -216,7 +218,6 @@ function buildCreatePayload(form: OfferForm): CreateOfferPayload | { error: stri
     title: form.title.trim(),
     description: form.description.trim(),
     terms: form.terms.trim() || null,
-    image: null,
     discount_type: form.discount_type,
     discount_value,
     min_order_amount: Number(form.min_order_amount) || 0,
@@ -299,8 +300,12 @@ function MarketingPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
   const [form, setForm] = useState<OfferForm>(() => emptyForm());
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Offer | null>(null);
@@ -374,6 +379,12 @@ function MarketingPage() {
     void refresh({ showLoading: true });
   }, [refresh]);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const rangeStart = count === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
@@ -398,27 +409,69 @@ function MarketingPage() {
     }));
   }
 
+  function resetImagePicker() {
+    if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveImage(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   function openCreate() {
     setEditing(null);
     setForm(emptyForm());
+    resetImagePicker();
     setSheetOpen(true);
   }
 
   async function openEdit(o: Offer) {
     setEditing(o);
     setForm(formFromOffer(o));
+    if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setRemoveImage(false);
+    setImagePreview(o.image);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setSheetOpen(true);
     setLoadingDetail(true);
     try {
       const detail = await withAuthRetry((token) => getOffer(token, o.public_id));
       setEditing(detail);
       setForm(formFromOffer(detail));
+      setImagePreview((prev) => (prev?.startsWith("blob:") ? prev : detail.image));
     } catch (err) {
       if (handleAuthError(err)) return;
       toast.error(err instanceof ApiError ? err.message : "Unable to load offer");
     } finally {
       setLoadingDetail(false);
     }
+  }
+
+  function onPickImage(file: File | null) {
+    if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    if (!file) {
+      setImageFile(null);
+      setImagePreview(removeImage ? null : (editing?.image ?? null));
+      return;
+    }
+    if (
+      !/^image\/(jpeg|png|webp|svg\+xml)$/i.test(file.type) &&
+      !/\.(jpe?g|png|webp|svg)$/i.test(file.name)
+    ) {
+      toast.error("Image must be JPEG, PNG, WebP, or SVG");
+      return;
+    }
+    setRemoveImage(false);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function onRemoveImage() {
+    if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveImage(Boolean(editing?.image));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function saveOffer() {
@@ -428,14 +481,22 @@ function MarketingPage() {
         toast.error(diff.error);
         return;
       }
-      if (Object.keys(diff).length === 0) {
+      const shouldRemove = Boolean(removeImage && editing.image && !imageFile);
+      if (Object.keys(diff).length === 0 && !imageFile && !shouldRemove) {
         toast.message("No changes to save");
         setSheetOpen(false);
         return;
       }
       setSaving(true);
       try {
-        await withAuthRetry((token) => updateOffer(token, editing.public_id, diff));
+        await withAuthRetry((token) =>
+          updateOffer(
+            token,
+            editing.public_id,
+            { ...diff, remove_image: shouldRemove || undefined },
+            imageFile,
+          ),
+        );
         toast.success(`${(diff.code ?? editing.code).toUpperCase()} updated`);
         setSheetOpen(false);
         await refresh({ showLoading: false });
@@ -455,7 +516,7 @@ function MarketingPage() {
     }
     setSaving(true);
     try {
-      const created = await withAuthRetry((token) => createOffer(token, payload));
+      const created = await withAuthRetry((token) => createOffer(token, payload, imageFile));
       toast.success(`${created.code} created`);
       setSheetOpen(false);
       setPage(1);
@@ -689,18 +750,29 @@ function MarketingPage() {
                     {results.map((o) => (
                       <tr key={o.public_id} className="border-b last:border-0 hover:bg-muted/20">
                         <td className="px-4 py-3 align-top">
-                          <button
-                            type="button"
-                            onClick={() => copyCode(o.code)}
-                            className="group flex items-center gap-1.5 font-mono text-base font-bold tracking-wide"
-                            title="Copy code"
-                          >
-                            {o.code}
-                            <Copy className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-50" />
-                          </button>
-                          <div className="mt-0.5 font-medium">{o.title}</div>
-                          <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                            {o.description || "—"}
+                          <div className="flex gap-3">
+                            {o.image ? (
+                              <img
+                                src={o.image}
+                                alt=""
+                                className="h-11 w-11 shrink-0 rounded-lg border object-cover"
+                              />
+                            ) : null}
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => copyCode(o.code)}
+                                className="group flex items-center gap-1.5 font-mono text-base font-bold tracking-wide"
+                                title="Copy code"
+                              >
+                                {o.code}
+                                <Copy className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-50" />
+                              </button>
+                              <div className="mt-0.5 font-medium">{o.title}</div>
+                              <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                {o.description || "—"}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top">
@@ -893,6 +965,51 @@ function MarketingPage() {
                     placeholder="e.g. Once per user"
                     className="mt-1 min-h-[64px] rounded-xl"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="coupon-image">Image (optional)</Label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50"
+                  >
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-border/70 bg-card">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium">
+                        {imageFile?.name ??
+                          (editing?.image && !removeImage
+                            ? "Replace image"
+                            : "Upload JPEG, PNG, WebP, or SVG")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Click to choose a file</div>
+                    </div>
+                  </button>
+                  <input
+                    id="coupon-image"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml,.jpg,.jpeg,.png,.webp,.svg"
+                    className="hidden"
+                    onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+                  />
+                  {(imagePreview || (editing?.image && !removeImage)) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-lg text-muted-foreground"
+                      onClick={onRemoveImage}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Remove image
+                    </Button>
+                  )}
                 </div>
               </section>
 
