@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -147,6 +148,7 @@ function weightedAvgCost(entries: InventoryStockEntry[]) {
 }
 
 function InventoryPage() {
+  const manageInventory = useAccess().canManage("inventory");
   const navigate = useNavigate();
   const panel = usePanel();
   const meta = usePanelMeta();
@@ -349,8 +351,7 @@ function InventoryPage() {
     if (!q) return stockSummaries;
     return stockSummaries.filter(
       (row) =>
-        row.item.name.toLowerCase().includes(q) ||
-        row.item.category.toLowerCase().includes(q),
+        row.item.name.toLowerCase().includes(q) || row.item.category.toLowerCase().includes(q),
     );
   }, [stockSummaries, search]);
 
@@ -394,8 +395,7 @@ function InventoryPage() {
       toast.error("Name is required");
       return;
     }
-    const reorder_level =
-      itemForm.reorder_level.trim() === "" ? 0 : Number(itemForm.reorder_level);
+    const reorder_level = itemForm.reorder_level.trim() === "" ? 0 : Number(itemForm.reorder_level);
     if (Number.isNaN(reorder_level) || reorder_level < 0) {
       toast.error("Reorder level must be a valid number");
       return;
@@ -423,9 +423,7 @@ function InventoryPage() {
         ),
       );
       setStock((prev) =>
-        prev.map((s) =>
-          s.item_id === editingItem.id ? { ...s, item_name: name } : s,
-        ),
+        prev.map((s) => (s.item_id === editingItem.id ? { ...s, item_name: name } : s)),
       );
       toast.success("Item updated locally (PATCH API pending)");
       setItemSheetOpen(false);
@@ -554,7 +552,7 @@ function InventoryPage() {
   }
 
   const lockedStockItem = stockItemLocked
-    ? panelItems.find((i) => i.id === stockForm.item_id) ?? null
+    ? (panelItems.find((i) => i.id === stockForm.item_id) ?? null)
     : null;
 
   if (panel === "banquet") {
@@ -592,12 +590,8 @@ function InventoryPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="rounded-xl gap-2"
-              onClick={() => openAddStock()}
-            >
+          <div className={cn("flex flex-wrap items-center gap-2", !manageInventory && "hidden")}>
+            <Button variant="outline" className="rounded-xl gap-2" onClick={() => openAddStock()}>
               <PackagePlus className="h-4 w-4" />
               Update Stock
             </Button>
@@ -628,9 +622,7 @@ function InventoryPage() {
                     "text-warning",
                 )}
               >
-                {item.id === "low" && tabCount > 0 && (
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                )}
+                {item.id === "low" && tabCount > 0 && <AlertTriangle className="h-3.5 w-3.5" />}
                 {item.id === "out" && tabCount > 0 && <PackageX className="h-3.5 w-3.5" />}
                 {item.id === "all" && <Boxes className="h-3.5 w-3.5" />}
                 {item.id === "stock" && <Package className="h-3.5 w-3.5" />}
@@ -687,7 +679,11 @@ function InventoryPage() {
               </span>
               <span className="text-muted-foreground"> — restock to keep kitchen running</span>
             </div>
-            <Button size="sm" className="h-7 rounded-lg gap-1 px-2.5 text-xs" onClick={() => openAddStock()}>
+            <Button
+              size="sm"
+              className="h-7 rounded-lg gap-1 px-2.5 text-xs"
+              onClick={() => openAddStock()}
+            >
               <PackagePlus className="h-3 w-3" />
               Restock
             </Button>
@@ -822,9 +818,7 @@ function InventoryPage() {
                   disabled={savingItem || categoriesLoading}
                 >
                   <SelectTrigger className="rounded-xl">
-                    <SelectValue
-                      placeholder={categoriesLoading ? "Loading…" : "Select category"}
-                    />
+                    <SelectValue placeholder={categoriesLoading ? "Loading…" : "Select category"} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
@@ -880,13 +874,13 @@ function InventoryPage() {
             <div className="flex items-center justify-between rounded-xl border px-3 py-2.5">
               <div>
                 <div className="text-sm font-medium">Active</div>
-                <div className="text-[11px] text-muted-foreground">Inactive items can’t take stock</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Inactive items can’t take stock
+                </div>
               </div>
               <Switch
                 checked={itemForm.is_active}
-                onCheckedChange={(checked) =>
-                  setItemForm((f) => ({ ...f, is_active: checked }))
-                }
+                onCheckedChange={(checked) => setItemForm((f) => ({ ...f, is_active: checked }))}
                 disabled={savingItem}
               />
             </div>
@@ -908,13 +902,13 @@ function InventoryPage() {
             >
               Cancel
             </Button>
-            <Button className="rounded-xl gap-2" disabled={savingItem} onClick={() => void saveItem()}>
+            <Button
+              className="rounded-xl gap-2"
+              disabled={savingItem}
+              onClick={() => void saveItem()}
+            >
               {savingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {savingItem
-                ? "Saving…"
-                : editingItem
-                  ? "Save Changes"
-                  : "Add Item"}
+              {savingItem ? "Saving…" : editingItem ? "Save Changes" : "Add Item"}
             </Button>
           </div>
         </SheetContent>
@@ -1076,9 +1070,7 @@ function InventoryPage() {
                     </div>
                   </div>
                 </div>
-                {s.notes ? (
-                  <p className="mt-2 text-xs text-muted-foreground">{s.notes}</p>
-                ) : null}
+                {s.notes ? <p className="mt-2 text-xs text-muted-foreground">{s.notes}</p> : null}
               </div>
             ))}
             {itemLogs.length === 0 && (
@@ -1151,10 +1143,7 @@ function ItemRow({
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         <span
-          className={cn(
-            "hidden h-8 w-1 shrink-0 rounded-full sm:block",
-            barTone,
-          )}
+          className={cn("hidden h-8 w-1 shrink-0 rounded-full sm:block", barTone)}
           aria-hidden
         />
         <div className="min-w-0 flex-1 space-y-1.5">
@@ -1172,7 +1161,10 @@ function ItemRow({
           </div>
           <div className="flex max-w-xs items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className={cn("h-full rounded-full transition-all", barTone)} style={{ width: `${fill}%` }} />
+              <div
+                className={cn("h-full rounded-full transition-all", barTone)}
+                style={{ width: `${fill}%` }}
+              />
             </div>
             <span className="shrink-0 text-[10px] text-muted-foreground">
               reorder {item.reorder_level}

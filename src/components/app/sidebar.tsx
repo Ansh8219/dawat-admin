@@ -22,11 +22,13 @@ import {
   RotateCcw,
   ReceiptText,
   Building2,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { LOGO_SRC } from "@/lib/brand";
-import { isSuperAdmin, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { isRouteVisible } from "@/lib/access";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { isRouteAllowed } from "@/lib/panel";
@@ -43,6 +45,8 @@ const nav = [
       { to: "/inventory", label: "Inventory", icon: Boxes },
       { to: "/bookings", label: "Tables & Bookings", icon: CalendarDays },
       { to: "/table-qr", label: "Tables", icon: QrCode },
+      { to: "/hall-bookings", label: "Hall Bookings", icon: CalendarDays },
+      { to: "/halls", label: "Halls", icon: Landmark },
     ],
   },
   {
@@ -94,16 +98,15 @@ export function AppSidebar({
   const newOrderBadge = useKitchenAlerts((s) => s.newOrderBadge);
   const panel = usePanel();
   const meta = usePanelMeta();
-  const user = useAuth((s) => s.user);
-  const canSeeAnalytics = isSuperAdmin(user);
+  const role = useAuth((s) => s.user?.role);
+  const access = useAuth((s) => s.access);
 
   const filteredNav = nav
     .map((group) => ({
       ...group,
       items: group.items
         .filter((item) => {
-          if (item.to === "/analytics" && !canSeeAnalytics) return false;
-          return isRouteAllowed(panel, item.to);
+          return isRouteAllowed(panel, item.to) && isRouteVisible(item.to, panel, { access, role });
         })
         .map((item) => {
           if (item.to === "/bookings") {

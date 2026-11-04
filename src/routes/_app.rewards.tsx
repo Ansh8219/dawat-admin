@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,9 @@ function useHandleAuthError() {
 }
 
 function RewardsPage() {
-  const [tab, setTab] = useState("earning");
+  const { isSuperAdmin: superAdmin } = useAccess();
+  const [pickedTab, setTab] = useState("earning");
+  const tab = superAdmin ? pickedTab : "rules";
 
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
@@ -79,12 +82,14 @@ function RewardsPage() {
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="rounded-xl">
-            <TabsTrigger value="earning">Earning Settings</TabsTrigger>
+            {superAdmin && <TabsTrigger value="earning">Earning Settings</TabsTrigger>}
             <TabsTrigger value="rules">Bonus Rules</TabsTrigger>
           </TabsList>
-          <TabsContent value="earning" className="mt-4">
-            <EarningSettingsTab />
-          </TabsContent>
+          {superAdmin && (
+            <TabsContent value="earning" className="mt-4">
+              <EarningSettingsTab />
+            </TabsContent>
+          )}
           <TabsContent value="rules" className="mt-4">
             <BonusRulesTab />
           </TabsContent>

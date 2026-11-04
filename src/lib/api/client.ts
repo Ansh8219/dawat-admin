@@ -22,6 +22,13 @@ type FormRequestOptions = {
   signal?: AbortSignal;
 };
 
+let passwordChangeRequiredHandler: (() => void) | null = null;
+
+/** Registered by the auth store; fired on 403 `password_change_required` from any API call. */
+export function onPasswordChangeRequired(handler: () => void) {
+  passwordChangeRequiredHandler = handler;
+}
+
 function isFastApiDetailBody(raw: unknown): raw is { detail: unknown } {
   return Boolean(raw && typeof raw === "object" && !("success" in raw) && "detail" in raw);
 }
@@ -46,6 +53,7 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
         : formatValidationDetails(detail) || `Unexpected response (${response.status}).`;
     const rawCode = (raw as { code?: unknown }).code;
     const code = typeof rawCode === "string" && rawCode ? rawCode : "validation_error";
+    if (code === "password_change_required") passwordChangeRequiredHandler?.();
     throw new ApiError(response.status, code, message, detail);
   }
 
@@ -56,6 +64,7 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
   }
 
   const code = envelope.error?.code ?? "request_failed";
+  if (code === "password_change_required") passwordChangeRequiredHandler?.();
   const fromDetails = formatValidationDetails(envelope.error?.details);
   const apiMessage = envelope.message?.trim();
   const message =
@@ -79,6 +88,10 @@ function humanizeErrorCode(code: string): string {
       return "Invalid email or password.";
     case "staff_access_denied":
       return "This account does not have admin access.";
+    case "permission_denied":
+      return "You do not have permission to do this.";
+    case "password_change_required":
+      return "You must change your temporary password before continuing.";
     case "account_inactive":
       return "This account has been deactivated.";
     case "validation_error":
@@ -199,6 +212,20 @@ function humanizeErrorCode(code: string): string {
       return "An account with this email already exists.";
     case "invoice_prefix_taken":
       return "Another business already uses this invoice prefix.";
+    case "hall_not_found":
+      return "Hall not found.";
+    case "hall_has_bookings":
+      return "This hall has bookings. Deactivate it instead.";
+    case "hall_slot_in_use":
+      return "This slot has bookings. Deactivate it instead.";
+    case "hall_booking_not_found":
+      return "Booking not found.";
+    case "hall_booking_invalid_transition":
+      return "This booking's status has changed. Refresh and try again.";
+    case "hall_refund_not_allowed":
+      return "A refund can only be retried when it has failed.";
+    case "hall_slug_taken":
+      return "That slug is already used by another hall.";
     default:
       return "Something went wrong. Please try again.";
   }

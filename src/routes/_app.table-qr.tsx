@@ -175,8 +175,7 @@ function TablesPage() {
     if (!needle) return results;
     return results.filter(
       (t) =>
-        t.table_number.toLowerCase().includes(needle) ||
-        t.qr_url.toLowerCase().includes(needle),
+        t.table_number.toLowerCase().includes(needle) || t.qr_url.toLowerCase().includes(needle),
     );
   }, [q, results]);
 
@@ -280,14 +279,16 @@ function TablesPage() {
       await refresh({ showLoading: false });
     } catch (err) {
       if (handleAuthError(err)) return;
-      if (err instanceof ApiError && (err.status === 404 || err.code === "dining_table_not_found")) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 404 || err.code === "dining_table_not_found")
+      ) {
         toast.error("That table is already gone.");
         setDeleteTarget(null);
         await refresh({ showLoading: false });
         return;
       }
-      const message =
-        err instanceof ApiError ? err.message : "Unable to delete table";
+      const message = err instanceof ApiError ? err.message : "Unable to delete table";
       setDeleteError(message);
       toast.error(message);
     } finally {
@@ -302,7 +303,9 @@ function TablesPage() {
         updateTable(token, table.public_id, { is_active: next }),
       );
       setResults((prev) => {
-        const nextList = prev.map((r) => (r.public_id === table.public_id ? { ...r, ...updated } : r));
+        const nextList = prev.map((r) =>
+          r.public_id === table.public_id ? { ...r, ...updated } : r,
+        );
         if (activeFilter === "active" && !next) {
           return nextList.filter((r) => r.public_id !== table.public_id);
         }
@@ -396,6 +399,7 @@ function TablesPage() {
     return (
       <div className="flex min-h-full flex-col bg-muted/20">
         <PageHeader
+          actionModule="tables"
           title="Tables"
           crumbs={["Operations", "Tables"]}
           description="Dining table QR codes are managed from the Restaurant or Bakery panel."
@@ -602,6 +606,7 @@ function TablesPage() {
                                 <RowActions
                                   items={[
                                     {
+                                      requires: "tables",
                                       label: "Edit",
                                       icon: <Pencil className="mr-2 h-4 w-4" />,
                                       onClick: () => openEdit(table),
@@ -613,6 +618,7 @@ function TablesPage() {
                                     },
                                     { label: "", onClick: () => {}, separator: true },
                                     {
+                                      requires: "tables",
                                       label: "Delete",
                                       icon: <Trash2 className="mr-2 h-4 w-4" />,
                                       destructive: true,
@@ -783,14 +789,16 @@ function TablesPage() {
 
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Print this card and place it on the table. The QR URL is fixed when the table is
-                  created and does not change on edit. Prefer deactivating a table to hide it; delete
-                  permanently removes it.
+                  created and does not change on edit. Prefer deactivating a table to hide it;
+                  delete permanently removes it.
                 </p>
               </div>
             ) : (
               <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center">
                 <QrCode className="h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">Select a table to preview its QR code.</p>
+                <p className="text-sm text-muted-foreground">
+                  Select a table to preview its QR code.
+                </p>
               </div>
             )}
           </aside>
@@ -929,13 +937,11 @@ function TablesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteTarget?.table_number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. Printed QR codes for this table will stop working. A table
-              that already has bookings cannot be deleted — turn it off instead so it is not
-              offered for new bookings. Existing bookings stay on the bookings list.
+              This cannot be undone. Printed QR codes for this table will stop working. A table that
+              already has bookings cannot be deleted — turn it off instead so it is not offered for
+              new bookings. Existing bookings stay on the bookings list.
             </AlertDialogDescription>
-            {deleteError ? (
-              <p className="text-sm text-destructive">{deleteError}</p>
-            ) : null}
+            {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>

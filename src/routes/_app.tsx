@@ -5,20 +5,41 @@ import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
 import { useAdminOrdersSocket } from "@/hooks/use-admin-orders-socket";
-import { canCheckPersistedAuth, getSelectedPanel, isAuthenticated } from "@/lib/auth";
+import {
+  useAuth,
+  canCheckPersistedAuth,
+  getSelectedPanel,
+  isAuthenticated,
+  mustChangePassword,
+} from "@/lib/auth";
 import { isRouteAllowed } from "@/lib/panel";
+import { isRouteVisible } from "@/lib/access";
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: ({ location }) => {
+  beforeLoad: async ({ location }) => {
     if (!canCheckPersistedAuth()) return;
     if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
+    }
+    if (mustChangePassword()) {
+      throw redirect({ to: "/change-password" });
     }
     const panel = getSelectedPanel();
     if (!panel) {
       throw redirect({ to: "/select-panel" });
     }
-    if (!isRouteAllowed(panel, location.pathname)) {
+    // Existing sessions (or a fresh password change) may not have access loaded yet.
+    if (!useAuth.getState().access) {
+      await useAuth.getState().loadAccess();
+    }
+    const { access, user } = useAuth.getState();
+    const allowed =
+      isRouteAllowed(panel, location.pathname) &&
+      isRouteVisible(location.pathname, panel, {
+        access,
+        role: user?.role,
+      });
+    if (!allowed) {
       throw redirect({ to: "/" });
     }
   },

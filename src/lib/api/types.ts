@@ -19,6 +19,16 @@ export interface AuthUser {
   email: string;
   role: AdminRole | string;
   is_staff: boolean;
+  /** True while the account still uses an emailed temporary password. */
+  must_change_password?: boolean;
+}
+
+/** GET /api/admin/me/access/ */
+export interface AdminAccess {
+  role: AdminRole | string;
+  is_super_admin: boolean;
+  /** Applies to every business. */
+  permissions: string[];
 }
 
 export interface LoginData {
@@ -50,6 +60,8 @@ export interface Business {
   image: string | null;
   /** When false, customers cannot place new orders for this business. */
   is_accepting_orders: boolean;
+  /** Managers only: this manager's permissions for the business. */
+  permissions?: string[];
   /** Average customer rating; null when there are no reviews yet. */
   rating: number | null;
   review_count: number;

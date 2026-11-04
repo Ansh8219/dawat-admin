@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -56,6 +57,7 @@ function refundOrderCode(refund: AdminRefund): string {
 }
 
 function RefundsPage() {
+  const manageRefunds = useAccess().canManage("refunds");
   const navigate = useNavigate();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
@@ -274,7 +276,7 @@ function RefundsPage() {
                               {r.razorpay_refund_id || "—"}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              {canRetryRefund(r) && (
+                              {manageRefunds && canRetryRefund(r) && (
                                 <Button
                                   size="sm"
                                   variant="outline"

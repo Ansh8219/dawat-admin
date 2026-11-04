@@ -248,7 +248,8 @@ function patchDiff(original: Offer, form: OfferForm): UpdateOfferPayload | { err
   if (created.description !== (original.description ?? "")) patch.description = created.description;
   if ((created.terms ?? null) !== (original.terms ?? null)) patch.terms = created.terms ?? null;
   if (created.discount_type !== original.discount_type) patch.discount_type = created.discount_type;
-  if (created.discount_value !== original.discount_value) patch.discount_value = created.discount_value;
+  if (created.discount_value !== original.discount_value)
+    patch.discount_value = created.discount_value;
   if (created.min_order_amount !== original.min_order_amount) {
     patch.min_order_amount = created.min_order_amount;
   }
@@ -256,7 +257,8 @@ function patchDiff(original: Offer, form: OfferForm): UpdateOfferPayload | { err
   if (created.per_user_limit !== original.per_user_limit) {
     patch.per_user_limit = created.per_user_limit;
   }
-  if (created.valid_from !== original.valid_from?.slice(0, 10)) patch.valid_from = created.valid_from;
+  if (created.valid_from !== original.valid_from?.slice(0, 10))
+    patch.valid_from = created.valid_from;
   if (created.valid_until !== original.valid_until?.slice(0, 10)) {
     patch.valid_until = created.valid_until;
   }
@@ -350,8 +352,7 @@ function MarketingPage() {
         const data = await withAuthRetry((token) =>
           listOffers(token, {
             search: debouncedQ || undefined,
-            is_active:
-              activeFilter === "all" ? undefined : activeFilter === "active",
+            is_active: activeFilter === "all" ? undefined : activeFilter === "active",
             channel: channelFilter === "all" ? undefined : channelFilter,
             page,
             page_size: PAGE_SIZE,
@@ -403,9 +404,7 @@ function MarketingPage() {
   function toggleChannel(ch: OfferChannel) {
     setForm((f) => ({
       ...f,
-      channels: f.channels.includes(ch)
-        ? f.channels.filter((c) => c !== ch)
-        : [...f.channels, ch],
+      channels: f.channels.includes(ch) ? f.channels.filter((c) => c !== ch) : [...f.channels, ch],
     }));
   }
 
@@ -622,6 +621,7 @@ function MarketingPage() {
   return (
     <div>
       <PageHeader
+        actionModule="offers"
         title="Coupons & Offers"
         crumbs={["Growth", "Marketing"]}
         description={`Create discount coupons for ${meta.label} — customers redeem at checkout.`}
@@ -790,8 +790,7 @@ function MarketingPage() {
                             </div>
                           )}
                           <div className="mt-1 text-xs text-muted-foreground">
-                            Min{" "}
-                            {o.min_order_amount > 0 ? inr(o.min_order_amount) : "none"}
+                            Min {o.min_order_amount > 0 ? inr(o.min_order_amount) : "none"}
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top">
@@ -808,9 +807,7 @@ function MarketingPage() {
                         </td>
                         <td className="px-4 py-3 align-top text-xs">
                           <div>{formatDate(o.valid_from)}</div>
-                          <div className="text-muted-foreground">
-                            → {formatDate(o.valid_until)}
-                          </div>
+                          <div className="text-muted-foreground">→ {formatDate(o.valid_until)}</div>
                         </td>
                         <td className="px-4 py-3 align-top">
                           <div className="font-semibold tabular-nums">
@@ -847,7 +844,11 @@ function MarketingPage() {
                         <td className="px-4 py-3 align-top text-right">
                           <RowActions
                             items={[
-                              { label: "Edit", onClick: () => void openEdit(o) },
+                              {
+                                requires: "offers",
+                                label: "Edit",
+                                onClick: () => void openEdit(o),
+                              },
                               {
                                 label: "View redemptions",
                                 onClick: () => void openRedemptions(o),
@@ -855,6 +856,7 @@ function MarketingPage() {
                               { label: "Copy code", onClick: () => copyCode(o.code) },
                               { separator: true, label: "", onClick: () => {} },
                               {
+                                requires: "offers",
                                 label: "Delete",
                                 onClick: () => setDeleteTarget(o),
                                 destructive: true,
@@ -1193,7 +1195,11 @@ function MarketingPage() {
                 >
                   Cancel
                 </Button>
-                <Button className="flex-1 rounded-xl" disabled={saving} onClick={() => void saveOffer()}>
+                <Button
+                  className="flex-1 rounded-xl"
+                  disabled={saving}
+                  onClick={() => void saveOffer()}
+                >
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
@@ -1280,9 +1286,7 @@ function MarketingPage() {
                             {channelLabel(r.channel)}
                           </td>
                           <td className="px-3 py-2 align-top">
-                            <div className="font-medium tabular-nums">
-                              {inr(r.discount_amount)}
-                            </div>
+                            <div className="font-medium tabular-nums">{inr(r.discount_amount)}</div>
                             <div className="text-xs text-muted-foreground">
                               on {inr(r.order_subtotal)}
                             </div>
@@ -1318,9 +1322,7 @@ function MarketingPage() {
                       size="sm"
                       className="rounded-lg"
                       disabled={redemptionsPage >= redemptionPages}
-                      onClick={() =>
-                        setRedemptionsPage((p) => Math.min(redemptionPages, p + 1))
-                      }
+                      onClick={() => setRedemptionsPage((p) => Math.min(redemptionPages, p + 1))}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -1342,8 +1344,8 @@ function MarketingPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteTarget?.code}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the coupon. If it already has redemptions, the API will
-              block delete — deactivate it instead.
+              This permanently removes the coupon. If it already has redemptions, the API will block
+              delete — deactivate it instead.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

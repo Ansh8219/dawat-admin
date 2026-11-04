@@ -98,7 +98,7 @@ const ROLE_TABS: {
     id: "managers",
     label: "Managers",
     icon: UserCog,
-    description: "Managers invited by a super admin, with their business access.",
+    description: "Managers created by a super admin, with their business access.",
   },
 ];
 
@@ -259,7 +259,8 @@ function PeoplePage() {
                 <DialogHeader>
                   <DialogTitle>Add manager</DialogTitle>
                   <DialogDescription>
-                    Invite a manager and choose what they can do in each business.
+                    Add a manager (a temporary password is emailed to them) and choose what they can
+                    do in each business.
                   </DialogDescription>
                 </DialogHeader>
                 <ManagerCreateForm

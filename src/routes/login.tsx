@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { canCheckPersistedAuth, isAuthenticated, useAuth } from "@/lib/auth";
+import { canCheckPersistedAuth, isAuthenticated, mustChangePassword, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
     if (!canCheckPersistedAuth()) return;
     if (isAuthenticated()) {
+      if (mustChangePassword()) throw redirect({ to: "/change-password" });
       throw redirect({ to: "/select-panel" });
     }
   },
@@ -39,7 +40,7 @@ function LoginPage() {
         setError(result.error);
         return;
       }
-      void navigate({ to: "/select-panel" });
+      void navigate({ to: result.mustChangePassword ? "/change-password" : "/select-panel" });
     } finally {
       setLoading(false);
     }
@@ -133,7 +134,11 @@ function LoginPage() {
           </div>
         )}
 
-        <Button type="submit" className="h-10 w-full rounded-xl text-[15px] font-semibold" disabled={loading}>
+        <Button
+          type="submit"
+          className="h-10 w-full rounded-xl text-[15px] font-semibold"
+          disabled={loading}
+        >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…

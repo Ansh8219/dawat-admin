@@ -1,14 +1,19 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { useAccess } from "@/lib/access";
 
 interface Props {
   title: string;
   crumbs?: string[];
   action?: ReactNode;
   description?: string;
+  /** When set, `action` is shown only if the user can `<module>:manage` here. */
+  actionModule?: string;
 }
 
-export function PageHeader({ title, crumbs = [], action, description }: Props) {
+export function PageHeader({ title, crumbs = [], action, description, actionModule }: Props) {
+  const { canManage } = useAccess();
+  const showAction = action && (!actionModule || canManage(actionModule));
   return (
     <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-border/70 bg-background/60 px-4 py-5 sm:px-6 lg:px-8">
       <div className="min-w-0">
@@ -25,7 +30,7 @@ export function PageHeader({ title, crumbs = [], action, description }: Props) {
         <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {showAction && <div className="shrink-0">{action}</div>}
     </header>
   );
 }

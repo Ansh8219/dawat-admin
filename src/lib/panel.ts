@@ -188,7 +188,8 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     status: "Events only",
     routes: [
       "/",
-      "/bookings",
+      "/hall-bookings",
+      "/halls",
       "/customers",
       "/customer-levels",
       "/rewards",

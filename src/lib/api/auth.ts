@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { DetailData, LoginData, MeData, RefreshData } from "./types";
+import type { AdminAccess, DetailData, LoginData, MeData, RefreshData } from "./types";
 
 export function adminLogin(email: string, password: string) {
   return apiRequest<LoginData>("/api/auth/admin/login/", {
@@ -55,5 +55,13 @@ export function refreshAccessToken(refresh: string) {
   return apiRequest<RefreshData>("/api/auth/token/refresh/", {
     method: "POST",
     body: { refresh },
+  });
+}
+
+/** GET /api/admin/me/access/ — role, assignments and permissions for the signed-in admin. */
+export function getMyAccess(accessToken: string) {
+  return apiRequest<AdminAccess>("/api/admin/me/access/", {
+    method: "GET",
+    accessToken,
   });
 }

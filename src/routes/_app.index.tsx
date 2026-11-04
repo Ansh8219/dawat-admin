@@ -23,7 +23,7 @@ import type {
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { inr, banquetEvents } from "@/lib/mock/data";
+import { HallDashboard } from "@/components/app/hall-dashboard";
 import { businessTypeToPanel } from "@/lib/panel";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
@@ -180,7 +180,7 @@ function tooltipSurface(style?: CSSProperties): CSSProperties {
 function Dashboard() {
   const panel = usePanel();
   if (panel === "banquet") {
-    return <BanquetDashboard />;
+    return <HallDashboard />;
   }
   return <FoodDashboard />;
 }
@@ -916,82 +916,6 @@ function Kpi({
       </div>
       <div className="mt-2 text-2xl font-bold tracking-tight">{value}</div>
       <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>
-    </div>
-  );
-}
-
-function BanquetDashboard() {
-  const navigate = useNavigate();
-  const meta = usePanelMeta();
-  const [bookings, setBookings] = useState(banquetEvents.slice(0, 4));
-
-  return (
-    <div className="flex min-h-full flex-col bg-muted/20">
-      <header className="border-b bg-background px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold sm:text-2xl">{meta.label} Home</h1>
-            <p className="text-xs text-muted-foreground">Events · packages · advances</p>
-          </div>
-          <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/bookings" })}>
-            <Plus className="h-4 w-4" /> New Booking
-          </Button>
-        </div>
-      </header>
-      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-4 lg:p-8">
-        <Kpi
-          label="This Week"
-          value={String(banquetEvents.length)}
-          icon={ShoppingBag}
-          hint="Events booked"
-        />
-        <Kpi label="Advance" value={inr(210000)} icon={IndianRupee} hint="Collected" />
-        <Kpi label="Capacity" value="350" icon={TrendingUp} hint="Max guests" />
-        <Kpi label="Halls" value="3" icon={Star} hint="Active this week" />
-      </div>
-      <div className="px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border bg-card p-4 shadow-soft">
-          <h2 className="mb-3 text-sm font-bold">Upcoming Bookings</h2>
-          <div className="space-y-2">
-            {bookings.map((e) => (
-              <div key={e.date} className="flex items-center gap-3 rounded-xl border p-3">
-                <div className="grid h-11 w-11 place-items-center rounded-xl bg-gold/20 font-bold text-gold-foreground">
-                  {e.date}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{e.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {e.guests} guests · {e.pkg}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 rounded-lg text-xs"
-                    onClick={() => {
-                      setBookings((prev) => prev.filter((b) => b.date !== e.date));
-                      toast.message(`${e.title} rejected`);
-                    }}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-7 rounded-lg text-xs"
-                    onClick={() => {
-                      setBookings((prev) => prev.filter((b) => b.date !== e.date));
-                      toast.success(`${e.title} approved`);
-                    }}
-                  >
-                    Approve
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1018,9 +1018,7 @@ function MenuPage() {
           price: Number(o.price) || 0,
         })),
       })),
-      ...(editingId && removedImageIds.length
-        ? { remove_image_public_ids: removedImageIds }
-        : {}),
+      ...(editingId && removedImageIds.length ? { remove_image_public_ids: removedImageIds } : {}),
     };
 
     setSaving(true);
@@ -1083,6 +1081,7 @@ function MenuPage() {
   return (
     <div>
       <PageHeader
+        actionModule="menu"
         title={`${meta.label} Menu`}
         crumbs={["Operations", "Menu"]}
         description={`Products for ${meta.label} only — GST ${meta.gst}. Loaded from the admin menu API.`}
@@ -1280,13 +1279,18 @@ function MenuPage() {
                           <div className="absolute right-2 top-2 z-10">
                             <RowActions
                               items={[
-                                { label: "Edit", onClick: () => void openEdit(m.public_id) },
+                                {
+                                  requires: "menu",
+                                  label: "Edit",
+                                  onClick: () => void openEdit(m.public_id),
+                                },
                                 {
                                   label: avail[m.public_id] ? "Mark unavailable" : "Mark available",
                                   onClick: () =>
                                     void toggleItemAvailability(m.public_id, !avail[m.public_id]),
                                 },
                                 {
+                                  requires: "menu",
                                   label: "Delete",
                                   onClick: () => setDeleteTarget({ id: m.public_id, name: m.name }),
                                   destructive: true,
@@ -1314,9 +1318,7 @@ function MenuPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span
-                                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm border border-emerald-500 bg-emerald-500"
-                                />
+                                <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm border border-emerald-500 bg-emerald-500" />
                                 {m.item_code && (
                                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
                                     #{m.item_code}
@@ -1406,9 +1408,7 @@ function MenuPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2 font-medium">
-                                  <span
-                                    className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500"
-                                  />
+                                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />
                                   {m.name}
                                 </div>
                               </td>
@@ -1433,8 +1433,13 @@ function MenuPage() {
                               <td className="px-4 py-3 text-right">
                                 <RowActions
                                   items={[
-                                    { label: "Edit", onClick: () => void openEdit(m.public_id) },
                                     {
+                                      requires: "menu",
+                                      label: "Edit",
+                                      onClick: () => void openEdit(m.public_id),
+                                    },
+                                    {
+                                      requires: "menu",
                                       label: "Delete",
                                       onClick: () =>
                                         setDeleteTarget({ id: m.public_id, name: m.name }),
@@ -2125,7 +2130,9 @@ function MenuPage() {
                   </p>
                 ) : form.recipe.length === 0 ? (
                   <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                    {editingId ? "No recipe lines on this item" : "No recipe — item won’t deduct inventory"}
+                    {editingId
+                      ? "No recipe lines on this item"
+                      : "No recipe — item won’t deduct inventory"}
                   </p>
                 ) : editingId ? (
                   <div className="space-y-2">
@@ -2179,10 +2186,7 @@ function MenuPage() {
                           ?.options ?? [];
 
                       return (
-                        <div
-                          key={line.id}
-                          className="space-y-2 rounded-xl border bg-muted/20 p-3"
-                        >
+                        <div key={line.id} className="space-y-2 rounded-xl border bg-muted/20 p-3">
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
                             <Select
                               value={line.inventory_item_public_id || undefined}
@@ -2232,7 +2236,8 @@ function MenuPage() {
                                   scope: value as MenuRecipeScope,
                                   variant_name: value === "variant" ? line.variant_name : "",
                                   addon_group_name: value === "addon" ? line.addon_group_name : "",
-                                  addon_option_name: value === "addon" ? line.addon_option_name : "",
+                                  addon_option_name:
+                                    value === "addon" ? line.addon_option_name : "",
                                 })
                               }
                             >

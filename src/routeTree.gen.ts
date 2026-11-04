@@ -13,6 +13,7 @@ import { Route as SelectPanelRouteImport } from './routes/select-panel'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppTableQrRouteImport } from './routes/_app.table-qr'
@@ -30,6 +31,8 @@ import { Route as AppMarketingRouteImport } from './routes/_app.marketing'
 import { Route as AppInvoicesRouteImport } from './routes/_app.invoices'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
+import { Route as AppHallsRouteImport } from './routes/_app.halls'
+import { Route as AppHallBookingsRouteImport } from './routes/_app.hall-bookings'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
 import { Route as AppBusinessesRouteImport } from './routes/_app.businesses'
@@ -37,6 +40,8 @@ import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners_.$partnerId'
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app.invoices_.$invoiceId'
+import { Route as AppHallsNewRouteImport } from './routes/_app.halls_.new'
+import { Route as AppHallsHallIdRouteImport } from './routes/_app.halls_.$hallId'
 import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
 import { Route as AppPeoplePartnersPartnerIdRouteImport } from './routes/_app.people_.partners.$partnerId'
 
@@ -58,6 +63,11 @@ const LoginRoute = LoginRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -144,6 +154,16 @@ const AppHomeServicesRoute = AppHomeServicesRouteImport.update({
   path: '/home-services',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHallsRoute = AppHallsRouteImport.update({
+  id: '/halls',
+  path: '/halls',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHallBookingsRoute = AppHallBookingsRouteImport.update({
+  id: '/hall-bookings',
+  path: '/hall-bookings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppCustomersRoute = AppCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -179,6 +199,16 @@ const AppInvoicesInvoiceIdRoute = AppInvoicesInvoiceIdRouteImport.update({
   path: '/invoices/$invoiceId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHallsNewRoute = AppHallsNewRouteImport.update({
+  id: '/halls_/new',
+  path: '/halls/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHallsHallIdRoute = AppHallsHallIdRouteImport.update({
+  id: '/halls_/$hallId',
+  path: '/halls/$hallId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPeopleStoreKeepersStoreKeeperIdRoute =
   AppPeopleStoreKeepersStoreKeeperIdRouteImport.update({
     id: '/people_/store-keepers/$storeKeeperId',
@@ -194,6 +224,7 @@ const AppPeoplePartnersPartnerIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -203,6 +234,8 @@ export interface FileRoutesByFullPath {
   '/businesses': typeof AppBusinessesRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
+  '/hall-bookings': typeof AppHallBookingsRoute
+  '/halls': typeof AppHallsRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/invoices': typeof AppInvoicesRoute
@@ -218,12 +251,15 @@ export interface FileRoutesByFullPath {
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
+  '/halls/$hallId': typeof AppHallsHallIdRoute
+  '/halls/new': typeof AppHallsNewRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
 export interface FileRoutesByTo {
+  '/change-password': typeof ChangePasswordRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -233,6 +269,8 @@ export interface FileRoutesByTo {
   '/businesses': typeof AppBusinessesRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
+  '/hall-bookings': typeof AppHallBookingsRoute
+  '/halls': typeof AppHallsRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
   '/invoices': typeof AppInvoicesRoute
@@ -249,6 +287,8 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
   '/': typeof AppIndexRoute
+  '/halls/$hallId': typeof AppHallsHallIdRoute
+  '/halls/new': typeof AppHallsNewRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
@@ -257,6 +297,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -266,6 +307,8 @@ export interface FileRoutesById {
   '/_app/businesses': typeof AppBusinessesRoute
   '/_app/customer-levels': typeof AppCustomerLevelsRoute
   '/_app/customers': typeof AppCustomersRoute
+  '/_app/hall-bookings': typeof AppHallBookingsRoute
+  '/_app/halls': typeof AppHallsRoute
   '/_app/home-services': typeof AppHomeServicesRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/invoices': typeof AppInvoicesRoute
@@ -282,6 +325,8 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/table-qr': typeof AppTableQrRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/halls_/$hallId': typeof AppHallsHallIdRoute
+  '/_app/halls_/new': typeof AppHallsNewRoute
   '/_app/invoices_/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/partners_/$partnerId': typeof AppPartnersPartnerIdRoute
   '/_app/people_/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
@@ -291,6 +336,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/change-password'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
@@ -300,6 +346,8 @@ export interface FileRouteTypes {
     | '/businesses'
     | '/customer-levels'
     | '/customers'
+    | '/hall-bookings'
+    | '/halls'
     | '/home-services'
     | '/inventory'
     | '/invoices'
@@ -315,12 +363,15 @@ export interface FileRouteTypes {
     | '/rewards'
     | '/settings'
     | '/table-qr'
+    | '/halls/$hallId'
+    | '/halls/new'
     | '/invoices/$invoiceId'
     | '/partners/$partnerId'
     | '/people/partners/$partnerId'
     | '/people/store-keepers/$storeKeeperId'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/change-password'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
@@ -330,6 +381,8 @@ export interface FileRouteTypes {
     | '/businesses'
     | '/customer-levels'
     | '/customers'
+    | '/hall-bookings'
+    | '/halls'
     | '/home-services'
     | '/inventory'
     | '/invoices'
@@ -346,6 +399,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/table-qr'
     | '/'
+    | '/halls/$hallId'
+    | '/halls/new'
     | '/invoices/$invoiceId'
     | '/partners/$partnerId'
     | '/people/partners/$partnerId'
@@ -353,6 +408,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/change-password'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
@@ -362,6 +418,8 @@ export interface FileRouteTypes {
     | '/_app/businesses'
     | '/_app/customer-levels'
     | '/_app/customers'
+    | '/_app/hall-bookings'
+    | '/_app/halls'
     | '/_app/home-services'
     | '/_app/inventory'
     | '/_app/invoices'
@@ -378,6 +436,8 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/table-qr'
     | '/_app/'
+    | '/_app/halls_/$hallId'
+    | '/_app/halls_/new'
     | '/_app/invoices_/$invoiceId'
     | '/_app/partners_/$partnerId'
     | '/_app/people_/partners/$partnerId'
@@ -386,6 +446,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ChangePasswordRoute: typeof ChangePasswordRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -420,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -541,6 +609,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHomeServicesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/halls': {
+      id: '/_app/halls'
+      path: '/halls'
+      fullPath: '/halls'
+      preLoaderRoute: typeof AppHallsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hall-bookings': {
+      id: '/_app/hall-bookings'
+      path: '/hall-bookings'
+      fullPath: '/hall-bookings'
+      preLoaderRoute: typeof AppHallBookingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/customers': {
       id: '/_app/customers'
       path: '/customers'
@@ -590,6 +672,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInvoicesInvoiceIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/halls_/new': {
+      id: '/_app/halls_/new'
+      path: '/halls/new'
+      fullPath: '/halls/new'
+      preLoaderRoute: typeof AppHallsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/halls_/$hallId': {
+      id: '/_app/halls_/$hallId'
+      path: '/halls/$hallId'
+      fullPath: '/halls/$hallId'
+      preLoaderRoute: typeof AppHallsHallIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/people_/store-keepers/$storeKeeperId': {
       id: '/_app/people_/store-keepers/$storeKeeperId'
       path: '/people/store-keepers/$storeKeeperId'
@@ -613,6 +709,8 @@ interface AppRouteChildren {
   AppBusinessesRoute: typeof AppBusinessesRoute
   AppCustomerLevelsRoute: typeof AppCustomerLevelsRoute
   AppCustomersRoute: typeof AppCustomersRoute
+  AppHallBookingsRoute: typeof AppHallBookingsRoute
+  AppHallsRoute: typeof AppHallsRoute
   AppHomeServicesRoute: typeof AppHomeServicesRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppInvoicesRoute: typeof AppInvoicesRoute
@@ -629,6 +727,8 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppTableQrRoute: typeof AppTableQrRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppHallsHallIdRoute: typeof AppHallsHallIdRoute
+  AppHallsNewRoute: typeof AppHallsNewRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppPartnersPartnerIdRoute: typeof AppPartnersPartnerIdRoute
   AppPeoplePartnersPartnerIdRoute: typeof AppPeoplePartnersPartnerIdRoute
@@ -641,6 +741,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppBusinessesRoute: AppBusinessesRoute,
   AppCustomerLevelsRoute: AppCustomerLevelsRoute,
   AppCustomersRoute: AppCustomersRoute,
+  AppHallBookingsRoute: AppHallBookingsRoute,
+  AppHallsRoute: AppHallsRoute,
   AppHomeServicesRoute: AppHomeServicesRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppInvoicesRoute: AppInvoicesRoute,
@@ -657,6 +759,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppTableQrRoute: AppTableQrRoute,
   AppIndexRoute: AppIndexRoute,
+  AppHallsHallIdRoute: AppHallsHallIdRoute,
+  AppHallsNewRoute: AppHallsNewRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppPartnersPartnerIdRoute: AppPartnersPartnerIdRoute,
   AppPeoplePartnersPartnerIdRoute: AppPeoplePartnersPartnerIdRoute,
@@ -668,6 +772,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ChangePasswordRoute: ChangePasswordRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,

@@ -324,6 +324,7 @@ function CustomerLevelsPage() {
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
+        actionModule="rewards"
         title="Customer Levels"
         crumbs={["Growth", "Customer Levels"]}
         description="Levels customers unlock as they earn lifetime coins. Every new customer starts on the starting level."
@@ -378,6 +379,7 @@ function CustomerLevelsPage() {
                   {levels.map((level) => {
                     const actions: RowActionItem[] = [
                       {
+                        requires: "rewards",
                         label: "Edit",
                         icon: <Pencil className="mr-2 h-3.5 w-3.5" />,
                         onClick: () => openEdit(level),
@@ -387,6 +389,7 @@ function CustomerLevelsPage() {
                       actions.push(
                         { separator: true, label: "", onClick: () => {} },
                         {
+                          requires: "rewards",
                           label: "Delete",
                           destructive: true,
                           icon: <Trash2 className="mr-2 h-3.5 w-3.5" />,

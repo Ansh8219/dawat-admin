@@ -34,17 +34,13 @@ export const ALL_MANAGER_PERMISSIONS: readonly string[] = MANAGER_PERMISSION_MOD
   MANAGER_PERMISSION_ACTIONS.map((a) => permissionKey(m.key, a)),
 );
 
-export interface ManagerAssignment {
-  business_id: string;
-  permissions: string[];
-}
-
 export interface CreateManagerPayload {
   email: string;
   name: string;
   country_code: string;
   phone_number: string;
-  assignments: ManagerAssignment[];
+  /** Applies to every business. */
+  permissions: string[];
 }
 
 export interface CreatedManager {
@@ -53,7 +49,7 @@ export interface CreatedManager {
   name: string;
   country_code: string;
   phone_number: string;
-  assignments: ManagerAssignment[];
+  permissions: string[];
   invite_sent: boolean;
 }
 
@@ -71,19 +67,14 @@ export interface ManagerFormErrors {
   email?: string;
   country_code?: string;
   phone_number?: string;
-  businesses?: string;
-  /** Keyed by business public_id. */
-  assignments: Record<string, string>;
+  permissions?: string;
   /** Anything that could not be tied to a field. */
   general?: string;
 }
 
-/**
- * Maps a failed create call onto form fields. `sentBusinessIds` is the
- * assignments order that was submitted, used to resolve `assignments.N.*` paths.
- */
-export function mapCreateManagerError(err: unknown, sentBusinessIds: string[]): ManagerFormErrors {
-  const out: ManagerFormErrors = { assignments: {} };
+/** Maps a failed create call onto form fields. */
+export function mapCreateManagerError(err: unknown): ManagerFormErrors {
+  const out: ManagerFormErrors = {};
   if (!(err instanceof ApiError)) {
     out.general = err instanceof Error && err.message ? err.message : "Something went wrong.";
     return out;
@@ -93,13 +84,8 @@ export function mapCreateManagerError(err: unknown, sentBusinessIds: string[]): 
     out.email = "An account with this email already exists.";
     return out;
   }
-  if (err.code === "business_not_found") {
-    out.businesses = "One or more businesses were not found.";
-    return out;
-  }
 
-  const isValidation =
-    err.status === 400 || err.status === 422 || err.code === "validation_error";
+  const isValidation = err.status === 400 || err.status === 422 || err.code === "validation_error";
   if (!isValidation) {
     out.general = err.message;
     return out;
@@ -113,16 +99,11 @@ export function mapCreateManagerError(err: unknown, sentBusinessIds: string[]): 
 
   const general: string[] = [];
   for (const { path, message } of entries) {
-    const [head, idx] = path;
+    const [head] = path;
     if (head === "name" || head === "email" || head === "country_code" || head === "phone_number") {
       out[head] ??= message;
-    } else if (head === "assignments") {
-      const businessId = typeof idx === "number" ? sentBusinessIds[idx] : undefined;
-      if (businessId) {
-        out.assignments[businessId] ??= message;
-      } else {
-        out.businesses ??= message;
-      }
+    } else if (head === "permissions") {
+      out.permissions ??= message;
     } else {
       general.push(message);
     }
@@ -136,7 +117,7 @@ type FieldMessage = { path: (string | number)[]; message: string };
 function extractFieldMessages(details: unknown): FieldMessage[] {
   const out: FieldMessage[] = [];
 
-  // Pydantic / FastAPI style: [{ loc: ["body","assignments",0,"permissions",1], msg }]
+  // Pydantic / FastAPI style: [{ loc: ["body","permissions",1], msg }]
   if (Array.isArray(details)) {
     for (const d of details) {
       if (typeof d === "string") {
@@ -152,7 +133,7 @@ function extractFieldMessages(details: unknown): FieldMessage[] {
     return out;
   }
 
-  // DRF style: { field: ["msg"], assignments: [{}, { permissions: ["msg"] }] }
+  // DRF style: { field: ["msg"], permissions: ["msg"] }
   const walk = (value: unknown, path: (string | number)[]) => {
     if (value == null || value === "") return;
     if (typeof value === "string") {
@@ -177,13 +158,12 @@ export interface ManagerFormValues {
   email: string;
   countryCode: string;
   phone: string;
-  /** business public_id -> permission keys */
-  assignments: Record<string, string[]>;
+  permissions: string[];
 }
 
 /** Client-side checks only; the backend is the final authority. */
 export function validateManagerForm(v: ManagerFormValues): ManagerFormErrors {
-  const e: ManagerFormErrors = { assignments: {} };
+  const e: ManagerFormErrors = {};
   if (!v.name.trim()) e.name = "Name is required.";
   if (!v.email.trim()) e.email = "Email is required.";
   else if (!EMAIL_RE.test(v.email.trim())) e.email = "Enter a valid email address.";
@@ -191,29 +171,17 @@ export function validateManagerForm(v: ManagerFormValues): ManagerFormErrors {
   const digits = v.phone.replace(/[\s-]/g, "");
   if (!digits) e.phone_number = "Phone number is required.";
   else if (!/^\d{6,15}$/.test(digits)) e.phone_number = "Enter a valid phone number.";
-  if (Object.keys(v.assignments).length === 0) e.businesses = "Select at least one business.";
+  if (v.permissions.length === 0) e.permissions = "Select at least one permission.";
   return e;
 }
 
 export function hasManagerFormErrors(e: ManagerFormErrors): boolean {
   return Boolean(
-    e.name ||
-    e.email ||
-    e.country_code ||
-    e.phone_number ||
-    e.businesses ||
-    e.general ||
-    Object.keys(e.assignments).length,
+    e.name || e.email || e.country_code || e.phone_number || e.permissions || e.general,
   );
 }
 
 export type ManagerInviteStatus = "pending" | "active";
-
-export interface ManagerListAssignment {
-  business_id: string;
-  business_name: string;
-  permissions: string[];
-}
 
 export interface ManagerListItem {
   public_id: string;
@@ -225,7 +193,7 @@ export interface ManagerListItem {
   invite_status: ManagerInviteStatus | string;
   last_login: string | null;
   created_at: string;
-  assignments: ManagerListAssignment[];
+  permissions: string[];
 }
 
 export interface ManagerListResponse {
@@ -271,4 +239,16 @@ export function describeManagerPermissions(permissions: string[]): string[] {
 
 export function formatManagerPhone(m: Pick<ManagerListItem, "country_code" | "phone_number">) {
   return [m.country_code, m.phone_number].filter(Boolean).join(" ") || "—";
+}
+
+/** Short summary for tables: "Orders, Menu +3" (modules with any permission). */
+export function summarizeManagerModules(permissions: string[], max = 2) {
+  const modules = MANAGER_PERMISSION_MODULES.filter(
+    (m) =>
+      permissions.includes(permissionKey(m.key, "view")) ||
+      permissions.includes(permissionKey(m.key, "manage")),
+  ).map((m) => m.label);
+  const shown = modules.slice(0, max).join(", ");
+  const rest = modules.length - max;
+  return rest > 0 ? `${shown} +${rest}` : shown;
 }

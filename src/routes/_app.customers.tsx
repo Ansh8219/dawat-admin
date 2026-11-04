@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
@@ -138,6 +139,7 @@ function inrMoney(n: number): string {
 }
 
 function CustomersPage() {
+  const manageCustomers = useAccess().canManage("customers");
   const navigate = useNavigate();
   const [results, setResults] = useState<Customer[]>([]);
   const [summary, setSummary] = useState<CustomerSummary>(EMPTY_SUMMARY);
@@ -269,9 +271,7 @@ function CustomersPage() {
         ),
       );
       setSel((prev) =>
-        prev?.public_id === customer.public_id
-          ? { ...prev, is_active: updated.is_active }
-          : prev,
+        prev?.public_id === customer.public_id ? { ...prev, is_active: updated.is_active } : prev,
       );
       toast.success(
         next
@@ -463,7 +463,10 @@ function CustomersPage() {
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   {c.profile_picture_url ? (
-                                    <AvatarImage src={c.profile_picture_url} alt={displayName(c.full_name)} />
+                                    <AvatarImage
+                                      src={c.profile_picture_url}
+                                      alt={displayName(c.full_name)}
+                                    />
                                   ) : null}
                                   <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                     {initials(c.full_name)}
@@ -505,7 +508,7 @@ function CustomersPage() {
                               <div className="flex items-center gap-2">
                                 <Switch
                                   checked={c.is_active}
-                                  disabled={togglingId === c.public_id}
+                                  disabled={togglingId === c.public_id || !manageCustomers}
                                   onCheckedChange={(v) => void toggleActive(c, v)}
                                 />
                                 <span className="text-xs text-muted-foreground">
@@ -521,11 +524,13 @@ function CustomersPage() {
                                 items={[
                                   { label: "View profile", onClick: () => setSel(c) },
                                   {
+                                    requires: "customers",
                                     label: c.is_active ? "Deactivate" : "Activate",
                                     onClick: () => void toggleActive(c, !c.is_active),
                                   },
                                   { separator: true, label: "", onClick: () => {} },
                                   {
+                                    requires: "customers",
                                     label: "Delete",
                                     onClick: () => setDeleteTarget(c),
                                     destructive: true,
@@ -716,16 +721,16 @@ function CustomersPage() {
                       </div>
                       <Switch
                         checked={sel.is_active}
-                        disabled={togglingId === sel.public_id}
+                        disabled={togglingId === sel.public_id || !manageCustomers}
                         onCheckedChange={(v) => void toggleActive(sel, v)}
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className={manageCustomers ? "flex gap-2" : "hidden"}>
                       <Button
                         variant="outline"
                         className="flex-1 rounded-xl"
                         onClick={() => void toggleActive(sel, !sel.is_active)}
-                        disabled={togglingId === sel.public_id}
+                        disabled={togglingId === sel.public_id || !manageCustomers}
                       >
                         {sel.is_active ? "Deactivate" : "Activate"}
                       </Button>

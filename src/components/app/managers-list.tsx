@@ -34,7 +34,7 @@ import {
   describeManagerPermissions,
   formatManagerPhone,
   listManagers,
-  type ManagerListAssignment,
+  summarizeManagerModules,
   type ManagerListItem,
 } from "@/lib/api/managers";
 import {
@@ -49,9 +49,8 @@ import { withAuthRetry } from "@/lib/api/with-auth";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZES = [10, 20, 50] as const;
-const MAX_CHIPS = 2;
 const PENDING_TIP =
-  "Manager has not logged in yet. Invite email may not have been delivered, or the link has not been used.";
+  "Manager has not logged in yet. The temporary password email may not have been delivered.";
 
 function relativeTime(value: string | null): string {
   if (!value) return "Never";
@@ -66,63 +65,27 @@ function formatDate(value: string): string {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function BusinessChip({ a }: { a: ManagerListAssignment }) {
-  const perms = describeManagerPermissions(a.permissions);
+function PermissionSummary({ permissions }: { permissions: string[] }) {
+  const summary = summarizeManagerModules(permissions);
+  const full = describeManagerPermissions(permissions);
+  if (!summary) return <span className="text-xs text-muted-foreground">No permissions</span>;
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="max-w-[160px] truncate rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
-        >
-          {a.business_name}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 text-sm" align="start">
-        <p className="mb-2 font-semibold">{a.business_name}</p>
-        {perms.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No permissions</p>
-        ) : (
-          <ul className="max-h-60 space-y-1 overflow-y-auto text-xs text-muted-foreground">
-            {perms.map((p) => (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0} className="cursor-default text-sm">
+            {summary}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <ul className="space-y-0.5 text-xs">
+            {full.map((p) => (
               <li key={p}>{p}</li>
             ))}
           </ul>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function BusinessChips({ assignments }: { assignments: ManagerListAssignment[] }) {
-  if (assignments.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
-  const shown = assignments.slice(0, MAX_CHIPS);
-  const rest = assignments.slice(MAX_CHIPS);
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {shown.map((a) => (
-        <BusinessChip key={a.business_id} a={a} />
-      ))}
-      {rest.length > 0 && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              +{rest.length} more
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto max-w-xs" align="start">
-            <div className="flex flex-wrap gap-1.5">
-              {rest.map((a) => (
-                <BusinessChip key={a.business_id} a={a} />
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -346,7 +309,7 @@ export function ManagersList({
             <tr>
               <th className="px-4 py-3 text-left font-medium">Manager</th>
               <th className="px-4 py-3 text-left font-medium">Phone</th>
-              <th className="px-4 py-3 text-left font-medium">Businesses</th>
+              <th className="px-4 py-3 text-left font-medium">Permissions</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Last login</th>
               <th className="px-4 py-3 text-left font-medium">Created</th>
@@ -364,7 +327,7 @@ export function ManagersList({
                   {formatManagerPhone(m)}
                 </td>
                 <td className="px-4 py-3">
-                  <BusinessChips assignments={m.assignments ?? []} />
+                  <PermissionSummary permissions={m.permissions ?? []} />
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadges m={m} />
@@ -398,7 +361,7 @@ export function ManagersList({
               </div>
               <StatusBadges m={m} />
             </div>
-            <BusinessChips assignments={m.assignments ?? []} />
+            <PermissionSummary permissions={m.permissions ?? []} />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Last login: {relativeTime(m.last_login)}</span>
               <span>Created {formatDate(m.created_at)}</span>
@@ -467,7 +430,7 @@ export function ManagersList({
             <AlertDialogTitle>Delete manager?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `Delete ${deleteTarget.name || deleteTarget.email} permanently? This removes their account and business assignments and cannot be undone. Consider deactivating instead.`
+                ? `Delete ${deleteTarget.name || deleteTarget.email} permanently? This removes their account and permissions and cannot be undone. Consider deactivating instead.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>

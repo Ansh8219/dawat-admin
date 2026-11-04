@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/lib/access";
 
 export type RowActionItem = {
   label: string;
@@ -17,6 +18,8 @@ export type RowActionItem = {
   destructive?: boolean;
   separator?: boolean;
   disabled?: boolean;
+  /** Module whose `:manage` permission is needed to show this item. */
+  requires?: string;
 };
 
 export function RowActions({
@@ -30,6 +33,13 @@ export function RowActions({
   className?: string;
   label?: string;
 }) {
+  const { canManage } = useAccess();
+  const allowed = items.filter((i) => i.separator || !i.requires || canManage(i.requires));
+  // Drop leading/trailing/duplicate separators left by filtering.
+  const visible = allowed.filter(
+    (it, i, arr) => !it.separator || (i > 0 && i < arr.length - 1 && !arr[i - 1].separator),
+  );
+  if (visible.length === 0) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -37,7 +47,10 @@ export function RowActions({
           type="button"
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground", className)}
+          className={cn(
+            "h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground",
+            className,
+          )}
           aria-label={label}
           onClick={(e) => e.stopPropagation()}
         >
@@ -45,7 +58,7 @@ export function RowActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-48" onClick={(e) => e.stopPropagation()}>
-        {items.map((item, i) =>
+        {visible.map((item, i) =>
           item.separator ? (
             <DropdownMenuSeparator key={`sep-${i}`} />
           ) : (

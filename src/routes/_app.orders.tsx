@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,7 @@ function itemLabel(item: NonNullable<AdminOrder["items"]>[number]): string {
 }
 
 function OrdersPage() {
+  const manageOrders = useAccess().canManage("orders");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const meta = usePanelMeta();
@@ -482,7 +484,10 @@ function OrdersPage() {
             <p className="mt-0.5 text-xs text-muted-foreground">{meta.label} · kitchen board</p>
           </div>
 
-          <Button className="rounded-xl gap-2" onClick={() => void navigate({ to: "/pos" })}>
+          <Button
+            className={cn("rounded-xl gap-2", !manageOrders && "hidden")}
+            onClick={() => void navigate({ to: "/pos" })}
+          >
             <Plus className="h-4 w-4" />
             New Order
           </Button>
@@ -831,7 +836,7 @@ function OrdersPage() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
+                <div className={cn("flex flex-wrap gap-2", !manageOrders && "hidden")}>
                   {isPlacedStatus(selected.status) && (
                     <Button className="rounded-xl" onClick={() => openAccept(selected)}>
                       Accept
@@ -983,6 +988,7 @@ function OrderTicket({
   onHandover: () => void;
   onCollect: () => void;
 }) {
+  const manageOrders = useAccess().canManage("orders");
   const isPlaced = isPlacedStatus(order.status);
   const isAccepted = order.status === "accepted";
   const isPreparing = order.status === "preparing";
@@ -1115,7 +1121,7 @@ function OrderTicket({
         </div>
       </button>
 
-      <div className="flex border-t border-border/70">
+      <div className={cn("flex border-t border-border/70", !manageOrders && "hidden")}>
         {isPlaced && (
           <button
             type="button"

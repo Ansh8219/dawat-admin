@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const SETTINGS_TABS = [
-  "business",
-  "businesses",
-  "delivery",
-  "security",
-] as const;
+const SETTINGS_TABS = ["business", "businesses", "delivery", "security"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const settingsSearchSchema = z.object({
@@ -48,7 +44,10 @@ function SettingsPage() {
   const user = useAuth((s) => s.user);
   const canChangePassword = isSuperAdmin(user);
   const navigate = useNavigate({ from: Route.fullPath });
-  const tab: SettingsTab = Route.useSearch().tab ?? "business";
+  const platformAdmin = useAccess().isSuperAdmin;
+  const requestedTab: SettingsTab = Route.useSearch().tab ?? "business";
+  // Business profile, businesses and delivery are platform settings (super admin only).
+  const tab: SettingsTab = platformAdmin ? requestedTab : "security";
   const setTab = (value: string) =>
     void navigate({
       search: { tab: value === "business" ? undefined : (value as SettingsTab) },
@@ -65,9 +64,13 @@ function SettingsPage() {
       <div className="p-4 sm:p-6 lg:p-8">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="rounded-xl flex-wrap h-auto">
-            <TabsTrigger value="business">Business</TabsTrigger>
-            <TabsTrigger value="businesses">Businesses</TabsTrigger>
-            <TabsTrigger value="delivery">Delivery</TabsTrigger>
+            {platformAdmin && (
+              <>
+                <TabsTrigger value="business">Business</TabsTrigger>
+                <TabsTrigger value="businesses">Businesses</TabsTrigger>
+                <TabsTrigger value="delivery">Delivery</TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -92,7 +95,7 @@ function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="delivery" className="mt-4">
-            {tab === "delivery" ? <DeliverySettingsForm /> : null}
+            {platformAdmin && tab === "delivery" ? <DeliverySettingsForm /> : null}
           </TabsContent>
 
           <TabsContent value="security" className="mt-4">
@@ -249,8 +252,8 @@ function DeliverySettingsForm() {
       <div>
         <div className="text-sm font-semibold">Delivery settings</div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Search a place or drop a pin to set pickup. Delivery fee is always distance × per-km
-          rate. There is no free delivery.
+          Search a place or drop a pin to set pickup. Delivery fee is always distance × per-km rate.
+          There is no free delivery.
         </p>
       </div>
 

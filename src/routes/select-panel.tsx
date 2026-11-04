@@ -31,7 +31,13 @@ import { listBusinesses } from "@/lib/api/businesses";
 import type { Business } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/types";
 import { LOGO_SRC, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
-import { canCheckPersistedAuth, getSelectedPanel, isAuthenticated, useAuth } from "@/lib/auth";
+import {
+  canCheckPersistedAuth,
+  getSelectedPanel,
+  isAuthenticated,
+  mustChangePassword,
+  useAuth,
+} from "@/lib/auth";
 import { PANEL_META, businessTypeToPanel, type Panel } from "@/lib/panel";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +46,9 @@ export const Route = createFileRoute("/select-panel")({
     if (!canCheckPersistedAuth()) return;
     if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
+    }
+    if (mustChangePassword()) {
+      throw redirect({ to: "/change-password" });
     }
   },
   component: SelectPanelPage,
@@ -156,7 +165,8 @@ function SelectPanelPage() {
             throw err;
           }
         }
-        if (!cancelled) setBusinesses(data);
+        if (cancelled) return;
+        setBusinesses(data);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.code === "staff_access_denied") {

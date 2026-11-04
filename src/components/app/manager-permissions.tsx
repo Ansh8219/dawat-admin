@@ -16,8 +16,7 @@ export function ManagerPermissions({ value, onChange, idPrefix }: Props) {
   const set = new Set(value);
   const allSelected = ALL_MANAGER_PERMISSIONS.every((k) => set.has(k));
 
-  const emit = (next: Set<string>) =>
-    onChange(ALL_MANAGER_PERMISSIONS.filter((k) => next.has(k)));
+  const emit = (next: Set<string>) => onChange(ALL_MANAGER_PERMISSIONS.filter((k) => next.has(k)));
 
   const toggleView = (module: string, checked: boolean) => {
     const next = new Set(set);

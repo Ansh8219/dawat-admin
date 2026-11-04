@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
@@ -134,6 +135,7 @@ function durationLabel(hours: number): string {
 }
 
 function DiningTableBookings() {
+  const platformAdmin = useAccess().isSuperAdmin;
   const navigate = useNavigate();
   const meta = usePanelMeta();
   const [tab, setTab] = useState("bookings");
@@ -215,6 +217,7 @@ function DiningTableBookings() {
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
+        actionModule={useAuth.getState().panel === "banquet" ? "halls" : "tables"}
         title="Table Bookings"
         crumbs={["Operations", "Table Bookings"]}
         description={`Customer dining reservations · GST ${meta.gst}. Occasion is chosen in the customer app and shown here only.`}
@@ -226,9 +229,11 @@ function DiningTableBookings() {
             <TabsTrigger value="bookings" className="rounded-lg">
               Bookings
             </TabsTrigger>
-            <TabsTrigger value="rate" className="rounded-lg">
-              Guest rate
-            </TabsTrigger>
+            {platformAdmin && (
+              <TabsTrigger value="rate" className="rounded-lg">
+                Guest rate
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="bookings" className="mt-4 space-y-4">
@@ -256,7 +261,10 @@ function DiningTableBookings() {
                     setPage(1);
                   }}
                 >
-                  <SelectTrigger id="booking-status" className="mt-1 h-10 w-[200px] rounded-xl bg-card">
+                  <SelectTrigger
+                    id="booking-status"
+                    className="mt-1 h-10 w-[200px] rounded-xl bg-card"
+                  >
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -299,7 +307,9 @@ function DiningTableBookings() {
                   <p className="font-medium">No bookings</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Nothing for {formatBookingDate(date)}
-                    {status === "all" ? "" : ` with status ${bookingStatusLabel(status).toLowerCase()}`}
+                    {status === "all"
+                      ? ""
+                      : ` with status ${bookingStatusLabel(status).toLowerCase()}`}
                     .
                   </p>
                 </div>
@@ -404,7 +414,9 @@ function DiningTableBookings() {
           </TabsContent>
 
           <TabsContent value="rate" className="mt-4">
-            {tab === "rate" ? <BookingRateForm onAuthError={handleAuthError} /> : null}
+            {platformAdmin && tab === "rate" ? (
+              <BookingRateForm onAuthError={handleAuthError} />
+            ) : null}
           </TabsContent>
         </Tabs>
       </div>
@@ -678,7 +690,10 @@ function BanquetBookings() {
                       <RowActions
                         items={[
                           { label: "View contract", onClick: () => toast.message(e.title) },
-                          { label: "Edit event", onClick: () => toast.message(`Edit · ${e.title}`) },
+                          {
+                            label: "Edit event",
+                            onClick: () => toast.message(`Edit · ${e.title}`),
+                          },
                           {
                             label: "Collect advance",
                             onClick: () => toast.success(`Advance reminder sent for ${e.title}`),

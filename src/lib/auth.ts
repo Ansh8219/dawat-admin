@@ -1,15 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { onPasswordChangeRequired } from "./api/client";
 import {
   adminLogin,
   changePassword as changePasswordApi,
   forgotPassword,
   getMe,
+  getMyAccess,
   refreshAccessToken,
   resetPassword as resetPasswordApi,
 } from "./api/auth";
 import { ApiError } from "./api/types";
-import type { AuthUser as ApiAuthUser, Business } from "./api/types";
+import type { AdminAccess, AuthUser as ApiAuthUser, Business } from "./api/types";
 import { businessTypeToPanel, type Panel } from "./panel";
 
 export interface AuthUser {
@@ -17,6 +19,8 @@ export interface AuthUser {
   email: string;
   role: string;
   isStaff: boolean;
+  /** Temporary password in use — user must set a new one before anything else. */
+  mustChangePassword: boolean;
   /** Display label derived from email local-part when API has no name. */
   name: string;
 }
@@ -40,7 +44,14 @@ interface AuthState {
   tokens: AuthTokens | null;
   panel: Panel | null;
   business: SelectedBusiness | null;
-  login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Role/permissions from GET /api/admin/me/access/. */
+  access: AdminAccess | null;
+  /** Fetches and stores access. Returns false if it could not be loaded. */
+  loadAccess: () => Promise<boolean>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: true; mustChangePassword: boolean } | { ok: false; error: string }>;
   logout: () => void;
   selectBusiness: (business: Business) => { ok: true } | { ok: false; error: string };
   /** @deprecated Prefer selectBusiness — kept for callers that only know the panel slug. */
@@ -59,6 +70,10 @@ interface AuthState {
     password: string,
     passwordConfirm: string,
   ) => Promise<{ ok: true; detail: string } | { ok: false; error: string }>;
+  /** Flag the stored user as needing a password change (global 403 guard). */
+  requirePasswordChange: () => void;
+  /** Call after a successful password change; keeps the same tokens. */
+  markPasswordChanged: () => void;
   refreshSession: () => Promise<boolean>;
   getAccessToken: () => string | null;
 }
@@ -77,6 +92,7 @@ type PersistedAuthState = {
   tokens?: AuthTokens | null;
   panel?: Panel | null;
   business?: SelectedBusiness | null;
+  access?: AdminAccess | null;
 };
 
 function readPersistedAuthState(): PersistedAuthState | null {
@@ -108,6 +124,7 @@ function mapUser(user: ApiAuthUser): AuthUser {
     email,
     role: user.role,
     isStaff: Boolean(user.is_staff),
+    mustChangePassword: Boolean(user.must_change_password),
     name: displayNameFromEmail(email),
   };
 }
@@ -119,7 +136,7 @@ function toErrorMessage(err: unknown, fallback: string): string {
 }
 
 function clearSession() {
-  return { user: null, tokens: null, panel: null, business: null } as const;
+  return { user: null, tokens: null, panel: null, business: null, access: null } as const;
 }
 
 export function isAuthenticated(): boolean {
@@ -146,6 +163,29 @@ export const useAuth = create<AuthState>()(
       tokens: null,
       panel: null,
       business: null,
+      access: null,
+
+      loadAccess: async () => {
+        // Not using withAuthRetry here: it imports this store (cycle).
+        let token = get().getAccessToken();
+        if (!token) return false;
+        try {
+          let access: AdminAccess;
+          try {
+            access = await getMyAccess(token);
+          } catch (err) {
+            if (!(err instanceof ApiError) || err.status !== 401) throw err;
+            if (!(await get().refreshSession())) return false;
+            token = get().getAccessToken();
+            if (!token) return false;
+            access = await getMyAccess(token);
+          }
+          set({ access });
+          return true;
+        } catch {
+          return false;
+        }
+      },
 
       login: async (email, password) => {
         const normalized = email.trim().toLowerCase();
@@ -155,17 +195,30 @@ export const useAuth = create<AuthState>()(
         try {
           const data = await adminLogin(normalized, password);
           try {
-            const me = await getMe(data.access);
-            if (!me?.user) {
-              throw new Error("Admin profile response was incomplete.");
+            let apiUser = data.user;
+            try {
+              const me = await getMe(data.access);
+              if (!me?.user) throw new Error("Admin profile response was incomplete.");
+              apiUser = {
+                ...me.user,
+                must_change_password:
+                  data.user?.must_change_password ?? me.user.must_change_password,
+              };
+            } catch (meErr) {
+              // /me may be blocked while a temporary password is active; fall back to login's user.
+              const blocked =
+                meErr instanceof ApiError && meErr.code === "password_change_required";
+              if (!blocked || !data.user) throw meErr;
             }
+            const mapped = mapUser(apiUser);
             set({
-              user: mapUser(me.user),
+              user: mapped,
               tokens: { access: data.access, refresh: data.refresh },
               panel: null,
               business: null,
             });
-            return { ok: true };
+            if (!mapped.mustChangePassword) await get().loadAccess();
+            return { ok: true, mustChangePassword: mapped.mustChangePassword };
           } catch (meErr) {
             set(clearSession());
             return {
@@ -265,6 +318,8 @@ export const useAuth = create<AuthState>()(
         }
         try {
           const data = await changePasswordApi(access, oldPassword, password, passwordConfirm);
+          get().markPasswordChanged();
+          await get().loadAccess();
           return { ok: true, detail: data.detail };
         } catch (err) {
           return {
@@ -272,6 +327,16 @@ export const useAuth = create<AuthState>()(
             error: toErrorMessage(err, "Unable to change password."),
           };
         }
+      },
+
+      requirePasswordChange: () => {
+        const user = get().user;
+        if (user && !user.mustChangePassword) set({ user: { ...user, mustChangePassword: true } });
+      },
+
+      markPasswordChanged: () => {
+        const user = get().user;
+        if (user) set({ user: { ...user, mustChangePassword: false } });
       },
 
       refreshSession: async () => {
@@ -302,10 +367,25 @@ export const useAuth = create<AuthState>()(
         tokens: state.tokens,
         panel: state.panel,
         business: state.business,
+        access: state.access,
       }),
     },
   ),
 );
+
+// Global guard: any API call answering 403 `password_change_required` lands on the change screen.
+onPasswordChangeRequired(() => {
+  if (!isBrowser() || !useAuth.getState().user) return;
+  useAuth.getState().requirePasswordChange();
+  if (window.location.pathname !== "/change-password") {
+    window.location.assign("/change-password");
+  }
+});
+
+/** True when the persisted user still has a temporary password. */
+export function mustChangePassword(): boolean {
+  return Boolean(readPersistedAuthState()?.user?.mustChangePassword);
+}
 
 export function isSuperAdmin(user: AuthUser | null | undefined): boolean {
   return user?.role === "super_admin";

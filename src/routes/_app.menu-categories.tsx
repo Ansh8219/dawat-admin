@@ -298,6 +298,7 @@ function MenuCategoriesPage() {
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
       <PageHeader
+        actionModule="menu"
         title="Menu Categories"
         crumbs={["Operations", "Menu Categories"]}
         description={`Organize ${meta.label} menu sections with images, sort order, and active state.`}
@@ -417,12 +418,14 @@ function MenuCategoriesPage() {
                         <RowActions
                           items={[
                             {
+                              requires: "menu",
                               label: "Edit",
                               icon: <Pencil className="mr-2 h-3.5 w-3.5" />,
                               onClick: () => openEdit(item),
                             },
                             { separator: true, label: "", onClick: () => {} },
                             {
+                              requires: "menu",
                               label: "Delete",
                               destructive: true,
                               icon: <Trash2 className="mr-2 h-3.5 w-3.5" />,
@@ -511,7 +514,8 @@ function MenuCategoriesPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium">
-                    {imageFile?.name ?? (editing ? "Replace image" : "Upload JPEG, PNG, WebP, or SVG")}
+                    {imageFile?.name ??
+                      (editing ? "Replace image" : "Upload JPEG, PNG, WebP, or SVG")}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {editing ? "Optional on update" : "Required for new categories"}
