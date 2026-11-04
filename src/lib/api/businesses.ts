@@ -1,5 +1,10 @@
-import { apiRequest } from "./client";
-import type { Business, BusinessInvoiceDetails, BusinessInvoiceDetailsPayload } from "./types";
+import { apiFormRequest, apiRequest } from "./client";
+import type {
+  Business,
+  BusinessInvoiceDetails,
+  BusinessInvoiceDetailsPayload,
+  BusinessProfile,
+} from "./types";
 
 /** GET /api/admin/businesses/{public_id}/invoice-details/ */
 export function getBusinessInvoiceDetails(accessToken: string, publicId: string) {
@@ -40,5 +45,14 @@ export function setBusinessAcceptingOrders(
     method: "PATCH",
     accessToken,
     body: { is_accepting_orders: isAcceptingOrders },
+  });
+}
+
+/** POST /api/admin/businesses/{public_id}/profile/ (multipart; send only changed fields) */
+export function updateBusinessProfile(accessToken: string, publicId: string, body: FormData) {
+  return apiFormRequest<BusinessProfile>(`/api/admin/businesses/${publicId}/profile/`, {
+    method: "POST",
+    accessToken,
+    body,
   });
 }

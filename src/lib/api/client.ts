@@ -44,7 +44,9 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
       typeof detail === "string"
         ? detail
         : formatValidationDetails(detail) || `Unexpected response (${response.status}).`;
-    throw new ApiError(response.status, "validation_error", message, detail);
+    const rawCode = (raw as { code?: unknown }).code;
+    const code = typeof rawCode === "string" && rawCode ? rawCode : "validation_error";
+    throw new ApiError(response.status, code, message, detail);
   }
 
   const envelope = raw as ApiEnvelope<T>;
@@ -82,7 +84,7 @@ function humanizeErrorCode(code: string): string {
     case "validation_error":
       return "Please check your input and try again.";
     case "invalid_reset_token":
-      return "This reset link is invalid or has expired.";
+      return "This link is invalid or has expired. Ask your admin to invite you again.";
     case "invalid_old_password":
       return "Current password is incorrect.";
     case "not_authenticated":
@@ -187,6 +189,14 @@ function humanizeErrorCode(code: string): string {
       return "Invoices have already been issued with this prefix, so it can't be changed.";
     case "gst_number_taken":
       return "Another business already uses this GSTIN.";
+    case "invalid_name":
+      return "Business name must be 2–255 characters.";
+    case "invalid_logo":
+      return "Logo must be a valid image (PNG, JPG, WEBP or SVG).";
+    case "file_too_large":
+      return "Logo is too large. Maximum size is 10 MB.";
+    case "email_taken":
+      return "An account with this email already exists.";
     case "invoice_prefix_taken":
       return "Another business already uses this invoice prefix.";
     default:

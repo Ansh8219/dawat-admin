@@ -65,6 +65,15 @@ export interface Business {
   missing_fields: string[];
 }
 
+/** POST /api/admin/businesses/{public_id}/profile/ */
+export interface BusinessProfile {
+  public_id: string;
+  panel_unit: string;
+  name: string;
+  logo: string | null;
+  email: string;
+}
+
 /** GET /api/admin/dashboard/?business_public_id= */
 export interface DashboardBusiness {
   public_id: string;
@@ -545,6 +554,8 @@ export interface PartnerListItem {
   country_code: string;
   email: string | null;
   partner_status: PartnerStatus;
+  /** Account sign-in state (super_admin can toggle). */
+  is_active?: boolean;
   submitted_at: string | null;
   created_at: string;
   wallet: PartnerWallet;
@@ -616,6 +627,7 @@ export interface PartnerBank {
 
 export interface PartnerDetail {
   public_id: string;
+  is_active?: boolean;
   partner_status: PartnerStatus;
   rejection_reason: string | null;
   submitted_at: string | null;
@@ -690,6 +702,7 @@ export interface StoreKeeperListItem {
   email: string | null;
   assigned_store: StoreKeeperAssignedStore | null;
   store_keeper_status: StoreKeeperStatus;
+  is_active?: boolean;
   submitted_at: string | null;
   created_at: string;
 }
@@ -734,6 +747,7 @@ export interface StoreKeeperDocuments {
 
 export interface StoreKeeperDetail {
   public_id: string;
+  is_active?: boolean;
   store_keeper_code: string | null;
   store_keeper_status: StoreKeeperStatus;
   rejection_reason: string | null;

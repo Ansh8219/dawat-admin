@@ -238,6 +238,9 @@ export const useAuth = create<AuthState>()(
         if (password !== passwordConfirm) {
           return { ok: false, error: "Passwords do not match." };
         }
+        if (password.length < 8) {
+          return { ok: false, error: "Password must be at least 8 characters." };
+        }
         try {
           const data = await resetPasswordApi(token.trim(), password, passwordConfirm);
           return { ok: true, detail: data.detail };

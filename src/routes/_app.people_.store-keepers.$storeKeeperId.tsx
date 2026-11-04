@@ -1,11 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+  AccountStatusToggle,
+  InactiveBadge,
+  isAccountActive,
+} from "@/components/app/account-status-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import {
@@ -145,10 +144,7 @@ function StoreKeeperDetailPage() {
     [storeKeeper],
   );
 
-  const lastRejectedFieldSet = useMemo(
-    () => new Set(lastRejectedFields),
-    [lastRejectedFields],
-  );
+  const lastRejectedFieldSet = useMemo(() => new Set(lastRejectedFields), [lastRejectedFields]);
 
   const isResubmitReview =
     storeKeeper?.store_keeper_status === "pending" && lastRejectedFields.length > 0;
@@ -263,7 +259,12 @@ function StoreKeeperDetailPage() {
             <div className="max-w-md rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {loadError}
             </div>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => void load()}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => void load()}
+            >
               Try again
             </Button>
           </div>
@@ -297,15 +298,14 @@ function StoreKeeperDetailPage() {
                       <StatusBadge
                         status={storeKeeperStatusLabel(storeKeeper.store_keeper_status)}
                       />
+                      {!isAccountActive(storeKeeper) && <InactiveBadge />}
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {formatStoreKeeperPhone(storeKeeper.user ?? {})} ·{" "}
                       {display(storeKeeper.user?.email)}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {storeKeeper.store_keeper_code
-                        ? `${storeKeeper.store_keeper_code} · `
-                        : ""}
+                      {storeKeeper.store_keeper_code ? `${storeKeeper.store_keeper_code} · ` : ""}
                       Submitted {formatStoreKeeperDate(storeKeeper.submitted_at)}
                       {storeKeeper.reviewed_at
                         ? ` · Reviewed ${formatStoreKeeperDate(storeKeeper.reviewed_at)}`
@@ -314,28 +314,45 @@ function StoreKeeperDetailPage() {
                   </div>
                 </div>
 
-                {canReview ? (
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        setRejectReason("");
-                        setRejectedFields([]);
-                        setRejectOpen(true);
-                      }}
-                    >
-                      <XCircle className="h-4 w-4" /> Reject
-                    </Button>
-                    <Button className="rounded-xl gap-2" onClick={() => setApproveOpen(true)}>
-                      <CheckCircle2 className="h-4 w-4" /> Approve
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    Only pending applications can be reviewed.
-                  </div>
-                )}
+                <div className="flex shrink-0 flex-wrap items-center gap-3">
+                  <AccountStatusToggle
+                    kind="store_keeper"
+                    publicId={storeKeeper.public_id}
+                    name={storeKeeper.profile?.full_name || "Store keeper"}
+                    isActive={isAccountActive(storeKeeper)}
+                    onChanged={(v) =>
+                      setStoreKeeper((prev) => (prev ? { ...prev, is_active: v } : prev))
+                    }
+                    onNotFound={() =>
+                      void navigate({
+                        to: "/people",
+                        search: { role: "store_keepers", status: "all" },
+                      })
+                    }
+                  />
+                  {canReview ? (
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          setRejectReason("");
+                          setRejectedFields([]);
+                          setRejectOpen(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" /> Reject
+                      </Button>
+                      <Button className="rounded-xl gap-2" onClick={() => setApproveOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4" /> Approve
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      Only pending applications can be reviewed.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

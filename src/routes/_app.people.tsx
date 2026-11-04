@@ -26,9 +26,25 @@ import type {
   StoreKeeperStatus,
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
-import { useAuth } from "@/lib/auth";
+import {
+  AccountStatusToggle,
+  InactiveBadge,
+  isAccountActive,
+} from "@/components/app/account-status-toggle";
+import { ManagersList } from "@/components/app/managers-list";
+import { ManagerCreateForm } from "@/components/app/manager-create-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { isSuperAdmin, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
+  UserPlus,
   Bike,
   ChevronLeft,
   ChevronRight,
@@ -82,7 +98,7 @@ const ROLE_TABS: {
     id: "managers",
     label: "Managers",
     icon: UserCog,
-    description: "Manager applications will appear here soon.",
+    description: "Managers invited by a super admin, with their business access.",
   },
 ];
 
@@ -114,13 +130,24 @@ function PeoplePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [page, setPage] = useState(1);
+  const [addManagerOpen, setAddManagerOpen] = useState(false);
+  const [managersRefresh, setManagersRefresh] = useState(0);
+  const canAddManager = isSuperAdmin(useAuth((s) => s.user));
 
-  const activeRole = ROLE_TABS.find((r) => r.id === role) ?? ROLE_TABS[0];
+  const roleTabs = ROLE_TABS.filter((t) => t.id !== "managers" || canAddManager);
+  const activeRole = roleTabs.find((r) => r.id === role) ?? roleTabs[0];
   const statusTabs = STATUS_TABS.filter((tab) => !tab.roles || tab.roles.includes(role));
 
   useEffect(() => {
     setPage(1);
   }, [role, status]);
+
+  // Managers tab is super_admin only.
+  useEffect(() => {
+    if (role === "managers" && !canAddManager) {
+      void navigate({ search: (prev) => ({ ...prev, role: "partners" }), replace: true });
+    }
+  }, [role, canAddManager, navigate]);
 
   useEffect(() => {
     if (role !== "store_keepers" && status === "draft") {
@@ -163,7 +190,8 @@ function PeoplePage() {
         if (role === "partners") {
           const data = await withAuthRetry((token) =>
             listPartners(token, {
-              status: status === "all" || status === "draft" ? undefined : (status as PartnerStatus),
+              status:
+                status === "all" || status === "draft" ? undefined : (status as PartnerStatus),
               page,
               page_size: PAGE_SIZE,
             }),
@@ -219,11 +247,36 @@ function PeoplePage() {
         title="Staff"
         crumbs={["Admin", "Staff"]}
         description="One place to review and check partners, store keepers, and managers."
+        action={
+          canAddManager && role === "managers" ? (
+            <Dialog open={addManagerOpen} onOpenChange={setAddManagerOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl">
+                  <UserPlus className="mr-2 h-4 w-4" /> Add manager
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Add manager</DialogTitle>
+                  <DialogDescription>
+                    Invite a manager and choose what they can do in each business.
+                  </DialogDescription>
+                </DialogHeader>
+                <ManagerCreateForm
+                  onCreated={() => {
+                    setAddManagerOpen(false);
+                    setManagersRefresh((k) => k + 1);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : undefined
+        }
       />
 
       <div className="space-y-5 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap gap-2">
-          {ROLE_TABS.map((tab) => {
+          {roleTabs.map((tab) => {
             const active = role === tab.id;
             const Icon = tab.icon;
             return (
@@ -235,7 +288,10 @@ function PeoplePage() {
                     search: (prev) => ({
                       ...prev,
                       role: tab.id,
-                      status: prev.status === "draft" && tab.id !== "store_keepers" ? "pending" : prev.status,
+                      status:
+                        prev.status === "draft" && tab.id !== "store_keepers"
+                          ? "pending"
+                          : prev.status,
                     }),
                   })
                 }
@@ -256,7 +312,7 @@ function PeoplePage() {
         <div className="card-elevated overflow-hidden">
           <div className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              {statusTabs.map((tab) => {
+              {(role === "managers" ? [] : statusTabs).map((tab) => {
                 const active = status === tab.id;
                 return (
                   <button
@@ -285,15 +341,7 @@ function PeoplePage() {
           </div>
 
           {role === "managers" ? (
-            <div className="flex flex-col items-center justify-center gap-3 px-4 py-24 text-center text-muted-foreground">
-              <UserCog className="h-10 w-10 opacity-40" />
-              <div>
-                <p className="font-medium text-foreground">Managers coming soon</p>
-                <p className="mt-1 text-sm">
-                  Manager applications will use the same review and directory flow.
-                </p>
-              </div>
-            </div>
+            <ManagersList refreshKey={managersRefresh} onAdd={() => setAddManagerOpen(true)} />
           ) : loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -393,22 +441,39 @@ function PeoplePage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={partnerStatusLabel(p.partner_status)} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status={partnerStatusLabel(p.partner_status)} />
+                      {!isAccountActive(p) && <InactiveBadge />}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="sm"
-                      variant={p.partner_status === "pending" ? "default" : "outline"}
-                      className="h-8 rounded-lg text-xs"
-                      asChild
-                    >
-                      <Link
-                        to="/people/partners/$partnerId"
-                        params={{ partnerId: p.public_id }}
+                    <div className="flex items-center justify-end gap-3">
+                      <AccountStatusToggle
+                        kind="driver"
+                        publicId={p.public_id}
+                        name={p.full_name || "Driver"}
+                        isActive={isAccountActive(p)}
+                        showLabel={false}
+                        onChanged={(v) =>
+                          setPartners((prev) =>
+                            prev.map((x) =>
+                              x.public_id === p.public_id ? { ...x, is_active: v } : x,
+                            ),
+                          )
+                        }
+                        onNotFound={() => void refresh()}
+                      />
+                      <Button
+                        size="sm"
+                        variant={p.partner_status === "pending" ? "default" : "outline"}
+                        className="h-8 rounded-lg text-xs"
+                        asChild
                       >
-                        {p.partner_status === "pending" ? "Review" : "View"}
-                      </Link>
-                    </Button>
+                        <Link to="/people/partners/$partnerId" params={{ partnerId: p.public_id }}>
+                          {p.partner_status === "pending" ? "Review" : "View"}
+                        </Link>
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -486,22 +551,42 @@ function PeoplePage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={storeKeeperStatusLabel(sk.store_keeper_status)} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status={storeKeeperStatusLabel(sk.store_keeper_status)} />
+                      {!isAccountActive(sk) && <InactiveBadge />}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="sm"
-                      variant={sk.store_keeper_status === "pending" ? "default" : "outline"}
-                      className="h-8 rounded-lg text-xs"
-                      asChild
-                    >
-                      <Link
-                        to="/people/store-keepers/$storeKeeperId"
-                        params={{ storeKeeperId: sk.public_id }}
+                    <div className="flex items-center justify-end gap-3">
+                      <AccountStatusToggle
+                        kind="store_keeper"
+                        publicId={sk.public_id}
+                        name={sk.full_name || "Store keeper"}
+                        isActive={isAccountActive(sk)}
+                        showLabel={false}
+                        onChanged={(v) =>
+                          setStoreKeepers((prev) =>
+                            prev.map((x) =>
+                              x.public_id === sk.public_id ? { ...x, is_active: v } : x,
+                            ),
+                          )
+                        }
+                        onNotFound={() => void refresh()}
+                      />
+                      <Button
+                        size="sm"
+                        variant={sk.store_keeper_status === "pending" ? "default" : "outline"}
+                        className="h-8 rounded-lg text-xs"
+                        asChild
                       >
-                        {sk.store_keeper_status === "pending" ? "Review" : "View"}
-                      </Link>
-                    </Button>
+                        <Link
+                          to="/people/store-keepers/$storeKeeperId"
+                          params={{ storeKeeperId: sk.public_id }}
+                        >
+                          {sk.store_keeper_status === "pending" ? "Review" : "View"}
+                        </Link>
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -563,7 +648,10 @@ function PeopleTable({
           <tbody>
             {isEmpty ? (
               <tr>
-                <td colSpan={colSpan} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={colSpan}
+                  className="px-4 py-16 text-center text-sm text-muted-foreground"
+                >
                   <div className="flex flex-col items-center gap-2">
                     <UserRound className="h-8 w-8 opacity-50" />
                     <p className="font-medium text-foreground">No {emptyLabel} found</p>

@@ -1,12 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+  AccountStatusToggle,
+  InactiveBadge,
+  isAccountActive,
+} from "@/components/app/account-status-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import {
@@ -90,7 +88,12 @@ function display(value: string | null | undefined): string {
 function buildDocuments(docs: PartnerDocuments | null | undefined): DocItem[] {
   if (!docs) return [];
   return [
-    { key: "aadhaar_front", label: "Aadhaar front", group: "Identity", src: docs.aadhaar_front_url },
+    {
+      key: "aadhaar_front",
+      label: "Aadhaar front",
+      group: "Identity",
+      src: docs.aadhaar_front_url,
+    },
     { key: "aadhaar_back", label: "Aadhaar back", group: "Identity", src: docs.aadhaar_back_url },
     { key: "licence_front", label: "Licence front", group: "Licence", src: docs.licence_front_url },
     { key: "licence_back", label: "Licence back", group: "Licence", src: docs.licence_back_url },
@@ -164,18 +167,14 @@ function PartnerDetailPage() {
     [partner],
   );
 
-  const lastRejectedFieldSet = useMemo(
-    () => new Set(lastRejectedFields),
-    [lastRejectedFields],
-  );
+  const lastRejectedFieldSet = useMemo(() => new Set(lastRejectedFields), [lastRejectedFields]);
 
   const lastRejectedSteps = useMemo(
     () => (partner?.last_rejected_steps ?? []).map(String),
     [partner],
   );
 
-  const isResubmitReview =
-    partner?.partner_status === "pending" && lastRejectedFields.length > 0;
+  const isResubmitReview = partner?.partner_status === "pending" && lastRejectedFields.length > 0;
 
   const needsRecheck = useCallback(
     (field: string) => isResubmitReview && lastRejectedFieldSet.has(field),
@@ -200,10 +199,7 @@ function PartnerDetailPage() {
     return () => window.clearTimeout(timer);
   }, [isResubmitReview, lastRejectedSteps, partner?.public_id]);
 
-  const documents = useMemo(
-    () => (partner ? buildDocuments(partner.documents) : []),
-    [partner],
-  );
+  const documents = useMemo(() => (partner ? buildDocuments(partner.documents) : []), [partner]);
 
   const documentGroups = useMemo(() => {
     const groups = new Map<string, DocItem[]>();
@@ -235,9 +231,7 @@ function PartnerDetailPage() {
     if (!partner) return;
     setReceivingCash(true);
     try {
-      const receipt = await withAuthRetry((token) =>
-        receivePartnerCash(token, partner.public_id),
-      );
+      const receipt = await withAuthRetry((token) => receivePartnerCash(token, partner.public_id));
       setPartner((prev) =>
         prev
           ? {
@@ -336,7 +330,12 @@ function PartnerDetailPage() {
             <div className="max-w-md rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {loadError}
             </div>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => void load()}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => void load()}
+            >
               Try again
             </Button>
           </div>
@@ -369,6 +368,7 @@ function PartnerDetailPage() {
                         {display(partner.profile?.full_name)}
                       </h2>
                       <StatusBadge status={partnerStatusLabel(partner.partner_status)} />
+                      {!isAccountActive(partner) && <InactiveBadge />}
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {formatPartnerPhone(partner.user ?? {})} · {display(partner.user?.email)}
@@ -387,6 +387,18 @@ function PartnerDetailPage() {
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <AccountStatusToggle
+                    kind="driver"
+                    publicId={partner.public_id}
+                    name={partner.profile?.full_name || "Driver"}
+                    isActive={isAccountActive(partner)}
+                    onChanged={(v) =>
+                      setPartner((prev) => (prev ? { ...prev, is_active: v } : prev))
+                    }
+                    onNotFound={() =>
+                      void navigate({ to: "/people", search: { role: "partners", status: "all" } })
+                    }
+                  />
                   {(partner.wallet?.cash_pending ?? 0) > 0 ? (
                     <Button
                       variant="outline"
@@ -433,18 +445,15 @@ function PartnerDetailPage() {
                       Resubmitted for re-verification
                     </p>
                     <p className="text-muted-foreground">
-                      Previously rejected:{" "}
-                      {partner.last_rejection_reason || "No reason provided."}
+                      Previously rejected: {partner.last_rejection_reason || "No reason provided."}
                     </p>
                     {lastRejectedSteps.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Re-check:{" "}
-                        {lastRejectedSteps.map(partnerRejectStepLabel).join(" · ")}
+                        Re-check: {lastRejectedSteps.map(partnerRejectStepLabel).join(" · ")}
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Fields:{" "}
-                      {lastRejectedFields.map(partnerRejectFieldLabel).join(", ")}
+                      Fields: {lastRejectedFields.map(partnerRejectFieldLabel).join(", ")}
                     </p>
                   </div>
                 </div>
@@ -463,13 +472,17 @@ function PartnerDetailPage() {
                     {partner.rejected_fields && partner.rejected_fields.length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Fields:{" "}
-                        {partner.rejected_fields.map((f) => partnerRejectFieldLabel(String(f))).join(", ")}
+                        {partner.rejected_fields
+                          .map((f) => partnerRejectFieldLabel(String(f)))
+                          .join(", ")}
                       </p>
                     )}
                     {partner.rejected_steps && partner.rejected_steps.length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Steps:{" "}
-                        {partner.rejected_steps.map((s) => partnerRejectStepLabel(String(s))).join(" · ")}
+                        {partner.rejected_steps
+                          .map((s) => partnerRejectStepLabel(String(s)))
+                          .join(" · ")}
                       </p>
                     )}
                   </div>
@@ -488,10 +501,7 @@ function PartnerDetailPage() {
 
                 <DetailCard title="Wallet" icon={Wallet}>
                   <Field label="Owed to driver" value={formatRupees(partner.wallet?.balance)} />
-                  <Field
-                    label="Cash pending"
-                    value={formatRupees(partner.wallet?.cash_pending)}
-                  />
+                  <Field label="Cash pending" value={formatRupees(partner.wallet?.cash_pending)} />
                   <p className="pt-3 text-xs text-muted-foreground">
                     Balance is delivery earnings still owed to this driver. Cash pending is cash
                     collected from customers and not yet handed to the restaurant. Cash orders add
@@ -737,10 +747,9 @@ function PartnerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Mark cash received?</AlertDialogTitle>
             <AlertDialogDescription>
-              This settles the full pending cash of{" "}
-              {formatRupees(partner?.wallet?.cash_pending)} from{" "}
-              {partner?.profile?.full_name || "this driver"} in one shot. Partial receive is not
-              supported. Earnings in balance are unchanged.
+              This settles the full pending cash of {formatRupees(partner?.wallet?.cash_pending)}{" "}
+              from {partner?.profile?.full_name || "this driver"} in one shot. Partial receive is
+              not supported. Earnings in balance are unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -805,8 +814,7 @@ function PartnerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Reject application</AlertDialogTitle>
             <AlertDialogDescription>
-              Select the exact fields with issues and explain why. The partner can fix and
-              resubmit.
+              Select the exact fields with issues and explain why. The partner can fix and resubmit.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
