@@ -3,6 +3,7 @@ import type { TableBooking, TableBookingListData, TableBookingListParams } from 
 
 export function listTableBookings(accessToken: string, params: TableBookingListParams = {}) {
   const qs = new URLSearchParams();
+  if (params.scope) qs.set("scope", params.scope);
   if (params.date) qs.set("date", params.date);
   if (params.status) qs.set("status", params.status);
   if (params.page != null) qs.set("page", String(params.page));

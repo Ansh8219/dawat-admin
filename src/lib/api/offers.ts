@@ -54,6 +54,9 @@ function buildOfferForm(
   appendChannels(form, fields.channels);
   appendField(form, "is_active", fields.is_active);
   appendField(form, "sort_order", fields.sort_order);
+  for (const id of fields.customer_public_ids ?? []) {
+    form.append("customer_public_ids", id);
+  }
   if (image) {
     form.append("image", image);
   } else if (removeImage) {

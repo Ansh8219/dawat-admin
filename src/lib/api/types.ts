@@ -1116,7 +1116,10 @@ export interface TableBooking {
   created_at: string;
 }
 
+export type TableBookingScope = "today" | "upcoming" | "past" | "all";
+
 export interface TableBookingListParams {
+  scope?: TableBookingScope;
   date?: string;
   status?: TableBookingStatus;
   page?: number;
@@ -1237,6 +1240,10 @@ export interface Offer {
   redemption_count: number;
   remaining_redemptions: number | null;
   is_currently_valid: boolean;
+  /** true = restricted to specific customers */
+  is_private?: boolean;
+  /** number of customers assigned (private coupons) */
+  customer_count?: number;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1273,6 +1280,8 @@ export interface CreateOfferPayload {
   channels: OfferChannel[];
   is_active?: boolean;
   sort_order?: number;
+  /** Omit for a public coupon. Create only; PATCH ignores it. */
+  customer_public_ids?: string[];
 }
 
 /** PATCH /api/admin/offers/{public_id}/ — multipart; image file is passed separately. */

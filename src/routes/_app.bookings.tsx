@@ -25,11 +25,30 @@ import {
 } from "@/lib/api/booking-settings";
 import { getTableBooking, listTableBookings } from "@/lib/api/table-bookings";
 import { ApiError } from "@/lib/api/types";
-import type { BookingSettings, TableBooking, TableBookingStatus } from "@/lib/api/types";
+import type {
+  BookingSettings,
+  TableBooking,
+  TableBookingScope,
+  TableBookingStatus,
+} from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
-import { Calendar, ChevronLeft, ChevronRight, Loader2, Plus, Users } from "lucide-react";
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarX,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  Loader2,
+  Plus,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/bookings")({
@@ -48,19 +67,17 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "expired", label: "Expired" },
 ];
 
+const SCOPE_TABS: { id: TableBookingScope; label: string; icon: LucideIcon; empty: string }[] = [
+  { id: "today", label: "Today", icon: CalendarDays, empty: "No bookings for today" },
+  { id: "upcoming", label: "Upcoming", icon: CalendarClock, empty: "No upcoming bookings" },
+  { id: "past", label: "Past", icon: History, empty: "No past bookings" },
+  { id: "all", label: "All", icon: Calendar, empty: "No bookings found" },
+];
+
 function BookingsPage() {
   const panel = usePanel();
   if (panel === "banquet") return <BanquetBookings />;
   return <DiningTableBookings />;
-}
-
-function todayInKolkata(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 function bookingStatusLabel(status: string): string {
@@ -139,7 +156,8 @@ function DiningTableBookings() {
   const navigate = useNavigate();
   const meta = usePanelMeta();
   const [tab, setTab] = useState("bookings");
-  const [date, setDate] = useState(todayInKolkata);
+  const [scope, setScope] = useState<TableBookingScope>("today");
+  const [date, setDate] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
   const [results, setResults] = useState<TableBooking[]>([]);
@@ -169,7 +187,8 @@ function DiningTableBookings() {
     try {
       const data = await withAuthRetry((token) =>
         listTableBookings(token, {
-          date,
+          scope,
+          date: date || undefined,
           status: status === "all" ? undefined : status,
           page,
           page_size: PAGE_SIZE,
@@ -187,7 +206,7 @@ function DiningTableBookings() {
     } finally {
       setLoading(false);
     }
-  }, [date, handleAuthError, page, status]);
+  }, [date, handleAuthError, page, scope, status]);
 
   useEffect(() => {
     void refresh();
@@ -237,23 +256,45 @@ function DiningTableBookings() {
           </TabsList>
 
           <TabsContent value="bookings" className="mt-4 space-y-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <Label htmlFor="booking-date">Date</Label>
-                <Input
-                  id="booking-date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => {
-                    const next = e.target.value || todayInKolkata();
-                    setDate(next);
-                    setPage(1);
-                  }}
-                  className="mt-1 h-10 w-[180px] rounded-xl bg-card"
-                />
+            <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-card p-2 shadow-[var(--shadow-soft)] lg:flex-row lg:items-center lg:justify-between">
+              <div
+                role="tablist"
+                aria-label="Booking range"
+                className="flex gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1"
+              >
+                {SCOPE_TABS.map((item) => {
+                  const active = !date && scope === item.id;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => {
+                        setScope(item.id);
+                        setDate("");
+                        setPage(1);
+                      }}
+                      className={cn(
+                        "flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-card hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                      {active && !loading && !loadError && (
+                        <span className="rounded-full bg-primary-foreground/20 px-1.5 text-[11px] font-bold">
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <Label htmlFor="booking-status">Status</Label>
+              <div className="flex flex-wrap items-center gap-2">
                 <Select
                   value={status}
                   onValueChange={(value) => {
@@ -263,7 +304,8 @@ function DiningTableBookings() {
                 >
                   <SelectTrigger
                     id="booking-status"
-                    className="mt-1 h-10 w-[200px] rounded-xl bg-card"
+                    aria-label="Status"
+                    className="h-10 w-[180px] rounded-xl bg-card"
                   >
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -275,6 +317,34 @@ function DiningTableBookings() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Input
+                  id="booking-date"
+                  type="date"
+                  aria-label="Specific date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "h-10 w-[160px] rounded-xl bg-card",
+                    date && "border-primary ring-1 ring-primary/30",
+                  )}
+                />
+                {date && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 rounded-xl"
+                    onClick={() => {
+                      setDate("");
+                      setPage(1);
+                    }}
+                  >
+                    <X className="h-4 w-4" /> Clear date
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -304,9 +374,12 @@ function DiningTableBookings() {
                 </div>
               ) : results.length === 0 ? (
                 <div className="px-6 py-16 text-center">
-                  <p className="font-medium">No bookings</p>
+                  <CalendarX className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                  <p className="mt-3 font-medium">No bookings found</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Nothing for {formatBookingDate(date)}
+                    {date
+                      ? `Nothing on ${formatBookingDate(date)}`
+                      : (SCOPE_TABS.find((t) => t.id === scope)?.empty ?? "No bookings found")}
                     {status === "all"
                       ? ""
                       : ` with status ${bookingStatusLabel(status).toLowerCase()}`}
@@ -316,11 +389,12 @@ function DiningTableBookings() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[860px] text-sm">
+                    <table className="w-full min-w-[960px] text-sm">
                       <thead>
                         <tr className="border-b border-border/80 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           <th className="px-4 py-3">Guest</th>
                           <th className="px-4 py-3">Table</th>
+                          <th className="px-4 py-3">Date</th>
                           <th className="px-4 py-3">Time</th>
                           <th className="px-4 py-3">Guests</th>
                           <th className="px-4 py-3">Occasion</th>
@@ -356,6 +430,9 @@ function DiningTableBookings() {
                               <div className="text-[11px] text-muted-foreground">
                                 {booking.table.seats} seats
                               </div>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 font-medium">
+                              {formatBookingDate(booking.booking_date)}
                             </td>
                             <td className="px-4 py-3">
                               <div>

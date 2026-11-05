@@ -168,6 +168,8 @@ function humanizeErrorCode(code: string): string {
       return "Invalid stock quantity. Please check and try again.";
     case "offer_code_taken":
       return "That coupon code is already in use.";
+    case "offer_customers_not_found":
+      return "One or more selected customers could not be found.";
     case "offer_not_found":
       return "Offer not found.";
     case "offer_has_redemptions":

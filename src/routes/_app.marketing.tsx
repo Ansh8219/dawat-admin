@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CustomerPicker, type PickedCustomer } from "@/components/app/customer-picker";
 import { PageHeader } from "@/components/app/page-header";
 import { RowActions } from "@/components/app/row-actions";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -46,6 +47,7 @@ import type {
   UpdateOfferPayload,
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
+import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { inr } from "@/lib/mock/data";
 import { usePanelMeta } from "@/lib/use-panel";
@@ -191,10 +193,16 @@ function customerPhone(c: OfferRedemption["customer"]) {
   return `${code} ${phone}`;
 }
 
-function buildCreatePayload(form: OfferForm): CreateOfferPayload | { error: string } {
+function buildCreatePayload(
+  form: OfferForm,
+  customers: PickedCustomer[] | null,
+): CreateOfferPayload | { error: string } {
   const code = form.code.trim().toUpperCase().replace(/\s+/g, "");
   if (!code) return { error: "Coupon code is required" };
   if (!form.title.trim()) return { error: "Title is required" };
+  if (customers && customers.length === 0) {
+    return { error: "Select at least one customer, or choose All customers" };
+  }
 
   const discount_value = Number(form.discount_value);
   if (!Number.isFinite(discount_value) || discount_value <= 0) {
@@ -230,6 +238,10 @@ function buildCreatePayload(form: OfferForm): CreateOfferPayload | { error: stri
     sort_order: Number(form.sort_order) || 0,
   };
 
+  if (customers && customers.length > 0) {
+    payload.customer_public_ids = customers.map((c) => c.public_id);
+  }
+
   if (form.discount_type === "percentage") {
     payload.max_discount = form.max_discount.trim() ? Number(form.max_discount) : null;
   }
@@ -238,7 +250,7 @@ function buildCreatePayload(form: OfferForm): CreateOfferPayload | { error: stri
 }
 
 function patchDiff(original: Offer, form: OfferForm): UpdateOfferPayload | { error: string } {
-  const created = buildCreatePayload(form);
+  const created = buildCreatePayload(form, null);
   if ("error" in created) return created;
 
   const patch: UpdateOfferPayload = {};
@@ -287,6 +299,10 @@ function patchDiff(original: Offer, form: OfferForm): UpdateOfferPayload | { err
 function MarketingPage() {
   const navigate = useNavigate();
   const meta = usePanelMeta();
+  const { canView } = useAccess();
+  const canPickCustomers = canView("customers");
+  const [audience, setAudience] = useState<"all" | "specific">("all");
+  const [pickedCustomers, setPickedCustomers] = useState<PickedCustomer[]>([]);
 
   const [results, setResults] = useState<Offer[]>([]);
   const [count, setCount] = useState(0);
@@ -418,6 +434,8 @@ function MarketingPage() {
 
   function openCreate() {
     setEditing(null);
+    setAudience("all");
+    setPickedCustomers([]);
     setForm(emptyForm());
     resetImagePicker();
     setSheetOpen(true);
@@ -508,7 +526,7 @@ function MarketingPage() {
       return;
     }
 
-    const payload = buildCreatePayload(form);
+    const payload = buildCreatePayload(form, audience === "specific" ? pickedCustomers : null);
     if ("error" in payload) {
       toast.error(payload.error);
       return;
@@ -769,6 +787,12 @@ function MarketingPage() {
                                 <Copy className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-50" />
                               </button>
                               <div className="mt-0.5 font-medium">{o.title}</div>
+                              {o.is_private && (
+                                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium">
+                                  Private · {o.customer_count ?? 0} customer
+                                  {o.customer_count === 1 ? "" : "s"}
+                                </span>
+                              )}
                               <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                                 {o.description || "—"}
                               </div>
@@ -1171,6 +1195,54 @@ function MarketingPage() {
                       className="mt-1 rounded-xl"
                     />
                   </div>
+                </div>
+                <div className="space-y-2 rounded-xl border px-3 py-3">
+                  <div className="text-sm font-medium">Who can use this coupon?</div>
+                  {editing ? (
+                    <p className="text-sm text-muted-foreground">
+                      {editing.is_private
+                        ? `Private · ${editing.customer_count ?? 0} customer${editing.customer_count === 1 ? "" : "s"}`
+                        : "All customers"}
+                      <span className="block text-xs">
+                        Assigned customers can't be changed after creation.
+                      </span>
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex gap-4 text-sm">
+                        <label className="flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="audience"
+                            checked={audience === "all"}
+                            onChange={() => setAudience("all")}
+                          />
+                          All customers
+                        </label>
+                        <label
+                          className={cn(
+                            "flex items-center gap-1.5",
+                            !canPickCustomers && "opacity-50",
+                          )}
+                          title={
+                            canPickCustomers ? undefined : "Requires customers:view permission"
+                          }
+                        >
+                          <input
+                            type="radio"
+                            name="audience"
+                            disabled={!canPickCustomers}
+                            checked={audience === "specific"}
+                            onChange={() => setAudience("specific")}
+                          />
+                          Specific customers
+                        </label>
+                      </div>
+                      {audience === "specific" && (
+                        <CustomerPicker value={pickedCustomers} onChange={setPickedCustomers} />
+                      )}
+                    </>
+                  )}
                 </div>
                 <label className="flex items-center justify-between rounded-xl border px-3 py-3">
                   <div>
