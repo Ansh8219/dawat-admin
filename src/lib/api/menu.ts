@@ -56,19 +56,32 @@ export function menuItemToSummary(item: MenuItemDetail): MenuItemSummary {
   };
 }
 
-export function listMenuItems(accessToken: string, businessPublicId: string) {
-  const params = new URLSearchParams({ business_public_id: businessPublicId });
-  return apiRequest<MenuItemSummary[] | { results?: MenuItemSummary[] }>(
-    `/api/admin/menu-items/?${params.toString()}`,
-    {
-      method: "GET",
-      accessToken,
-    },
-  ).then((data) => {
+type MenuItemsPage = {
+  count?: number;
+  page?: number;
+  page_size?: number;
+  results?: MenuItemSummary[];
+};
+
+export async function listMenuItems(accessToken: string, businessPublicId: string) {
+  const all: MenuItemSummary[] = [];
+  const MAX_PAGES = 100;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      business_public_id: businessPublicId,
+      page: String(page),
+    });
+    const data = await apiRequest<MenuItemSummary[] | MenuItemsPage>(
+      `/api/admin/menu-items/?${params.toString()}`,
+      { method: "GET", accessToken },
+    );
     if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.results)) return data.results;
-    return [];
-  });
+    const results = data?.results ?? [];
+    all.push(...results);
+    const total = data?.count ?? all.length;
+    if (results.length === 0 || all.length >= total) break;
+  }
+  return all;
 }
 
 export function getMenuItem(accessToken: string, publicId: string, businessPublicId?: string) {
