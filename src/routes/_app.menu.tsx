@@ -402,6 +402,7 @@ function MenuPage() {
   const [customAddonIds, setCustomAddonIds] = useState<Set<string>>(new Set());
   const [inventoryItems, setInventoryItems] = useState<InventoryItemDetail[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [recipeError, setRecipeError] = useState("");
 
   const panel = business?.panel ?? "restaurant";
   const formCopy = useMemo(() => getMenuFormCopy(panel), [panel]);
@@ -617,6 +618,7 @@ function MenuPage() {
     setRemovedImageIds([]);
     setForm(emptyForm(formCopy));
     setItemCodeApiError("");
+    setRecipeError("");
     clearImages();
     setCustomServes(false);
     setCustomVariantIds(new Set());
@@ -634,6 +636,7 @@ function MenuPage() {
     setDetailLoading(true);
     setModal(true);
     setItemCodeApiError("");
+    setRecipeError("");
     clearImages();
     setRemovedImageIds([]);
     setCustomServes(false);
@@ -772,13 +775,36 @@ function MenuPage() {
   }
 
   function updateVariant(id: string, patch: Partial<FormVariant>) {
-    setForm((f) => ({
-      ...f,
-      variants: f.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
-    }));
+    setForm((f) => {
+      const old = f.variants.find((v) => v.id === id);
+      const renamed = patch.name !== undefined && old && old.name !== patch.name;
+      return {
+        ...f,
+        variants: f.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+        // Keep recipe lines pointing at the renamed variant (backend matches by name).
+        recipe:
+          renamed && old.name
+            ? f.recipe.map((line) =>
+                line.scope === "variant" && line.variant_name === old.name
+                  ? { ...line, variant_name: patch.name ?? "" }
+                  : line,
+              )
+            : f.recipe,
+      };
+    });
   }
 
   function removeVariant(id: string) {
+    const removedVariant = form.variants.find((v) => v.id === id);
+    const affected = removedVariant?.name
+      ? form.recipe.filter((l) => l.scope === "variant" && l.variant_name === removedVariant.name)
+          .length
+      : 0;
+    if (affected > 0) {
+      toast.warning(
+        `${affected} recipe line${affected === 1 ? "" : "s"} used variant "${removedVariant?.name}". Pick another variant or remove ${affected === 1 ? "it" : "them"} before saving.`,
+      );
+    }
     setForm((f) => {
       const removed = f.variants.find((v) => v.id === id);
       return {
@@ -813,19 +839,20 @@ function MenuPage() {
     setForm((f) => ({ ...f, recipe: f.recipe.filter((line) => line.id !== id) }));
   }
 
-  /** Returns recipe lines, or `null` if invalid (toast already shown). Empty = omit. */
+  /** Returns the COMPLETE recipe line list, or `null` if invalid (toast already shown). */
   function buildRecipePayload(): CreateMenuRecipeLine[] | null {
     if (form.recipe.length === 0) return [];
 
     const lines: CreateMenuRecipeLine[] = [];
+    const seen = new Set<string>();
     for (const line of form.recipe) {
       if (!line.inventory_item_public_id) {
         toast.error("Select an inventory item for each recipe line");
         return null;
       }
       const quantity_per_unit = Number(line.quantity_per_unit);
-      if (Number.isNaN(quantity_per_unit) || quantity_per_unit < 0) {
-        toast.error("Recipe quantity must be a valid number");
+      if (!Number.isFinite(quantity_per_unit) || quantity_per_unit <= 0) {
+        toast.error("Recipe quantity must be a number greater than 0");
         return null;
       }
       if (line.scope === "variant") {
@@ -852,6 +879,19 @@ function MenuPage() {
           return null;
         }
       }
+
+      const target =
+        line.scope === "variant"
+          ? `v:${line.variant_name.trim()}`
+          : line.scope === "addon"
+            ? `a:${line.addon_group_name.trim()}/${line.addon_option_name.trim()}`
+            : "base";
+      const dupKey = `${line.inventory_item_public_id}|${target}`;
+      if (seen.has(dupKey)) {
+        toast.error("Duplicate recipe line: same ingredient used twice in the same scope");
+        return null;
+      }
+      seen.add(dupKey);
 
       const payload: CreateMenuRecipeLine = {
         inventory_item_public_id: line.inventory_item_public_id,
@@ -887,14 +927,43 @@ function MenuPage() {
   }
 
   function updateAddonGroup(id: string, patch: Partial<FormAddonGroup>) {
-    setForm((f) => ({
-      ...f,
-      addons: f.addons.map((g) => (g.id === id ? { ...g, ...patch } : g)),
-    }));
+    setForm((f) => {
+      const old = f.addons.find((g) => g.id === id);
+      const renamed = patch.name !== undefined && old && old.name !== patch.name;
+      return {
+        ...f,
+        addons: f.addons.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+        recipe:
+          renamed && old.name
+            ? f.recipe.map((line) =>
+                line.scope === "addon" && line.addon_group_name === old.name
+                  ? { ...line, addon_group_name: patch.name ?? "" }
+                  : line,
+              )
+            : f.recipe,
+      };
+    });
   }
 
   function removeAddonGroup(id: string) {
-    setForm((f) => ({ ...f, addons: f.addons.filter((g) => g.id !== id) }));
+    const group = form.addons.find((g) => g.id === id);
+    const affected = group?.name
+      ? form.recipe.filter((l) => l.scope === "addon" && l.addon_group_name === group.name).length
+      : 0;
+    if (affected > 0) {
+      toast.warning(
+        `${affected} recipe line${affected === 1 ? "" : "s"} used add-on group "${group?.name}". Update or remove ${affected === 1 ? "it" : "them"} before saving.`,
+      );
+    }
+    setForm((f) => ({
+      ...f,
+      addons: f.addons.filter((g) => g.id !== id),
+      recipe: f.recipe.map((line) =>
+        group && line.scope === "addon" && line.addon_group_name === group.name
+          ? { ...line, addon_group_name: "", addon_option_name: "" }
+          : line,
+      ),
+    }));
     setCustomAddonIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -914,24 +983,64 @@ function MenuPage() {
   }
 
   function updateAddonOption(groupId: string, optionId: string, patch: Partial<FormAddonOption>) {
-    setForm((f) => ({
-      ...f,
-      addons: f.addons.map((g) =>
-        g.id === groupId
-          ? {
-              ...g,
-              options: g.options.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
-            }
-          : g,
-      ),
-    }));
+    setForm((f) => {
+      const group = f.addons.find((g) => g.id === groupId);
+      const old = group?.options.find((o) => o.id === optionId);
+      const renamed = patch.name !== undefined && old && old.name !== patch.name;
+      return {
+        ...f,
+        addons: f.addons.map((g) =>
+          g.id === groupId
+            ? {
+                ...g,
+                options: g.options.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
+              }
+            : g,
+        ),
+        recipe:
+          renamed && old.name && group
+            ? f.recipe.map((line) =>
+                line.scope === "addon" &&
+                line.addon_group_name === group.name &&
+                line.addon_option_name === old.name
+                  ? { ...line, addon_option_name: patch.name ?? "" }
+                  : line,
+              )
+            : f.recipe,
+      };
+    });
   }
 
   function removeAddonOption(groupId: string, optionId: string) {
+    const group = form.addons.find((g) => g.id === groupId);
+    const opt = group?.options.find((o) => o.id === optionId);
+    const affected =
+      group && opt?.name
+        ? form.recipe.filter(
+            (l) =>
+              l.scope === "addon" &&
+              l.addon_group_name === group.name &&
+              l.addon_option_name === opt.name,
+          ).length
+        : 0;
+    if (affected > 0) {
+      toast.warning(
+        `${affected} recipe line${affected === 1 ? "" : "s"} used add-on "${opt?.name}". Update or remove ${affected === 1 ? "it" : "them"} before saving.`,
+      );
+    }
     setForm((f) => ({
       ...f,
       addons: f.addons.map((g) =>
         g.id === groupId ? { ...g, options: g.options.filter((o) => o.id !== optionId) } : g,
+      ),
+      recipe: f.recipe.map((line) =>
+        group &&
+        opt &&
+        line.scope === "addon" &&
+        line.addon_group_name === group.name &&
+        line.addon_option_name === opt.name
+          ? { ...line, addon_option_name: "" }
+          : line,
       ),
     }));
   }
@@ -989,7 +1098,8 @@ function MenuPage() {
       }
     }
 
-    const recipeLines = !editingId ? buildRecipePayload() : [];
+    setRecipeError("");
+    const recipeLines = buildRecipePayload();
     if (recipeLines === null) return;
 
     const updatePayload = {
@@ -1018,6 +1128,8 @@ function MenuPage() {
           price: Number(o.price) || 0,
         })),
       })),
+      // Always the full current list (PATCH fully replaces; [] clears).
+      ...(editingId ? { recipe: recipeLines } : {}),
       ...(editingId && removedImageIds.length ? { remove_image_public_ids: removedImageIds } : {}),
     };
 
@@ -1061,6 +1173,15 @@ function MenuPage() {
         setItemCodeApiError(msg);
         toast.error(msg);
         return;
+      }
+      if (err instanceof ApiError && (err.status === 400 || err.status === 404)) {
+        const recipeMsg = fieldErrorFromDetails(err.details, "recipe");
+        if (recipeMsg || /recipe|inventory/i.test(`${err.code} ${err.message}`)) {
+          const msg = recipeMsg || err.message;
+          setRecipeError(msg);
+          toast.error(msg);
+          return;
+        }
       }
       if (err instanceof ApiError && err.status === 400) {
         const codeMsg = fieldErrorFromDetails(err.details, "item_code");
@@ -2097,7 +2218,7 @@ function MenuPage() {
 
               <Separator />
 
-              {/* Recipe — create only (POST payload); edit shows read-only until PATCH recipe API */}
+              {/* Recipe — editable on create and edit (PATCH replaces the full list) */}
               <section className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
@@ -2105,79 +2226,40 @@ function MenuPage() {
                       Recipe
                     </h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {editingId
-                        ? "Recipe lines from the server (edit via create-only API for now)."
-                        : "Optional inventory usage per plate / variant / add-on."}
+                      Optional inventory usage per plate / variant / add-on. Saving replaces the
+                      whole recipe.
                     </p>
                   </div>
-                  {!editingId && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="rounded-lg"
-                      onClick={addRecipeLine}
-                      disabled={inventoryLoading}
-                    >
-                      <Plus className="mr-1 h-3.5 w-3.5" /> Add line
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg"
+                    onClick={addRecipeLine}
+                    disabled={inventoryLoading}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add line
+                  </Button>
                 </div>
 
-                {inventoryLoading && !editingId ? (
+                {recipeError ? (
+                  <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {recipeError}
+                  </p>
+                ) : null}
+
+                {inventoryLoading ? (
                   <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
                     Loading inventory items…
                   </p>
                 ) : form.recipe.length === 0 ? (
                   <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                    {editingId
-                      ? "No recipe lines on this item"
-                      : "No recipe — item won’t deduct inventory"}
+                    No recipe — item won’t deduct inventory
                   </p>
-                ) : editingId ? (
-                  <div className="space-y-2">
-                    {form.recipe.map((line) => {
-                      const inv = inventoryItems.find(
-                        (i) => i.public_id === line.inventory_item_public_id,
-                      );
-                      const scopeLabel =
-                        line.scope === "variant"
-                          ? `Variant · ${line.variant_name || "—"}`
-                          : line.scope === "addon"
-                            ? `Addon · ${line.addon_group_name || "—"} / ${line.addon_option_name || "—"}`
-                            : "Base";
-                      return (
-                        <div
-                          key={line.id}
-                          className="flex items-start justify-between gap-3 rounded-xl border bg-muted/20 px-3 py-2.5 text-sm"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-medium">
-                              {inv?.name ?? "Inventory item"}
-                              {inv?.sku ? (
-                                <span className="ml-1 font-mono text-[11px] text-muted-foreground">
-                                  {inv.sku}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">{scopeLabel}</div>
-                          </div>
-                          <div className="shrink-0 text-right font-semibold tabular-nums">
-                            {line.quantity_per_unit}
-                            {inv?.unit ? (
-                              <span className="ml-1 text-[10px] font-normal uppercase text-muted-foreground">
-                                {inv.unit}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 ) : (
                   <div className="space-y-3">
                     {form.recipe.map((line) => {
-                      const inv = activeInventoryItems.find(
+                      const inv = inventoryItems.find(
                         (i) => i.public_id === line.inventory_item_public_id,
                       );
                       const unitLabel = inv?.unit ?? "";
@@ -2187,6 +2269,16 @@ function MenuPage() {
 
                       return (
                         <div key={line.id} className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <span className="rounded-full border bg-background px-2 py-0.5">
+                              {line.scope === "variant"
+                                ? `Variant · ${line.variant_name || "—"}`
+                                : line.scope === "addon"
+                                  ? `Addon · ${line.addon_group_name || "—"} / ${line.addon_option_name || "—"}`
+                                  : "Base"}
+                            </span>
+                            {inv?.unit ? <span>Unit: {inv.unit}</span> : null}
+                          </div>
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
                             <Select
                               value={line.inventory_item_public_id || undefined}

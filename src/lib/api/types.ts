@@ -345,7 +345,7 @@ export interface CreateMenuItemPayload {
   sort_order?: number;
   variants?: MenuVariant[];
   addon_groups?: MenuAddonGroup[];
-  /** Optional recipe lines — omit or [] = no recipe. Create only for now. */
+  /** Optional recipe lines — omit or [] = no recipe. On PATCH: omit = untouched, array = full replace, [] = clear. */
   recipe?: CreateMenuRecipeLine[];
 }
 
