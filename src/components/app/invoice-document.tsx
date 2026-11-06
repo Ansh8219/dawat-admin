@@ -65,9 +65,9 @@ export function InvoiceDocument({ invoice }: { invoice: InvoiceDetail }) {
           <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
             Bill to
           </div>
-          <div className="font-semibold">{buyer.name?.trim() || "Walk-in customer"}</div>
-          {buyer.phone && <div>{buyer.phone}</div>}
-          {buyer.address && <div className="whitespace-pre-line">{buyer.address}</div>}
+          <div className="font-semibold">{buyer?.name?.trim() || "Walk-in customer"}</div>
+          {buyer?.phone && <div>{buyer.phone}</div>}
+          {buyer?.address && <div className="whitespace-pre-line">{buyer.address}</div>}
           <div className="pt-1.5">
             <Field label="Order" value={order.public_id} mono />
             <Field

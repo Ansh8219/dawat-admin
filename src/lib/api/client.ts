@@ -214,6 +214,16 @@ function humanizeErrorCode(code: string): string {
       return "An account with this email already exists.";
     case "invoice_prefix_taken":
       return "Another business already uses this invoice prefix.";
+    case "bill_not_found":
+      return "Bill not found.";
+    case "business_inactive":
+      return "This business is inactive.";
+    case "business_invoice_details_missing":
+      return "Complete GSTIN, FSSAI, address and invoice prefix in Businesses settings first.";
+    case "invalid_variant":
+      return "One of the selected variants is not valid. Reload the menu and try again.";
+    case "invalid_addon":
+      return "One of the selected add-ons is not valid. Reload the menu and try again.";
     case "hall_not_found":
       return "Hall not found.";
     case "hall_has_bookings":

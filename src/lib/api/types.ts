@@ -1387,6 +1387,8 @@ export interface InvoiceListItem {
 }
 
 export interface InvoiceListParams {
+  /** "pos" = counter bills only. */
+  source?: "pos";
   business_public_id?: string;
   /** YYYY-MM-DD, IST, inclusive */
   date_from?: string;
@@ -1462,7 +1464,8 @@ export interface InvoiceDetail {
   title: string;
   business: InvoiceBusiness;
   seller: InvoiceSeller;
-  buyer: InvoiceBuyer;
+  /** Null for walk-in (POS) bills. */
+  buyer: InvoiceBuyer | null;
   place_of_supply: string;
   place_of_supply_code: string;
   order: InvoiceOrderSummary;
@@ -1671,4 +1674,135 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+// ---------------------------------------------------------------------------
+// POS
+// ---------------------------------------------------------------------------
+
+export interface PosVariant {
+  name: string;
+  price: number;
+}
+
+export interface PosAddonOption {
+  name: string;
+  price: number;
+}
+
+export interface PosAddonGroup {
+  name: string;
+  min_select: number;
+  max_select: number;
+  options: PosAddonOption[];
+}
+
+export interface PosMenuItem {
+  public_id: string;
+  item_code: string | null;
+  name: string;
+  price: number;
+  dietary: string;
+  image: string | null;
+  category_public_id: string | null;
+  variants: PosVariant[];
+  addon_groups: PosAddonGroup[];
+}
+
+/** GET /api/admin/pos/menu/ */
+export interface PosMenuParams {
+  business_public_id: string;
+  page?: number;
+  page_size?: number;
+  /** Partial match on item name or code (max 64). */
+  q?: string;
+  category_public_id?: string;
+  /** Exact item code (max 16). */
+  code?: string;
+}
+
+export interface PosMenuData {
+  /** Items matching the current filters. */
+  count: number;
+  page: number;
+  page_size: number;
+  business: InvoiceBusiness;
+  /** Returned on every page. */
+  categories: { public_id: string; name: string }[];
+  results: PosMenuItem[];
+}
+
+export type PosPaymentMethod = "upi" | "cash" | "card";
+export type PosFulfillment = "takeaway" | "dine_in";
+
+/** POST /api/admin/pos/bills/ */
+export interface PosBillPayload {
+  business_public_id: string;
+  items: {
+    menu_item_public_id: string;
+    quantity: number;
+    variant_name: string;
+    addons: { name: string }[];
+  }[];
+  payment_method: PosPaymentMethod;
+  fulfillment_type?: PosFulfillment;
+  discount_percent?: number;
+}
+
+/** Bill returned by POST /api/admin/pos/bills/ and GET /api/admin/pos/bills/{id}/ */
+export interface PosBill {
+  public_id: string;
+  created_at: string;
+  business: InvoiceBusiness;
+  fulfillment_type: PosFulfillment | string;
+  payment_method: PosPaymentMethod | string;
+  payment_status: string;
+  items: {
+    name: string;
+    item_code: string | null;
+    variant_name: string | null;
+    addons: { name: string; price: number }[];
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+  }[];
+  subtotal: number;
+  discount_amount: number;
+  total: number;
+  tax_included: { cgst_amount: number; sgst_amount: number; total_tax: number };
+  invoice: { public_id: string; invoice_number: string };
+}
+
+export interface PosBillListParams {
+  business_public_id?: string;
+  date_from?: string;
+  date_to?: string;
+  /** Invoice number (partial) or a bill public_id. */
+  search?: string;
+  payment_method?: PosPaymentMethod;
+  page?: number;
+  page_size?: number;
+}
+
+export interface PosBillListItem {
+  public_id: string;
+  created_at: string;
+  business: InvoiceBusiness;
+  fulfillment_type: string;
+  payment_method: string;
+  /** Total quantity of items. */
+  item_count: number;
+  total: number;
+  invoice_number: string;
+  invoice_public_id: string;
+}
+
+/** GET /api/admin/pos/bills/ */
+export interface PosBillListData {
+  count: number;
+  page: number;
+  page_size: number;
+  /** Sum of `total` for every bill matching the filters. */
+  total_amount: number;
+  results: PosBillListItem[];
 }

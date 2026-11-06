@@ -11,6 +11,7 @@ import type {
 /** GET /api/admin/invoices/ — totals cover the whole filter, not just the page. */
 export function listInvoices(accessToken: string, params: InvoiceListParams = {}) {
   const qs = new URLSearchParams();
+  if (params.source) qs.set("source", params.source);
   if (params.business_public_id) qs.set("business_public_id", params.business_public_id);
   if (params.date_from) qs.set("date_from", params.date_from);
   if (params.date_to) qs.set("date_to", params.date_to);

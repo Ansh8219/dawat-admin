@@ -135,8 +135,8 @@ export function downloadInvoiceDetailCsv(inv: InvoiceDetail) {
     ["Date (IST)", formatInvoiceDateTime(inv.invoice_date)],
     ["Business", inv.business.name],
     ["Seller GSTIN", inv.seller.gstin],
-    ["Customer", inv.buyer.name ?? ""],
-    ["Phone", inv.buyer.phone ?? ""],
+    ["Customer", inv.buyer?.name ?? ""],
+    ["Phone", inv.buyer?.phone ?? ""],
     ["Place of supply", inv.place_of_supply],
     [],
     [
