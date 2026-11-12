@@ -14,6 +14,9 @@ export async function withAuthRetry<T>(fn: (accessToken: string) => Promise<T>):
     if (!(err instanceof ApiError) || err.status !== 401) {
       throw err;
     }
+    // Another request may already have refreshed the token while this one was in flight.
+    const current = useAuth.getState().getAccessToken();
+    if (current && current !== token) return fn(current);
     const refreshed = await useAuth.getState().refreshSession();
     const nextToken = useAuth.getState().getAccessToken();
     if (!refreshed || !nextToken) {

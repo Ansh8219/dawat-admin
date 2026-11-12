@@ -418,6 +418,8 @@ function MenuPage() {
   const totalImageCount = keptExistingImages.length + images.length;
   const imageSlotsLeft = Math.max(0, 10 - totalImageCount);
 
+  const menuRefreshSeq = useRef(0);
+
   async function refreshMenuItems(options?: { showLoading?: boolean; resetFilters?: boolean }) {
     const showLoading = options?.showLoading ?? false;
     if (!businessPublicId) {
@@ -428,6 +430,7 @@ function MenuPage() {
       return;
     }
 
+    const seq = ++menuRefreshSeq.current;
     if (showLoading) {
       setLoading(true);
       setLoadError("");
@@ -438,6 +441,7 @@ function MenuPage() {
         withAuthRetry((token) => listMenuItems(token, businessPublicId)),
         withAuthRetry((token) => listMenuCategoryOptions(token, businessPublicId)),
       ]);
+      if (seq !== menuRefreshSeq.current) return; // superseded (e.g. business switched)
       const nextItems = Array.isArray(data) ? data : [];
       setItems(nextItems);
       setCategoryOptions(
@@ -451,6 +455,7 @@ function MenuPage() {
         setCategory("all");
       }
     } catch (err) {
+      if (seq !== menuRefreshSeq.current) return;
       if (err instanceof ApiError && err.status === 401) {
         useAuth.getState().logout();
         void navigate({ to: "/login" });
@@ -462,12 +467,14 @@ function MenuPage() {
         toast.error(err instanceof ApiError ? err.message : "Unable to refresh menu items.");
       }
     } finally {
-      if (showLoading) setLoading(false);
+      if (seq === menuRefreshSeq.current) setLoading(false);
     }
   }
 
   useEffect(() => {
     void refreshMenuItems({ showLoading: true, resetFilters: true });
+    // refreshMenuItems closes over businessPublicId; re-run only when the business changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessPublicId, navigate]);
 
   const imagePreviewsRef = useRef<string[]>([]);
@@ -515,7 +522,8 @@ function MenuPage() {
   const toggleSel = (publicId: string) =>
     setSelected((s) => {
       const n = new Set(s);
-      n.has(publicId) ? n.delete(publicId) : n.add(publicId);
+      if (n.has(publicId)) n.delete(publicId);
+      else n.add(publicId);
       return n;
     });
 

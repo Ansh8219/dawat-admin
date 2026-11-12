@@ -48,6 +48,8 @@ export interface DetailData {
 
 export interface RefreshData {
   access: string;
+  /** Present only if the backend rotates refresh tokens. */
+  refresh?: string;
 }
 
 /** Business module type keys from GET /api/admin/businesses/ */

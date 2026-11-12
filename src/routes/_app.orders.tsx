@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAccess } from "@/lib/access";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -174,22 +174,46 @@ function OrdersPage() {
     [navigate],
   );
 
+  const refreshSeq = useRef(0);
+
   const refresh = useCallback(
     async (options?: { showLoading?: boolean }) => {
       const showLoading = options?.showLoading ?? false;
+      const seq = ++refreshSeq.current;
+      // Transient network failures (e.g. burst of parallel requests right after an action)
+      // get one quiet retry before surfacing an error.
+      const withNetworkRetry = async <T,>(fn: () => Promise<T>): Promise<T> => {
+        try {
+          return await fn();
+        } catch (err) {
+          if (err instanceof ApiError && err.code === "network_error") {
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            return fn();
+          }
+          throw err;
+        }
+      };
       if (showLoading) {
         setLoading(true);
         setLoadError("");
       }
       try {
         const [active, ...rest] = await Promise.all([
-          withAuthRetry((token) => listAdminOrders(token, { tab, page, page_size: PAGE_SIZE })),
+          withNetworkRetry(() =>
+            withAuthRetry((token) => listAdminOrders(token, { tab, page, page_size: PAGE_SIZE })),
+          ),
           ...TABS.filter((item) => item.id !== tab).map((item) =>
-            withAuthRetry((token) =>
-              listAdminOrders(token, { tab: item.id, page: 1, page_size: 1 }),
-            ),
+            withNetworkRetry(() =>
+              withAuthRetry((token) =>
+                listAdminOrders(token, { tab: item.id, page: 1, page_size: 1 }),
+              ),
+            )
+              // Badge counts are secondary: a failed count must not fail the whole board.
+              // Auth failures still surface via the main request.
+              .catch(() => null),
           ),
         ]);
+        if (seq !== refreshSeq.current) return; // a newer refresh superseded this one
         setOrders(active.results);
         setCount(active.count ?? 0);
         setLoadedAt(Date.now());
@@ -207,12 +231,13 @@ function OrdersPage() {
           return active.results.find((order) => order.public_id === current.public_id) ?? current;
         });
       } catch (err) {
+        if (seq !== refreshSeq.current) return;
         if (handleAuthError(err)) return;
         const message = err instanceof ApiError ? err.message : "Unable to load orders.";
         if (showLoading) setLoadError(message);
         else toast.error(message);
       } finally {
-        if (showLoading) setLoading(false);
+        if (seq === refreshSeq.current) setLoading(false);
       }
     },
     [tab, page, handleAuthError, queryClient],

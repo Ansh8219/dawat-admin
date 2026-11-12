@@ -78,6 +78,8 @@ interface AuthState {
   getAccessToken: () => string | null;
 }
 
+let refreshInFlight: Promise<boolean> | null = null;
+
 function isBrowser() {
   return typeof window !== "undefined";
 }
@@ -339,22 +341,32 @@ export const useAuth = create<AuthState>()(
         if (user) set({ user: { ...user, mustChangePassword: false } });
       },
 
-      refreshSession: async () => {
+      refreshSession: () => {
+        // Single-flight: parallel 401s share one refresh call, so a rotating
+        // refresh token isn't consumed twice (which would log the user out).
+        if (refreshInFlight) return refreshInFlight;
         const refresh = get().tokens?.refresh;
-        if (!refresh) return false;
-        try {
-          const data = await refreshAccessToken(refresh);
-          set({
-            tokens: {
-              access: data.access,
-              refresh,
-            },
-          });
-          return true;
-        } catch {
-          set(clearSession());
-          return false;
-        }
+        if (!refresh) return Promise.resolve(false);
+        refreshInFlight = (async () => {
+          try {
+            const data = await refreshAccessToken(refresh);
+            set({
+              tokens: {
+                access: data.access,
+                refresh: data.refresh ?? refresh,
+              },
+            });
+            return true;
+          } catch (err) {
+            // A flaky network must not end the session; only a real rejection does.
+            if (err instanceof ApiError && err.code === "network_error") return false;
+            set(clearSession());
+            return false;
+          } finally {
+            refreshInFlight = null;
+          }
+        })();
+        return refreshInFlight;
       },
 
       getAccessToken: () =>
