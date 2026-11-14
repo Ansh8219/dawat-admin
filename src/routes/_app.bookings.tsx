@@ -357,7 +357,6 @@ function DiningTableBookings() {
             <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[var(--shadow-soft)]">
               {loading ? (
                 <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
                   Loading bookings…
                 </div>
               ) : loadError ? (
@@ -516,7 +515,6 @@ function DiningTableBookings() {
             <div className="mt-6 space-y-5">
               {detailLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
                   Loading booking…
                 </div>
               ) : null}
@@ -640,7 +638,7 @@ function BookingRateForm({ onAuthError }: { onAuthError: (err: unknown) => boole
   if (loading) {
     return (
       <div className="card-elevated flex max-w-xl items-center gap-2 p-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading booking settings…
+        Loading booking settings…
       </div>
     );
   }

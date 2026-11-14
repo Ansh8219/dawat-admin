@@ -15,7 +15,7 @@ import type { InvoiceDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { z } from "zod";
-import { ArrowLeft, Download, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_app/invoices_/$invoiceId")({
   component: InvoiceDetailPage,
@@ -109,8 +109,7 @@ function InvoiceDetailPage() {
       <div className="p-4 sm:p-6 lg:p-8 print:p-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading invoice…</p>
+            <p className="animate-pulse text-sm">Loading invoice…</p>
           </div>
         ) : error || !invoice ? (
           <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">

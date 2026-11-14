@@ -49,7 +49,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Loader2,
   Mail,
   Phone,
   Store,
@@ -345,8 +344,7 @@ function PeoplePage() {
             <ManagersList refreshKey={managersRefresh} onAdd={() => setAddManagerOpen(true)} />
           ) : loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Loading {activeRole.label.toLowerCase()}…</p>
+              <p className="animate-pulse text-sm">Loading {activeRole.label.toLowerCase()}…</p>
             </div>
           ) : loadError ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">

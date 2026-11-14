@@ -718,8 +718,7 @@ function MarketingPage() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Loading offers…</p>
+              <p className="animate-pulse text-sm">Loading offers…</p>
             </div>
           ) : loadError ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
@@ -939,7 +938,6 @@ function MarketingPage() {
 
           {loadingDetail ? (
             <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
               Loading…
             </div>
           ) : (
@@ -1313,7 +1311,6 @@ function MarketingPage() {
 
             {redemptionsLoading ? (
               <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
                 Loading redemptions…
               </div>
             ) : redemptionsError ? (

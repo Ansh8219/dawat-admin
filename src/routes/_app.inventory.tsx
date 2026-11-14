@@ -733,8 +733,7 @@ function InventoryPage() {
 
         {loading ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading inventory…</p>
+            <p className="animate-pulse text-sm">Loading inventory…</p>
           </div>
         ) : loadError ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24 text-center">

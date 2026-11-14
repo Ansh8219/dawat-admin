@@ -35,6 +35,7 @@ import { Route as AppHallsRouteImport } from './routes/_app.halls'
 import { Route as AppHallBookingsRouteImport } from './routes/_app.hall-bookings'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
+import { Route as AppCampaignsRouteImport } from './routes/_app.campaigns'
 import { Route as AppBusinessesRouteImport } from './routes/_app.businesses'
 import { Route as AppBookingsRouteImport } from './routes/_app.bookings'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
@@ -42,8 +43,11 @@ import { Route as AppPartnersPartnerIdRouteImport } from './routes/_app.partners
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app.invoices_.$invoiceId'
 import { Route as AppHallsNewRouteImport } from './routes/_app.halls_.new'
 import { Route as AppHallsHallIdRouteImport } from './routes/_app.halls_.$hallId'
+import { Route as AppCampaignsNewRouteImport } from './routes/_app.campaigns_.new'
+import { Route as AppCampaignsCampaignIdRouteImport } from './routes/_app.campaigns_.$campaignId'
 import { Route as AppPeopleStoreKeepersStoreKeeperIdRouteImport } from './routes/_app.people_.store-keepers.$storeKeeperId'
 import { Route as AppPeoplePartnersPartnerIdRouteImport } from './routes/_app.people_.partners.$partnerId'
+import { Route as AppCampaignsCampaignIdEditRouteImport } from './routes/_app.campaigns_.$campaignId_.edit'
 
 const SelectPanelRoute = SelectPanelRouteImport.update({
   id: '/select-panel',
@@ -174,6 +178,11 @@ const AppCustomerLevelsRoute = AppCustomerLevelsRouteImport.update({
   path: '/customer-levels',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCampaignsRoute = AppCampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBusinessesRoute = AppBusinessesRouteImport.update({
   id: '/businesses',
   path: '/businesses',
@@ -209,6 +218,16 @@ const AppHallsHallIdRoute = AppHallsHallIdRouteImport.update({
   path: '/halls/$hallId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCampaignsNewRoute = AppCampaignsNewRouteImport.update({
+  id: '/campaigns_/new',
+  path: '/campaigns/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCampaignsCampaignIdRoute = AppCampaignsCampaignIdRouteImport.update({
+  id: '/campaigns_/$campaignId',
+  path: '/campaigns/$campaignId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPeopleStoreKeepersStoreKeeperIdRoute =
   AppPeopleStoreKeepersStoreKeeperIdRouteImport.update({
     id: '/people_/store-keepers/$storeKeeperId',
@@ -219,6 +238,12 @@ const AppPeoplePartnersPartnerIdRoute =
   AppPeoplePartnersPartnerIdRouteImport.update({
     id: '/people_/partners/$partnerId',
     path: '/people/partners/$partnerId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppCampaignsCampaignIdEditRoute =
+  AppCampaignsCampaignIdEditRouteImport.update({
+    id: '/campaigns_/$campaignId_/edit',
+    path: '/campaigns/$campaignId/edit',
     getParentRoute: () => AppRoute,
   } as any)
 
@@ -232,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AppAnalyticsRoute
   '/bookings': typeof AppBookingsRoute
   '/businesses': typeof AppBusinessesRoute
+  '/campaigns': typeof AppCampaignsRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/hall-bookings': typeof AppHallBookingsRoute
@@ -251,10 +277,13 @@ export interface FileRoutesByFullPath {
   '/rewards': typeof AppRewardsRoute
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
+  '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
+  '/campaigns/new': typeof AppCampaignsNewRoute
   '/halls/$hallId': typeof AppHallsHallIdRoute
   '/halls/new': typeof AppHallsNewRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
@@ -267,6 +296,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AppAnalyticsRoute
   '/bookings': typeof AppBookingsRoute
   '/businesses': typeof AppBusinessesRoute
+  '/campaigns': typeof AppCampaignsRoute
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/hall-bookings': typeof AppHallBookingsRoute
@@ -287,10 +317,13 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/table-qr': typeof AppTableQrRoute
   '/': typeof AppIndexRoute
+  '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
+  '/campaigns/new': typeof AppCampaignsNewRoute
   '/halls/$hallId': typeof AppHallsHallIdRoute
   '/halls/new': typeof AppHallsNewRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/partners/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/people/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/people/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
@@ -305,6 +338,7 @@ export interface FileRoutesById {
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/bookings': typeof AppBookingsRoute
   '/_app/businesses': typeof AppBusinessesRoute
+  '/_app/campaigns': typeof AppCampaignsRoute
   '/_app/customer-levels': typeof AppCustomerLevelsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/hall-bookings': typeof AppHallBookingsRoute
@@ -325,10 +359,13 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/table-qr': typeof AppTableQrRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/campaigns_/$campaignId': typeof AppCampaignsCampaignIdRoute
+  '/_app/campaigns_/new': typeof AppCampaignsNewRoute
   '/_app/halls_/$hallId': typeof AppHallsHallIdRoute
   '/_app/halls_/new': typeof AppHallsNewRoute
   '/_app/invoices_/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/partners_/$partnerId': typeof AppPartnersPartnerIdRoute
+  '/_app/campaigns_/$campaignId_/edit': typeof AppCampaignsCampaignIdEditRoute
   '/_app/people_/partners/$partnerId': typeof AppPeoplePartnersPartnerIdRoute
   '/_app/people_/store-keepers/$storeKeeperId': typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
@@ -344,6 +381,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/bookings'
     | '/businesses'
+    | '/campaigns'
     | '/customer-levels'
     | '/customers'
     | '/hall-bookings'
@@ -363,10 +401,13 @@ export interface FileRouteTypes {
     | '/rewards'
     | '/settings'
     | '/table-qr'
+    | '/campaigns/$campaignId'
+    | '/campaigns/new'
     | '/halls/$hallId'
     | '/halls/new'
     | '/invoices/$invoiceId'
     | '/partners/$partnerId'
+    | '/campaigns/$campaignId/edit'
     | '/people/partners/$partnerId'
     | '/people/store-keepers/$storeKeeperId'
   fileRoutesByTo: FileRoutesByTo
@@ -379,6 +420,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/bookings'
     | '/businesses'
+    | '/campaigns'
     | '/customer-levels'
     | '/customers'
     | '/hall-bookings'
@@ -399,10 +441,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/table-qr'
     | '/'
+    | '/campaigns/$campaignId'
+    | '/campaigns/new'
     | '/halls/$hallId'
     | '/halls/new'
     | '/invoices/$invoiceId'
     | '/partners/$partnerId'
+    | '/campaigns/$campaignId/edit'
     | '/people/partners/$partnerId'
     | '/people/store-keepers/$storeKeeperId'
   id:
@@ -416,6 +461,7 @@ export interface FileRouteTypes {
     | '/_app/analytics'
     | '/_app/bookings'
     | '/_app/businesses'
+    | '/_app/campaigns'
     | '/_app/customer-levels'
     | '/_app/customers'
     | '/_app/hall-bookings'
@@ -436,10 +482,13 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/table-qr'
     | '/_app/'
+    | '/_app/campaigns_/$campaignId'
+    | '/_app/campaigns_/new'
     | '/_app/halls_/$hallId'
     | '/_app/halls_/new'
     | '/_app/invoices_/$invoiceId'
     | '/_app/partners_/$partnerId'
+    | '/_app/campaigns_/$campaignId_/edit'
     | '/_app/people_/partners/$partnerId'
     | '/_app/people_/store-keepers/$storeKeeperId'
   fileRoutesById: FileRoutesById
@@ -637,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomerLevelsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/campaigns': {
+      id: '/_app/campaigns'
+      path: '/campaigns'
+      fullPath: '/campaigns'
+      preLoaderRoute: typeof AppCampaignsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/businesses': {
       id: '/_app/businesses'
       path: '/businesses'
@@ -686,6 +742,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHallsHallIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/campaigns_/new': {
+      id: '/_app/campaigns_/new'
+      path: '/campaigns/new'
+      fullPath: '/campaigns/new'
+      preLoaderRoute: typeof AppCampaignsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns_/$campaignId': {
+      id: '/_app/campaigns_/$campaignId'
+      path: '/campaigns/$campaignId'
+      fullPath: '/campaigns/$campaignId'
+      preLoaderRoute: typeof AppCampaignsCampaignIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/people_/store-keepers/$storeKeeperId': {
       id: '/_app/people_/store-keepers/$storeKeeperId'
       path: '/people/store-keepers/$storeKeeperId'
@@ -700,6 +770,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeoplePartnersPartnerIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/campaigns_/$campaignId_/edit': {
+      id: '/_app/campaigns_/$campaignId_/edit'
+      path: '/campaigns/$campaignId/edit'
+      fullPath: '/campaigns/$campaignId/edit'
+      preLoaderRoute: typeof AppCampaignsCampaignIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -707,6 +784,7 @@ interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppBookingsRoute: typeof AppBookingsRoute
   AppBusinessesRoute: typeof AppBusinessesRoute
+  AppCampaignsRoute: typeof AppCampaignsRoute
   AppCustomerLevelsRoute: typeof AppCustomerLevelsRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppHallBookingsRoute: typeof AppHallBookingsRoute
@@ -727,10 +805,13 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppTableQrRoute: typeof AppTableQrRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
+  AppCampaignsNewRoute: typeof AppCampaignsNewRoute
   AppHallsHallIdRoute: typeof AppHallsHallIdRoute
   AppHallsNewRoute: typeof AppHallsNewRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppPartnersPartnerIdRoute: typeof AppPartnersPartnerIdRoute
+  AppCampaignsCampaignIdEditRoute: typeof AppCampaignsCampaignIdEditRoute
   AppPeoplePartnersPartnerIdRoute: typeof AppPeoplePartnersPartnerIdRoute
   AppPeopleStoreKeepersStoreKeeperIdRoute: typeof AppPeopleStoreKeepersStoreKeeperIdRoute
 }
@@ -739,6 +820,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppBookingsRoute: AppBookingsRoute,
   AppBusinessesRoute: AppBusinessesRoute,
+  AppCampaignsRoute: AppCampaignsRoute,
   AppCustomerLevelsRoute: AppCustomerLevelsRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppHallBookingsRoute: AppHallBookingsRoute,
@@ -759,10 +841,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppTableQrRoute: AppTableQrRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
+  AppCampaignsNewRoute: AppCampaignsNewRoute,
   AppHallsHallIdRoute: AppHallsHallIdRoute,
   AppHallsNewRoute: AppHallsNewRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppPartnersPartnerIdRoute: AppPartnersPartnerIdRoute,
+  AppCampaignsCampaignIdEditRoute: AppCampaignsCampaignIdEditRoute,
   AppPeoplePartnersPartnerIdRoute: AppPeoplePartnersPartnerIdRoute,
   AppPeopleStoreKeepersStoreKeeperIdRoute:
     AppPeopleStoreKeepersStoreKeeperIdRoute,

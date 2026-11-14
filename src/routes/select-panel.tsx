@@ -12,7 +12,6 @@ import {
   FileText,
   Headset,
   Lightbulb,
-  Loader2,
   MoonStar,
   PartyPopper,
   Star,
@@ -269,8 +268,7 @@ function SelectPanelPage() {
 
         {loading ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading businesses…</p>
+            <p className="animate-pulse text-sm">Loading businesses…</p>
           </div>
         ) : error ? (
           <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-4 py-16 text-center">

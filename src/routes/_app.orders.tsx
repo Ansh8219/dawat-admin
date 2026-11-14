@@ -34,6 +34,7 @@ import {
   paymentStatusLabel,
   rejectAdminOrder,
   showsSincePlacedClock,
+  isOrderLate,
   sincePlacedSeconds,
   startAdminOrderPreparing,
   formatCancelledAt,
@@ -65,7 +66,6 @@ import {
   XCircle,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   HandPlatter,
   Armchair,
 } from "lucide-react";
@@ -591,8 +591,7 @@ function OrdersPage() {
 
         {loading ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading orders…</p>
+            <p className="animate-pulse text-sm">Loading orders…</p>
           </div>
         ) : loadError ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24 text-center">
@@ -1023,6 +1022,7 @@ function OrderTicket({
   const isCancelled = isCancelledStatus(order.status);
   const liveClock = showsSincePlacedClock(tab);
   const waiting = liveClock ? sincePlacedSeconds(order, now, loadedAt) : null;
+  const isLate = isOrderLate(order, tab, now, loadedAt);
   const closedAt = formatDeliveredAt(order.delivered_at) ?? formatCancelledAt(order.cancelled_at);
   const address = order.address?.formatted_address?.trim() || orderAddressLine(order);
   const itemCount = orderItemCount(order);
@@ -1036,6 +1036,8 @@ function OrderTicket({
         "flex flex-col overflow-hidden rounded-2xl border bg-card shadow-soft transition-all hover:shadow-elevated",
         isPlaced && "border-primary/45 ring-1 ring-primary/15",
         highlighted && "border-primary ring-2 ring-primary/40 animate-pulse",
+        isPreparing && !isLate && "border-success/50",
+        isLate && "order-late-blink border-destructive ring-1 ring-destructive/40",
       )}
     >
       <div
@@ -1043,6 +1045,8 @@ function OrderTicket({
           "h-1 w-full",
           isPlaced && "bg-primary",
           (isAccepted || isPreparing) && "bg-info",
+          isPreparing && !isLate && "bg-success",
+          isLate && "bg-destructive",
           isReadyTrack && "bg-success",
           isDelivered && "bg-muted",
           (isRejected || isCancelled) && "bg-destructive/50",
@@ -1065,10 +1069,17 @@ function OrderTicket({
           </div>
 
           {liveClock && waiting != null ? (
-            <div className="flex shrink-0 flex-col items-end rounded-xl bg-muted/80 px-2.5 py-1.5 text-foreground">
+            <div
+              className={cn(
+                "flex shrink-0 flex-col items-end rounded-xl px-2.5 py-1.5",
+                isLate
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-muted/80 text-foreground",
+              )}
+            >
               <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">
                 <Timer className="h-3 w-3" />
-                Since placed
+                {isLate ? "Late" : "Since placed"}
               </div>
               <div className="font-mono text-lg font-bold tabular-nums leading-none">
                 {formatDuration(waiting)}

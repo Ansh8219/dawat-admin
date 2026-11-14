@@ -1304,8 +1304,7 @@ function MenuPage() {
       <div className="grid gap-4 p-4 lg:grid-cols-[220px_1fr] sm:p-6 lg:p-8">
         {loading ? (
           <div className="col-span-full flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading menu…</p>
+            <p className="animate-pulse text-sm">Loading menu…</p>
           </div>
         ) : loadError ? (
           <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-center">
@@ -1725,11 +1724,10 @@ function MenuPage() {
 
           {detailLoading ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Loading item…</p>
+              <p className="animate-pulse text-sm">Loading item…</p>
             </div>
           ) : (
-            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+            <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-6 py-5">
               {/* Item details */}
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2381,7 +2379,7 @@ function MenuPage() {
                           ?.options ?? [];
 
                       return (
-                        <div key={line.id} className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                        <div key={line.id} className="min-w-0 space-y-2 rounded-xl border bg-muted/20 p-3">
                           <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             <span className="rounded-full border bg-background px-2 py-0.5">
                               {line.scope === "variant"
@@ -2400,7 +2398,7 @@ function MenuPage() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_100px_auto]">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_96px_96px_auto] [&>*]:min-w-0">
                             <Select
                               value={line.inventory_item_public_id || undefined}
                               onValueChange={(value) =>
@@ -2412,7 +2410,7 @@ function MenuPage() {
                                 })
                               }
                             >
-                              <SelectTrigger className="rounded-xl bg-background">
+                              <SelectTrigger className="w-full min-w-0 rounded-xl bg-background">
                                 <SelectValue placeholder="Inventory item" />
                               </SelectTrigger>
                               <SelectContent>
@@ -2443,7 +2441,7 @@ function MenuPage() {
                               disabled={!inv}
                               onValueChange={(value) => updateRecipeLine(line.id, { unit: value })}
                             >
-                              <SelectTrigger className="rounded-xl bg-background">
+                              <SelectTrigger className="w-full min-w-0 rounded-xl bg-background">
                                 <SelectValue placeholder="Unit" />
                               </SelectTrigger>
                               <SelectContent>
@@ -2465,7 +2463,7 @@ function MenuPage() {
                             </Button>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 [&>*]:min-w-0">
                             <Select
                               value={line.scope}
                               onValueChange={(value) =>
@@ -2478,7 +2476,7 @@ function MenuPage() {
                                 })
                               }
                             >
-                              <SelectTrigger className="rounded-xl bg-background">
+                              <SelectTrigger className="w-full min-w-0 rounded-xl bg-background">
                                 <SelectValue placeholder="Scope" />
                               </SelectTrigger>
                               <SelectContent>
@@ -2496,7 +2494,7 @@ function MenuPage() {
                                   updateRecipeLine(line.id, { variant_name: value })
                                 }
                               >
-                                <SelectTrigger className="rounded-xl bg-background">
+                                <SelectTrigger className="w-full min-w-0 rounded-xl bg-background">
                                   <SelectValue placeholder="Variant name" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2523,7 +2521,7 @@ function MenuPage() {
                                     })
                                   }
                                 >
-                                  <SelectTrigger className="rounded-xl bg-background">
+                                  <SelectTrigger className="w-full min-w-0 rounded-xl bg-background">
                                     <SelectValue placeholder="Addon group" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -2543,7 +2541,7 @@ function MenuPage() {
                                     updateRecipeLine(line.id, { addon_option_name: value })
                                   }
                                 >
-                                  <SelectTrigger className="rounded-xl bg-background sm:col-span-2">
+                                  <SelectTrigger className="w-full min-w-0 rounded-xl bg-background sm:col-span-2">
                                     <SelectValue placeholder="Addon option" />
                                   </SelectTrigger>
                                   <SelectContent>

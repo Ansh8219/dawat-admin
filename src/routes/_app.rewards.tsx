@@ -202,7 +202,7 @@ function EarningSettingsTab() {
   if (loading) {
     return (
       <div className="card-elevated flex max-w-2xl items-center gap-2 p-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading earning settings…
+        Loading earning settings…
       </div>
     );
   }
@@ -587,7 +587,7 @@ function BonusRulesTab() {
       <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[var(--shadow-soft)]">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading bonus rules…
+            Loading bonus rules…
           </div>
         ) : loadError ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">

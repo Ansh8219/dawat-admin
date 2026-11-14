@@ -956,6 +956,8 @@ export interface AdminOrder {
   delivery_status: string | null;
   driver: AdminOrderDriver | null;
   driver_accepted_at: string | null;
+  /** When the kitchen accepted the order (prep timer starts here). */
+  accepted_at?: string | null;
   payment_method: string | null;
   payment_status: string | null;
   subtotal: number;
@@ -1839,4 +1841,109 @@ export interface PosBillListData {
   /** Sum of `total` for every bill matching the filters. */
   total_amount: number;
   results: PosBillListItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns (promotions) — /api/admin/campaigns/ (super admin only)
+// ---------------------------------------------------------------------------
+
+export type CampaignAudienceType =
+  "all_customers" | "ordered_within_days" | "inactive_for_days" | "new_within_days";
+
+export type CampaignChannel = "push" | "whatsapp";
+
+export type CampaignStatus = "scheduled" | "sending" | "completed" | "failed" | "cancelled";
+
+export type CampaignRecipientStatus = "sent" | "failed" | "skipped";
+
+export interface CampaignOfferRef {
+  id: string;
+  code: string;
+  title: string;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  offer: CampaignOfferRef | null;
+  audience_type: CampaignAudienceType;
+  audience_days: number | null;
+  channels: CampaignChannel[];
+  whatsapp_template_name: string | null;
+  whatsapp_template_language: string;
+  whatsapp_template_params: string[];
+  scheduled_at: string;
+  status: CampaignStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  skipped_count: number;
+  created_at: string;
+}
+
+/** Body for POST (create) and PATCH (edit — full body, not partial). */
+export interface CampaignPayload {
+  name: string;
+  title: string;
+  body: string;
+  offer_id?: string;
+  audience_type: CampaignAudienceType;
+  audience_days?: number;
+  channels: CampaignChannel[];
+  whatsapp_template_name?: string;
+  whatsapp_template_language?: string;
+  whatsapp_template_params?: string[];
+  /** ISO-8601 with timezone. Omit to send immediately. */
+  scheduled_at?: string;
+  /** PATCH only: delete the existing image (ignored when a new image file is sent). */
+  remove_image?: boolean;
+}
+
+export interface CampaignListParams {
+  status?: CampaignStatus;
+  page?: number;
+  page_size?: number;
+}
+
+export interface CampaignListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: Campaign[];
+}
+
+export interface CampaignAudiencePreviewPayload {
+  audience_type: CampaignAudienceType;
+  audience_days?: number;
+}
+
+export interface CampaignAudiencePreviewData {
+  eligible_customers: number;
+}
+
+export interface CampaignRecipient {
+  user_id: string | number;
+  channel: CampaignChannel;
+  status: CampaignRecipientStatus;
+  error: string | null;
+  sent_at: string | null;
+}
+
+export interface CampaignRecipientListParams {
+  status?: CampaignRecipientStatus;
+  channel?: CampaignChannel;
+  page?: number;
+  page_size?: number;
+}
+
+export interface CampaignRecipientListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: CampaignRecipient[];
 }

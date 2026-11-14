@@ -179,8 +179,7 @@ function RefundsPage() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Loading refunds…</p>
+              <p className="animate-pulse text-sm">Loading refunds…</p>
             </div>
           ) : loadError ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">

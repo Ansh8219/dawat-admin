@@ -1,10 +1,13 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { GlobalProgress } from "@/components/app/global-progress";
+import { BootSplash } from "@/components/app/boot-splash";
 import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
 import { useAdminOrdersSocket } from "@/hooks/use-admin-orders-socket";
+import { useLateOrderWatcher } from "@/hooks/use-late-order-watcher";
 import {
   useAuth,
   canCheckPersistedAuth,
@@ -48,12 +51,35 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  // The server render has no session, so the sidebar/topbar used to pop in piece by piece.
+  // Show an intro until the client has the session + permissions, then reveal the shell at once.
+  useEffect(() => {
+    let alive = true;
+    const minDelay = new Promise((r) => window.setTimeout(r, 350));
+    const auth = useAuth.getState();
+    const access =
+      auth.getAccessToken() && !auth.access
+        ? auth.loadAccess().catch(() => false)
+        : Promise.resolve(true);
+    void Promise.all([minDelay, access]).then(() => {
+      if (alive) setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Zomato-style: keep kitchen WS alive across all admin pages while authenticated.
   useAdminOrdersSocket({ enabled: true });
+  // Late-order sound + toast on every page (not only Orders).
+  useLateOrderWatcher();
+
+  if (!ready) return <BootSplash />;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="app-shell-in flex h-screen w-full overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">
       <div className="hidden lg:block print:hidden">
         <AppSidebar />
       </div>
@@ -71,6 +97,7 @@ function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <GlobalProgress />
       <Toaster position="top-right" />
     </div>
   );

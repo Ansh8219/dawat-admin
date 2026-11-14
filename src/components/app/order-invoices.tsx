@@ -4,7 +4,7 @@ import { formatInvoiceDate, formatInvoiceMoney, listOrderInvoices } from "@/lib/
 import { ApiError } from "@/lib/api/types";
 import type { InvoiceDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
-import { AlertTriangle, ChevronRight, FileText, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText } from "lucide-react";
 
 /**
  * Invoices for a completed order: one per business (a mixed restaurant + bakery
@@ -47,7 +47,7 @@ export function OrderInvoices({ orderPublicId }: { orderPublicId: string }) {
       <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Invoices</div>
       {loading ? (
         <div className="flex items-center gap-2 rounded-xl border p-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading invoices…
+          Loading invoices…
         </div>
       ) : error ? (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

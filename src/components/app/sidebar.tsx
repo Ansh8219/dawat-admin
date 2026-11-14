@@ -23,6 +23,7 @@ import {
   ReceiptText,
   Building2,
   Landmark,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -56,6 +57,7 @@ const nav = [
       { to: "/customer-levels", label: "Customer Levels", icon: Trophy },
       { to: "/rewards", label: "Rewards", icon: Coins },
       { to: "/marketing", label: "Marketing", icon: Megaphone },
+      { to: "/campaigns", label: "Campaigns", icon: Send },
     ],
   },
   {

@@ -384,7 +384,6 @@ function HomeServicesPage() {
         <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[var(--shadow-soft)]">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
               Loading home services…
             </div>
           ) : loadError ? (

@@ -24,6 +24,7 @@ import { useApp } from "@/lib/store";
 import { formatRoleLabel, useAuth } from "@/lib/auth";
 import { usePanelMeta } from "@/lib/use-panel";
 import { NotificationsBell } from "./notifications-bell";
+import { SoundStatus } from "./sound-status";
 import { OutletToggle } from "./outlet-toggle";
 import { toast } from "sonner";
 
@@ -114,6 +115,7 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
+          <SoundStatus />
           <NotificationsBell />
 
           <DropdownMenu>

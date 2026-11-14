@@ -322,8 +322,7 @@ function PartnerDetailPage() {
       <div className="space-y-5 p-4 sm:p-6 lg:p-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Loading application…</p>
+            <p className="animate-pulse text-sm">Loading application…</p>
           </div>
         ) : loadError ? (
           <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">

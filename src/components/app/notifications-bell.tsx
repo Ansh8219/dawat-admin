@@ -169,7 +169,7 @@ export function NotificationsBell() {
         <div className="max-h-96 overflow-y-auto">
           {loadingPreview && results.length === 0 ? (
             <div className="flex items-center justify-center gap-2 px-3 py-10 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              Loading…
             </div>
           ) : previewQuery.isError ? (
             <div className="px-3 py-8 text-center text-sm text-destructive">

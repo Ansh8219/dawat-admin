@@ -1,3 +1,4 @@
+import { trackedFetch } from "./activity";
 import { ApiError, type ApiEnvelope } from "./types";
 
 export function getApiBaseUrl(): string {
@@ -297,7 +298,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await trackedFetch(url, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -328,7 +329,7 @@ export async function apiFormRequest<T>(path: string, options: FormRequestOption
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await trackedFetch(url, {
       method,
       headers,
       body,
@@ -379,7 +380,7 @@ async function fetchBinaryResponse(
 
   let response: Response;
   try {
-    response = await fetch(url, { method, headers, signal });
+    response = await trackedFetch(url, { method, headers, signal });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
     throw new ApiError(0, "network_error", "Unable to reach the server. Check your connection.");

@@ -14,7 +14,7 @@ import {
   type AdminOrderWsEvent,
   type InventoryStockAlertEvent,
 } from "@/lib/realtime/admin-orders-socket";
-import { playNewOrderChime } from "@/lib/realtime/new-order-chime";
+import { installAudioUnlock, playAlertTone, playNewOrderChime } from "@/lib/realtime/new-order-chime";
 import { toast } from "sonner";
 
 export type UseAdminOrdersSocketOptions = {
@@ -63,6 +63,9 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   useEffect(() => {
     navigateRef.current = navigate;
   }, [navigate]);
+
+  // Unlock audio on first user gesture so rings work on every page (incl. Orders).
+  useEffect(() => installAudioUnlock(), []);
 
   // Drop alert state when auth is gone (logout).
   useEffect(() => {
@@ -123,6 +126,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       void invalidateQueries(event);
 
       if (event.type === "order.updated" && isCancelledStatus(event.status)) {
+        if (playSoundRef.current) playAlertTone();
         toast.warning(`Order ${code} cancelled by customer`, { duration: 8_000 });
         if (isOrdersPath(pathnameRef.current)) markCancelled(event.order_public_id);
         return;
@@ -162,6 +166,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       if (seenStockAlerts.has(key)) return;
       seenStockAlerts.set(key, now);
 
+      if (playSoundRef.current) playAlertTone();
       const show = event.stock_status === "out_of_stock" ? toast.error : toast.warning;
       show(event.title, {
         description: event.message,

@@ -6,6 +6,19 @@
 let sharedCtx: AudioContext | null = null;
 let stopTimer: ReturnType<typeof setTimeout> | null = null;
 
+const audioListeners = new Set<() => void>();
+
+/** True once the browser has allowed sound (after a user gesture). */
+export function isAudioUnlocked(): boolean {
+  return sharedCtx?.state === "running";
+}
+
+/** Subscribe to unlocked/locked changes (for UI status). Returns unsubscribe. */
+export function subscribeAudioState(fn: () => void): () => void {
+  audioListeners.add(fn);
+  return () => audioListeners.delete(fn);
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const Ctor =
@@ -14,16 +27,12 @@ function getAudioContext(): AudioContext | null {
   if (!Ctor) return null;
   if (!sharedCtx || sharedCtx.state === "closed") {
     sharedCtx = new Ctor();
+    sharedCtx.onstatechange = () => audioListeners.forEach((fn) => fn());
   }
   return sharedCtx;
 }
 
-function dualToneBurst(
-  ctx: AudioContext,
-  startAt: number,
-  duration: number,
-  volume: number,
-) {
+function dualToneBurst(ctx: AudioContext, startAt: number, duration: number, volume: number) {
   // Classic ring pair (~440 + 480 Hz)
   for (const freq of [440, 480]) {
     const osc = ctx.createOscillator();
@@ -38,6 +47,41 @@ function dualToneBurst(
     gain.connect(ctx.destination);
     osc.start(startAt);
     osc.stop(startAt + duration + 0.02);
+  }
+}
+
+/**
+ * Browsers keep AudioContext suspended until a user gesture. Call once at app
+ * start so the first click/key/touch anywhere unlocks sound for later alerts.
+ */
+export function installAudioUnlock(): () => void {
+  if (typeof window === "undefined") return () => {};
+  getAudioContext();
+  const events = ["pointerdown", "keydown", "touchstart"] as const;
+  const unlock = () => {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === "suspended") void ctx.resume();
+    if (ctx && ctx.state !== "suspended") {
+      for (const e of events) window.removeEventListener(e, unlock);
+    }
+  };
+  for (const e of events) window.addEventListener(e, unlock);
+  return () => {
+    for (const e of events) window.removeEventListener(e, unlock);
+  };
+}
+
+/** Shorter two-pulse alert for cancellations / stock alerts. */
+export function playAlertTone() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    if (ctx.state === "suspended") void ctx.resume();
+    const now = ctx.currentTime;
+    dualToneBurst(ctx, now, 0.3, 0.2);
+    dualToneBurst(ctx, now + 0.45, 0.3, 0.2);
+  } catch {
+    // Autoplay blocked — toast still notifies.
   }
 }
 
@@ -77,5 +121,22 @@ export function playNewOrderChime() {
     }, totalMs);
   } catch {
     // Autoplay / AudioContext may be blocked — toast still notifies.
+  }
+}
+
+/** Warning tone + spoken "Order is getting late" for a delayed order. */
+export function playLateOrderAlert(code?: string) {
+  playAlertTone();
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    const text = code ? `Order ${code} is getting late` : "Order is getting late";
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "en-IN";
+    utter.rate = 0.95;
+    utter.volume = 1;
+    // Wait for the tone, then speak.
+    window.setTimeout(() => window.speechSynthesis.speak(utter), 900);
+  } catch {
+    // Speech blocked — tone + red card still notify.
   }
 }

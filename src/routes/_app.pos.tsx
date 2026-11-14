@@ -413,7 +413,7 @@ function POSCounter({ businessId }: { businessId: string }) {
         </div>
         {loading && items.length === 0 ? (
           <div className="grid place-items-center p-10 text-sm text-muted-foreground">
-            <Loader2 className="mb-2 h-5 w-5 animate-spin" /> Loading menu…
+            Loading menu…
           </div>
         ) : loadError ? (
           <div className="grid place-items-center gap-3 p-10 text-sm text-destructive">

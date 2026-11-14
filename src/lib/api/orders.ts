@@ -36,6 +36,7 @@ function normalizeOrder(order: AdminOrder): AdminOrder {
     waiting_seconds: order.waiting_seconds ?? null,
     delivery_status: order.delivery_status ?? null,
     driver_accepted_at: order.driver_accepted_at ?? null,
+    accepted_at: order.accepted_at ?? null,
     driver: order.driver ?? null,
     address: order.address ?? null,
     pickup: order.pickup ?? null,
@@ -272,6 +273,48 @@ export function sincePlacedSeconds(
   }
   if (order.waiting_seconds == null) return null;
   return Math.max(0, order.waiting_seconds + Math.floor((now - loadedAt) / 1000));
+}
+
+/** Un-accepted orders turn late after this many minutes. */
+export const NEW_ORDER_LATE_MINUTES = 5;
+/** Preparing orders with no prep time set turn late after this many minutes. */
+export const DEFAULT_PREP_LATE_MINUTES = 30;
+
+/** Seconds after which an active order counts as delayed (null = never late). */
+export function orderLateAfterSeconds(
+  order: Pick<AdminOrder, "status" | "preparation_minutes">,
+  tab: AdminOrderTab,
+): number | null {
+  if (tab === "new") return NEW_ORDER_LATE_MINUTES * 60;
+  if (tab === "preparing") {
+    return (order.preparation_minutes ?? DEFAULT_PREP_LATE_MINUTES) * 60;
+  }
+  return null;
+}
+
+export function isOrderLate(
+  order: Pick<
+    AdminOrder,
+    | "status"
+    | "preparation_minutes"
+    | "created_at"
+    | "ordered_at"
+    | "waiting_seconds"
+    | "accepted_at"
+  >,
+  tab: AdminOrderTab,
+  now: number,
+  loadedAt: number,
+): boolean {
+  const limit = orderLateAfterSeconds(order, tab);
+  if (limit == null) return false;
+  // Prep timer starts when the kitchen accepted, not when the customer placed.
+  const acceptedMs = order.accepted_at ? new Date(order.accepted_at).getTime() : NaN;
+  if (tab === "preparing" && !Number.isNaN(acceptedMs)) {
+    return Math.floor((now - acceptedMs) / 1000) > limit;
+  }
+  const waited = sincePlacedSeconds(order, now, loadedAt);
+  return waited != null && waited > limit;
 }
 
 export function orderBillTotal(order: Pick<AdminOrder, "total" | "subtotal">): number {
