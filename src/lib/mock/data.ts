@@ -380,7 +380,7 @@ export const orders: Order[] = [
   },
 ];
 
-export type InventoryUnit = "kg" | "gram" | "litre" | "pcs";
+export type InventoryUnit = "kg" | "gram" | "litre" | "ml" | "pcs";
 export type InventoryStore = "restaurant" | "bakery";
 export type InventoryItemStatus = "Active" | "Inactive";
 

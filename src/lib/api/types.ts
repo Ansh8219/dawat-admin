@@ -204,6 +204,8 @@ export type MenuRecipeScope = "base" | "variant" | "addon";
 export interface CreateMenuRecipeLine {
   inventory_item_public_id: string;
   quantity_per_unit: number;
+  /** Recipe unit; must be in the same family as the ingredient's stock unit. */
+  unit?: InventoryUnit;
   scope: MenuRecipeScope;
   variant_name?: string;
   addon_group_name?: string;
@@ -217,7 +219,10 @@ export interface MenuRecipeLine {
   inventory_item_public_id: string;
   inventory_sku?: string | null;
   inventory_name?: string | null;
+  /** Stock unit of the ingredient. */
   inventory_unit?: string | null;
+  /** Recipe unit (what quantity_per_unit is measured in). */
+  unit?: string | null;
   quantity_per_unit: number;
   scope: MenuRecipeScope;
   variant_name?: string | null;
@@ -297,6 +302,8 @@ export interface MenuItemSummary {
   thumbnail: string | null;
   menu_type: string;
   sort_order?: number;
+  /** True for legacy items with no valid recipe (sales won't deduct inventory). */
+  recipe_missing?: boolean;
 }
 
 /** Full shape from GET detail / POST create. */
@@ -321,6 +328,7 @@ export interface MenuItemDetail {
   variants: MenuVariant[];
   addon_groups: MenuAddonGroup[];
   recipe?: MenuRecipeLine[];
+  recipe_missing?: boolean;
   images: MenuItemImage[];
   created_at: string;
   updated_at: string;
@@ -347,7 +355,11 @@ export interface CreateMenuItemPayload {
   sort_order?: number;
   variants?: MenuVariant[];
   addon_groups?: MenuAddonGroup[];
-  /** Optional recipe lines — omit or [] = no recipe. On PATCH: omit = untouched, array = full replace, [] = clear. */
+  /**
+   * Required on create (backend: `recipe_required`). Valid = at least one `base` line, or a
+   * `variant` line for every variant. On PATCH: omit = untouched, array = full replace
+   * (empty / non-covering is rejected).
+   */
   recipe?: CreateMenuRecipeLine[];
 }
 
@@ -1149,7 +1161,7 @@ export interface DeliverySettings {
 export type UpdateDeliverySettingsPayload = Partial<DeliverySettings>;
 
 /** Inventory unit enum from /api/admin/inventory/. */
-export type InventoryUnit = "kg" | "gram" | "litre" | "pcs";
+export type InventoryUnit = "kg" | "gram" | "litre" | "ml" | "pcs";
 
 /** GET /api/admin/inventory/categories/ */
 export interface InventoryCategory {
@@ -1215,6 +1227,26 @@ export interface UpdateInventoryStockPayload {
   cost_per_unit?: number;
   stock_date?: string;
   notes?: string;
+}
+
+/** GET /api/admin/inventory/items/{public_id}/history/ entry. */
+export type InventoryHistoryReason =
+  "order" | "order_cancelled" | "wastage" | "purchase" | "adjustment" | (string & {});
+
+export interface InventoryHistoryEntry {
+  public_id?: string;
+  entry_type: "in" | "out" | string;
+  reason?: InventoryHistoryReason | null;
+  quantity: number | string;
+  cost_per_unit?: number | string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  date?: string | null;
+}
+
+export interface InventoryHistoryData {
+  count?: number;
+  results?: InventoryHistoryEntry[];
 }
 
 /** —— Admin offers / coupons —— */

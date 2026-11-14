@@ -1,6 +1,8 @@
 import { apiRequest } from "./client";
 import type {
   CreateInventoryItemPayload,
+  InventoryHistoryData,
+  InventoryHistoryEntry,
   InventoryCategoryListData,
   InventoryCategoryListParams,
   InventoryItemDetail,
@@ -57,3 +59,53 @@ export function updateInventoryItemStock(
     body: payload,
   });
 }
+
+/** GET /api/admin/inventory/items/{item_public_id}/history/ */
+export async function listInventoryItemHistory(
+  accessToken: string,
+  itemPublicId: string,
+): Promise<InventoryHistoryEntry[]> {
+  const data = await apiRequest<InventoryHistoryData | InventoryHistoryEntry[]>(
+    `/api/admin/inventory/items/${itemPublicId}/history/`,
+    { method: "GET", accessToken },
+  );
+  return Array.isArray(data) ? data : (data?.results ?? []);
+}
+
+export type InventoryHistoryDisplay = {
+  label: string;
+  tone: "out" | "in" | "neutral";
+  /** True when this reason is wastage (order usage / returns are NOT wastage). */
+  isWastage: boolean;
+};
+
+/** Label + tone for a history row. `order` / `order_cancelled` are never wastage. */
+export function describeInventoryHistory(entry: InventoryHistoryEntry): InventoryHistoryDisplay {
+  switch (entry.reason) {
+    case "order":
+      return { label: "Used by order", tone: "out", isWastage: false };
+    case "order_cancelled":
+      return { label: "Returned (order cancelled)", tone: "in", isWastage: false };
+    case "wastage":
+      return { label: "Wastage", tone: "out", isWastage: true };
+    default: {
+      const label = entry.reason
+        ? entry.reason.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+        : entry.entry_type === "out"
+          ? "Stock out"
+          : "Stock in";
+      return { label, tone: entry.entry_type === "out" ? "out" : "in", isWastage: false };
+    }
+  }
+}
+
+/** Parses "(short by X)" from history notes (stock was not enough for the order). */
+export function parseShortBy(notes: string | null | undefined): string | null {
+  const m = notes?.match(/\(short by\s+([^)]+)\)/i);
+  return m ? m[1].trim() : null;
+}
+
+/** Stable query key for an item's history. */
+export const inventoryKeys = {
+  history: (itemPublicId: string) => ["admin-inventory", "history", itemPublicId] as const,
+};

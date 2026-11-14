@@ -11,6 +11,23 @@ export type AdminOrderWsEvent = {
   at: string;
 };
 
+export type InventoryStockStatus = "low_stock" | "out_of_stock";
+
+/** `inventory.stock_alert` message on the same admin socket. */
+export type InventoryStockAlertEvent = {
+  type: "inventory.stock_alert";
+  business_public_id?: string;
+  business_name?: string;
+  inventory_item_public_id: string;
+  item_name: string;
+  unit?: string;
+  available: string;
+  stock_status: InventoryStockStatus;
+  title: string;
+  message: string;
+  at: string;
+};
+
 export const ADMIN_ORDERS_WS_CLOSE = {
   unauthorized: 4401,
   forbidden: 4403,
@@ -41,8 +58,19 @@ function isAdminOrderWsEvent(value: unknown): value is AdminOrderWsEvent {
   );
 }
 
+function isInventoryStockAlertEvent(value: unknown): value is InventoryStockAlertEvent {
+  if (!value || typeof value !== "object") return false;
+  const event = value as Record<string, unknown>;
+  return (
+    event.type === "inventory.stock_alert" &&
+    typeof event.inventory_item_public_id === "string" &&
+    (event.stock_status === "low_stock" || event.stock_status === "out_of_stock")
+  );
+}
+
 export type AdminOrdersSocketHandlers = {
   onEvent: (event: AdminOrderWsEvent) => void;
+  onStockAlert?: (event: InventoryStockAlertEvent) => void;
   onOpen?: () => void;
   onReconnected?: () => void;
   /** Called when the socket should stop (auth/forbidden) or needs a fresh token. */
@@ -131,8 +159,12 @@ export class AdminOrdersSocket {
       } catch {
         return;
       }
-      if (!isAdminOrderWsEvent(parsed)) return;
-      this.handlers.onEvent(parsed);
+      // Route by `type`; unknown types are ignored.
+      if (isAdminOrderWsEvent(parsed)) {
+        this.handlers.onEvent(parsed);
+      } else if (isInventoryStockAlertEvent(parsed)) {
+        this.handlers.onStockAlert?.(parsed);
+      }
     };
 
     socket.onerror = () => {

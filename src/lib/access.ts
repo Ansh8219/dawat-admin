@@ -57,7 +57,7 @@ const ROUTE_RULES: Record<string, RouteRule> = {
   "/notifications": open,
   "/settings": open,
   "/orders": mod("orders"),
-  "/pos": mod("orders"),
+  "/pos": mod("pos"),
   "/menu": mod("menu"),
   "/menu-categories": mod("menu"),
   "/inventory": mod("inventory"),

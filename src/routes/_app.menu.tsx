@@ -28,20 +28,27 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { listInventoryItems } from "@/lib/api/inventory";
 import { listMenuCategoryOptions } from "@/lib/api/menu-categories";
 import {
   createMenuItem,
   deleteMenuItem,
   getMenuItem,
+  countRecipeMissingMenuItems,
+  formatRecipeQuantity,
+  isRecipeValid,
+  recipeUnitOptions,
   ITEM_CODE_PATTERN,
   listMenuItems,
+  RECIPE_REQUIRED_MESSAGE,
   normalizeItemCode,
   TAX_OPTIONS,
   updateMenuItem,
 } from "@/lib/api/menu";
 import type {
   CreateMenuRecipeLine,
+  InventoryUnit,
   InventoryItemDetail,
   MenuCategoryOption,
   MenuDietary,
@@ -69,6 +76,7 @@ import {
   X,
   Loader2,
   Tags,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -90,6 +98,7 @@ type FormRecipeLine = {
   id: string;
   inventory_item_public_id: string;
   quantity_per_unit: string;
+  unit: string;
   scope: MenuRecipeScope;
   variant_name: string;
   addon_group_name: string;
@@ -261,6 +270,7 @@ function emptyRecipeLine(): FormRecipeLine {
     id: uid(),
     inventory_item_public_id: "",
     quantity_per_unit: "",
+    unit: "",
     scope: "base",
     variant_name: "",
     addon_group_name: "",
@@ -301,6 +311,7 @@ function recipeFromDetail(lines: MenuRecipeLine[] | undefined): FormRecipeLine[]
     id: uid(),
     inventory_item_public_id: line.inventory_item_public_id,
     quantity_per_unit: numToStr(line.quantity_per_unit),
+    unit: line.unit?.trim() || line.inventory_unit?.trim() || "",
     scope: line.scope,
     variant_name: line.variant_name?.trim() || "",
     addon_group_name: line.addon_group_name?.trim() || "",
@@ -368,6 +379,28 @@ function detailToForm(
   };
 }
 
+function RecipeMissingBadge({ onClick }: { onClick: () => void }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
+          >
+            <AlertTriangle className="h-3 w-3" /> Recipe missing
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Sales of this item will not deduct inventory.</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function MenuPage() {
   const meta = usePanelMeta();
   const business = useAuth((s) => s.business);
@@ -403,6 +436,10 @@ function MenuPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItemDetail[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [recipeError, setRecipeError] = useState("");
+  const [recipeMissingOnly, setRecipeMissingOnly] = useState(false);
+  const [recipeMissingCount, setRecipeMissingCount] = useState(0);
+  const recipeSectionRef = useRef<HTMLElement | null>(null);
+  const [focusRecipe, setFocusRecipe] = useState(false);
 
   const panel = business?.panel ?? "restaurant";
   const formCopy = useMemo(() => getMenuFormCopy(panel), [panel]);
@@ -437,11 +474,18 @@ function MenuPage() {
     }
 
     try {
-      const [data, categoryData] = await Promise.all([
+      const [data, categoryData, missingCount] = await Promise.all([
         withAuthRetry((token) => listMenuItems(token, businessPublicId)),
         withAuthRetry((token) => listMenuCategoryOptions(token, businessPublicId)),
+        // Chip count is non-critical; never fail the whole refresh over it.
+        withAuthRetry((token) => countRecipeMissingMenuItems(token, businessPublicId)).catch(
+          () => null,
+        ),
       ]);
       if (seq !== menuRefreshSeq.current) return; // superseded (e.g. business switched)
+      setRecipeMissingCount(
+        missingCount ?? (Array.isArray(data) ? data.filter((m) => m.recipe_missing).length : 0),
+      );
       const nextItems = Array.isArray(data) ? data : [];
       setItems(nextItems);
       setCategoryOptions(
@@ -453,6 +497,7 @@ function MenuPage() {
       if (options?.resetFilters) {
         setSelected(new Set());
         setCategory("all");
+        setRecipeMissingOnly(false);
       }
     } catch (err) {
       if (seq !== menuRefreshSeq.current) return;
@@ -476,6 +521,15 @@ function MenuPage() {
     // refreshMenuItems closes over businessPublicId; re-run only when the business changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessPublicId, navigate]);
+
+  useEffect(() => {
+    if (!focusRecipe || detailLoading || !modal) return;
+    const t = setTimeout(() => {
+      recipeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setFocusRecipe(false);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [focusRecipe, detailLoading, modal]);
 
   const imagePreviewsRef = useRef<string[]>([]);
   imagePreviewsRef.current = imagePreviews;
@@ -506,13 +560,14 @@ function MenuPage() {
           m.category === categoryNameById[category] ||
           m.category === category;
         const needle = q.toLowerCase();
+        if (recipeMissingOnly && !m.recipe_missing) return false;
         return (
           matchesCategory &&
           (m.name.toLowerCase().includes(needle) ||
             (m.item_code ?? "").toLowerCase().includes(needle))
         );
       }),
-    [items, category, q, categoryNameById],
+    [items, category, q, categoryNameById, recipeMissingOnly],
   );
 
   async function reloadMenu() {
@@ -622,6 +677,7 @@ function MenuPage() {
 
   function openAdd() {
     setEditingId(null);
+    setFocusRecipe(false);
     setExistingImages([]);
     setRemovedImageIds([]);
     setForm(emptyForm(formCopy));
@@ -635,13 +691,14 @@ function MenuPage() {
     void loadInventoryOptions();
   }
 
-  async function openEdit(publicId: string) {
+  async function openEdit(publicId: string, options?: { focusRecipe?: boolean }) {
     if (!businessPublicId) {
       toast.error("No business selected");
       return;
     }
     setEditingId(publicId);
     setDetailLoading(true);
+    setFocusRecipe(options?.focusRecipe ?? false);
     setModal(true);
     setItemCodeApiError("");
     setRecipeError("");
@@ -849,7 +906,11 @@ function MenuPage() {
 
   /** Returns the COMPLETE recipe line list, or `null` if invalid (toast already shown). */
   function buildRecipePayload(): CreateMenuRecipeLine[] | null {
-    if (form.recipe.length === 0) return [];
+    if (form.recipe.length === 0) {
+      setRecipeError(RECIPE_REQUIRED_MESSAGE);
+      toast.error(RECIPE_REQUIRED_MESSAGE);
+      return null;
+    }
 
     const lines: CreateMenuRecipeLine[] = [];
     const seen = new Set<string>();
@@ -906,6 +967,10 @@ function MenuPage() {
         quantity_per_unit,
         scope: line.scope,
       };
+      const lineUnit =
+        line.unit ||
+        inventoryItems.find((i) => i.public_id === line.inventory_item_public_id)?.unit;
+      if (lineUnit) payload.unit = lineUnit as InventoryUnit;
       if (line.scope === "variant") payload.variant_name = line.variant_name.trim();
       if (line.scope === "addon") {
         payload.addon_group_name = line.addon_group_name.trim();
@@ -913,6 +978,16 @@ function MenuPage() {
       }
       if (line.notes.trim()) payload.notes = line.notes.trim();
       lines.push(payload);
+    }
+    if (
+      !isRecipeValid(
+        lines,
+        form.variants.map((v) => v.name),
+      )
+    ) {
+      setRecipeError(RECIPE_REQUIRED_MESSAGE);
+      toast.error(RECIPE_REQUIRED_MESSAGE);
+      return null;
     }
     return lines;
   }
@@ -1156,7 +1231,7 @@ function MenuPage() {
               business_public_id: businessPublicId,
               ...updatePayload,
               is_available: true,
-              ...(recipeLines.length > 0 ? { recipe: recipeLines } : {}),
+              recipe: recipeLines,
             },
             images,
           ),
@@ -1184,6 +1259,12 @@ function MenuPage() {
       }
       if (err instanceof ApiError && (err.status === 400 || err.status === 404)) {
         const recipeMsg = fieldErrorFromDetails(err.details, "recipe");
+        if (err.code === "recipe_required" || err.code === "recipe_validation_error") {
+          const msg = recipeMsg || err.message || RECIPE_REQUIRED_MESSAGE;
+          setRecipeError(msg);
+          toast.error(msg);
+          return;
+        }
         if (recipeMsg || /recipe|inventory/i.test(`${err.code} ${err.message}`)) {
           const msg = recipeMsg || err.message;
           setRecipeError(msg);
@@ -1255,6 +1336,18 @@ function MenuPage() {
                 </Link>
               </div>
               <ul className="space-y-1">
+                <li>
+                  <button
+                    type="button"
+                    aria-pressed={recipeMissingOnly}
+                    onClick={() => setRecipeMissingOnly((v) => !v)}
+                    className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${recipeMissingOnly ? "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400" : "border-dashed hover:bg-muted"}`}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Recipe missing
+                    <span className="ml-auto text-xs">{recipeMissingCount}</span>
+                  </button>
+                </li>
                 <li>
                   <button
                     type="button"
@@ -1459,6 +1552,11 @@ function MenuPage() {
                                 {m.category}
                                 {m.variant_count > 0 ? ` · ${m.variant_count} variants` : ""}
                               </div>
+                              {m.recipe_missing ? (
+                                <RecipeMissingBadge
+                                  onClick={() => void openEdit(m.public_id, { focusRecipe: true })}
+                                />
+                              ) : null}
                               {m.tags && m.tags.length > 0 && (
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {m.tags.slice(0, 2).map((t) => (
@@ -1539,6 +1637,13 @@ function MenuPage() {
                                 <div className="flex items-center gap-2 font-medium">
                                   <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />
                                   {m.name}
+                                  {m.recipe_missing ? (
+                                    <RecipeMissingBadge
+                                      onClick={() =>
+                                        void openEdit(m.public_id, { focusRecipe: true })
+                                      }
+                                    />
+                                  ) : null}
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-muted-foreground">{m.category}</td>
@@ -2227,15 +2332,15 @@ function MenuPage() {
               <Separator />
 
               {/* Recipe — editable on create and edit (PATCH replaces the full list) */}
-              <section className="space-y-3">
+              <section ref={recipeSectionRef} className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Recipe
+                      Recipe / Ingredients <span className="text-destructive">*</span>
                     </h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Optional inventory usage per plate / variant / add-on. Saving replaces the
-                      whole recipe.
+                      Required. Quantity is per ONE unit sold. Add a Base ingredient, or an
+                      ingredient for every variant. Saving replaces the whole recipe.
                     </p>
                   </div>
                   <Button
@@ -2262,7 +2367,7 @@ function MenuPage() {
                   </p>
                 ) : form.recipe.length === 0 ? (
                   <p className="rounded-xl border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                    No recipe — item won’t deduct inventory
+                    No ingredients yet — add at least one line
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -2285,13 +2390,26 @@ function MenuPage() {
                                   ? `Addon · ${line.addon_group_name || "—"} / ${line.addon_option_name || "—"}`
                                   : "Base"}
                             </span>
-                            {inv?.unit ? <span>Unit: {inv.unit}</span> : null}
+                            {inv?.unit ? (
+                              <span className="normal-case">
+                                {formatRecipeQuantity({
+                                  quantity_per_unit: line.quantity_per_unit || "—",
+                                  unit: line.unit || inv.unit,
+                                  inventory_unit: inv.unit,
+                                })}
+                              </span>
+                            ) : null}
                           </div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_100px_auto]">
                             <Select
                               value={line.inventory_item_public_id || undefined}
                               onValueChange={(value) =>
-                                updateRecipeLine(line.id, { inventory_item_public_id: value })
+                                updateRecipeLine(line.id, {
+                                  inventory_item_public_id: value,
+                                  unit:
+                                    activeInventoryItems.find((i) => i.public_id === value)?.unit ??
+                                    "",
+                                })
                               }
                             >
                               <SelectTrigger className="rounded-xl bg-background">
@@ -2302,21 +2420,40 @@ function MenuPage() {
                                   <SelectItem key={item.public_id} value={item.public_id}>
                                     {item.name}
                                     {item.sku ? ` · ${item.sku}` : ""} ({item.unit})
+                                    {item.available != null ? ` · ${item.available} available` : ""}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Input
-                              type="number"
-                              min={0}
-                              step="any"
-                              value={line.quantity_per_unit}
-                              onChange={(e) =>
-                                updateRecipeLine(line.id, { quantity_per_unit: e.target.value })
-                              }
-                              placeholder={unitLabel ? `Qty (${unitLabel})` : "Qty"}
-                              className="rounded-xl bg-background"
-                            />
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min={0}
+                                step="any"
+                                value={line.quantity_per_unit}
+                                onChange={(e) =>
+                                  updateRecipeLine(line.id, { quantity_per_unit: e.target.value })
+                                }
+                                placeholder="Qty"
+                                className="rounded-xl bg-background"
+                              />
+                            </div>
+                            <Select
+                              value={line.unit || unitLabel || undefined}
+                              disabled={!inv}
+                              onValueChange={(value) => updateRecipeLine(line.id, { unit: value })}
+                            >
+                              <SelectTrigger className="rounded-xl bg-background">
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {recipeUnitOptions(unitLabel).map((u) => (
+                                  <SelectItem key={u} value={u}>
+                                    {u}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <Button
                               type="button"
                               size="icon"

@@ -1,4 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+import { useInventoryAlerts } from "@/lib/inventory-alerts";
 import { useAccess } from "@/lib/access";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +22,10 @@ import {
   listInventoryCategories,
   listInventoryItems,
   updateInventoryItemStock,
+  describeInventoryHistory,
+  inventoryKeys,
+  listInventoryItemHistory,
+  parseShortBy,
 } from "@/lib/api/inventory";
 import { ApiError, type InventoryCategory, type InventoryItemDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
@@ -46,12 +53,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+const inventorySearchSchema = z.object({
+  /** Inventory item public_id to open in the detail sheet (from stock-alert toasts). */
+  item: z.string().min(1).optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/_app/inventory")({
   component: InventoryPage,
+  validateSearch: inventorySearchSchema,
   head: () => ({ meta: [{ title: "Inventory — Daawat Baker's" }] }),
 });
 
-const UNITS: InventoryUnit[] = ["kg", "gram", "litre", "pcs"];
+const UNITS: InventoryUnit[] = ["kg", "gram", "litre", "ml", "pcs"];
 
 type InventoryTab = "all" | "low" | "out" | "stock";
 
@@ -179,6 +192,15 @@ function InventoryPage() {
   const [savingStock, setSavingStock] = useState(false);
 
   const [logItem, setLogItem] = useState<InventoryItem | null>(null);
+  const { item: itemParam } = Route.useSearch();
+  const alertTick = useInventoryAlerts((s) => s.tick);
+
+  const historyQuery = useQuery({
+    queryKey: inventoryKeys.history(logItem?.id ?? ""),
+    enabled: !!logItem,
+    queryFn: () => withAuthRetry((token) => listInventoryItemHistory(token, logItem!.id)),
+  });
+  const refetchHistory = historyQuery.refetch;
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -270,6 +292,25 @@ function InventoryPage() {
     }
     void loadItems({ showLoading: true });
   }, [panel, loadItems]);
+
+  // Live stock alert: refetch item list (stock_status / available) and open item history.
+  useEffect(() => {
+    if (alertTick === 0 || panel === "banquet") return;
+    void loadItems();
+    if (logItem) void refetchHistory();
+    // Only react to new alerts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertTick]);
+
+  // Deep link: /inventory?item=<public_id> opens that item's detail sheet.
+  useEffect(() => {
+    if (!itemParam || loading) return;
+    const match = items.find((i) => i.id === itemParam);
+    if (match) {
+      setLogItem(match);
+      void navigate({ to: "/inventory", search: {}, replace: true });
+    }
+  }, [itemParam, items, loading, navigate]);
 
   const panelItems = useMemo(() => {
     if (panel === "banquet") return [];
@@ -1073,8 +1114,51 @@ function InventoryPage() {
                 {s.notes ? <p className="mt-2 text-xs text-muted-foreground">{s.notes}</p> : null}
               </div>
             ))}
-            {itemLogs.length === 0 && (
+            {itemLogs.length === 0 && (historyQuery.data?.length ?? 0) === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">No stock entries yet</p>
+            )}
+
+            {(historyQuery.data?.length ?? 0) > 0 && (
+              <div className="space-y-2 pt-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  History
+                </h4>
+                {historyQuery.data!.map((h, idx) => {
+                  const d = describeInventoryHistory(h);
+                  const shortBy = parseShortBy(h.notes);
+                  return (
+                    <div key={h.public_id ?? idx} className="rounded-xl border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div
+                            className={cn(
+                              "font-semibold",
+                              d.tone === "out" ? "text-destructive" : "text-emerald-600",
+                            )}
+                          >
+                            {d.tone === "out" ? "−" : "+"}
+                            {h.quantity} {logItem?.unit}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {(h.created_at ?? h.date ?? "").slice(0, 16).replace("T", " ")}
+                          </div>
+                        </div>
+                        <span className="rounded-full border px-2 py-0.5 text-[11px] font-medium">
+                          {d.label}
+                        </span>
+                      </div>
+                      {shortBy ? (
+                        <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                          Stock was short by {shortBy} {logItem?.unit}
+                        </p>
+                      ) : null}
+                      {h.notes ? (
+                        <p className="mt-2 text-xs text-muted-foreground">{h.notes}</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
           <div className="flex items-center justify-end gap-2 border-t px-6 py-4">

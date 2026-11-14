@@ -1,8 +1,10 @@
 import { apiFormRequest, apiRequest } from "./client";
 import type {
   CreateMenuItemPayload,
+  InventoryUnit,
   MenuItemDetail,
   MenuItemSummary,
+  MenuRecipeScope,
   MenuTax,
   UpdateMenuItemPayload,
 } from "./types";
@@ -53,7 +55,62 @@ export function menuItemToSummary(item: MenuItemDetail): MenuItemSummary {
     thumbnail: firstImage ? menuImageUrl(firstImage) : null,
     menu_type: item.menu_type,
     sort_order: item.sort_order,
+    recipe_missing: item.recipe_missing ?? false,
   };
+}
+
+/**
+ * Same rule as the backend: valid if there is at least one `base` line, or a `variant`
+ * line for EVERY variant of the item.
+ */
+export function isRecipeValid(
+  lines: { scope: MenuRecipeScope; variant_name?: string | null }[],
+  variantNames: string[],
+): boolean {
+  if (lines.some((l) => l.scope === "base")) return true;
+  const names = variantNames.map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) return false;
+  const covered = new Set(
+    lines.filter((l) => l.scope === "variant").map((l) => (l.variant_name ?? "").trim()),
+  );
+  return names.every((n) => covered.has(n));
+}
+
+const UNIT_FAMILIES: InventoryUnit[][] = [["kg", "gram"], ["litre", "ml"], ["pcs"]];
+
+/** Recipe units allowed for an ingredient: same family as its stock unit. */
+export function recipeUnitOptions(stockUnit: string | null | undefined): InventoryUnit[] {
+  return UNIT_FAMILIES.find((f) => f.includes(stockUnit as InventoryUnit)) ?? [];
+}
+
+/** e.g. "30 gram (stock in kg)"; omits the suffix when units match. */
+export function formatRecipeQuantity(line: {
+  quantity_per_unit: number | string;
+  unit?: string | null;
+  inventory_unit?: string | null;
+}): string {
+  const unit = line.unit || line.inventory_unit || "";
+  const base = `${line.quantity_per_unit} ${unit}`.trim();
+  return line.inventory_unit && unit && unit !== line.inventory_unit
+    ? `${base} (stock in ${line.inventory_unit})`
+    : base;
+}
+
+export const RECIPE_REQUIRED_MESSAGE =
+  "Add at least one Base ingredient, or an ingredient for every variant.";
+
+/** Count of items missing a recipe (uses the `count` of the filtered query). */
+export async function countRecipeMissingMenuItems(accessToken: string, businessPublicId: string) {
+  const params = new URLSearchParams({
+    business_public_id: businessPublicId,
+    recipe_missing: "true",
+    page: "1",
+  });
+  const data = await apiRequest<MenuItemSummary[] | MenuItemsPage>(
+    `/api/admin/menu-items/?${params.toString()}`,
+    { method: "GET", accessToken },
+  );
+  return Array.isArray(data) ? data.length : (data?.count ?? data?.results?.length ?? 0);
 }
 
 type MenuItemsPage = {

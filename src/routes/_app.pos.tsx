@@ -115,7 +115,7 @@ function POSPage() {
   const { canView } = useAccess();
   const business = useAuth((s) => s.business);
 
-  if (!canView("orders")) {
+  if (!canView("pos")) {
     return (
       <div>
         <PageHeader title="POS & Billing" crumbs={["Operations", "POS"]} />
@@ -159,7 +159,7 @@ function POSPage() {
 
 function POSCounter({ businessId }: { businessId: string }) {
   const { canManage } = useAccess();
-  const canBill = canManage("orders");
+  const canBill = canManage("pos");
 
   const [items, setItems] = useState<PosMenuItem[]>([]);
   const [categories, setCategories] = useState<PosMenuData["categories"]>([]);

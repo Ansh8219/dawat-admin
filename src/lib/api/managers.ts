@@ -7,6 +7,7 @@ import { ApiError } from "./types";
  */
 export const MANAGER_PERMISSION_MODULES = [
   { key: "orders", label: "Orders" },
+  { key: "pos", label: "POS Billing" },
   { key: "menu", label: "Menu" },
   { key: "tables", label: "Tables" },
   { key: "halls", label: "Halls" },

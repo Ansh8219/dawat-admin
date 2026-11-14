@@ -5,11 +5,14 @@ import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
 import { isCancelledStatus, orderDisplayCode } from "@/lib/api/orders";
 import type { AdminOrderListData } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
+import { adminNotificationsKeys } from "@/lib/api/notifications";
+import { useInventoryAlerts } from "@/lib/inventory-alerts";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import {
   ADMIN_ORDERS_WS_CLOSE,
   AdminOrdersSocket,
   type AdminOrderWsEvent,
+  type InventoryStockAlertEvent,
 } from "@/lib/realtime/admin-orders-socket";
 import { playNewOrderChime } from "@/lib/realtime/new-order-chime";
 import { toast } from "sonner";
@@ -44,6 +47,8 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   const tickBoard = useKitchenAlerts((s) => s.tickBoard);
   const markCancelled = useKitchenAlerts((s) => s.markCancelled);
   const resetAlerts = useKitchenAlerts((s) => s.reset);
+  const bumpInventory = useInventoryAlerts((s) => s.bump);
+  const resetInventoryAlerts = useInventoryAlerts((s) => s.reset);
 
   const playSoundRef = useRef(playSoundOnCreate);
   const pathnameRef = useRef(pathname);
@@ -61,8 +66,11 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
 
   // Drop alert state when auth is gone (logout).
   useEffect(() => {
-    if (!accessToken) resetAlerts();
-  }, [accessToken, resetAlerts]);
+    if (!accessToken) {
+      resetAlerts();
+      resetInventoryAlerts();
+    }
+  }, [accessToken, resetAlerts, resetInventoryAlerts]);
 
   useEffect(() => {
     if (!enabled || !accessToken || typeof window === "undefined") return;
@@ -141,6 +149,40 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       refreshBoardIfActive();
     };
 
+    /** De-dupe identical stock-alert toasts within a few seconds. */
+    const seenStockAlerts = new Map<string, number>();
+    const STOCK_DEDUP_TTL_MS = 5_000;
+
+    const handleStockAlert = (event: InventoryStockAlertEvent) => {
+      const key = `${event.inventory_item_public_id}:${event.stock_status}:${event.at}`;
+      const now = Date.now();
+      for (const [k, t] of seenStockAlerts) {
+        if (now - t > STOCK_DEDUP_TTL_MS) seenStockAlerts.delete(k);
+      }
+      if (seenStockAlerts.has(key)) return;
+      seenStockAlerts.set(key, now);
+
+      const show = event.stock_status === "out_of_stock" ? toast.error : toast.warning;
+      show(event.title, {
+        description: event.message,
+        duration: 10_000,
+        action: {
+          label: "View item",
+          onClick: () => {
+            void navigateRef.current({
+              to: "/inventory",
+              search: { item: event.inventory_item_public_id },
+            });
+          },
+        },
+      });
+
+      // Bell badge + list (stored as in-app notification type "stock").
+      void queryClient.invalidateQueries({ queryKey: adminNotificationsKeys.all });
+      // Open Inventory page / item detail refetches stock_status + available.
+      bumpInventory(event.inventory_item_public_id);
+    };
+
     const handleAuthFailure = async (code: number) => {
       if (stopped) return;
       if (code === ADMIN_ORDERS_WS_CLOSE.forbidden) {
@@ -162,6 +204,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
 
     socket = new AdminOrdersSocket(accessToken, {
       onEvent: handleEvent,
+      onStockAlert: handleStockAlert,
       onReconnected: () => {
         void invalidateQueries(null);
         // Catch-up refetch only when kitchen board is open.
@@ -178,5 +221,14 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       socket?.dispose();
       socket = null;
     };
-  }, [enabled, accessToken, queryClient, refreshSession, bumpNewOrder, tickBoard, markCancelled]);
+  }, [
+    enabled,
+    accessToken,
+    queryClient,
+    refreshSession,
+    bumpNewOrder,
+    tickBoard,
+    markCancelled,
+    bumpInventory,
+  ]);
 }
