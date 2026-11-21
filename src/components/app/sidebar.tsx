@@ -24,6 +24,7 @@ import {
   Building2,
   Landmark,
   Send,
+  MessageSquareText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
@@ -47,6 +48,7 @@ const nav = [
       { to: "/bookings", label: "Tables & Bookings", icon: CalendarDays },
       { to: "/table-qr", label: "Tables", icon: QrCode },
       { to: "/hall-bookings", label: "Hall Bookings", icon: CalendarDays },
+      { to: "/hall-enquiries", label: "Hall Enquiries", icon: MessageSquareText },
       { to: "/halls", label: "Halls", icon: Landmark },
     ],
   },

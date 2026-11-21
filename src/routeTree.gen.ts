@@ -32,6 +32,7 @@ import { Route as AppInvoicesRouteImport } from './routes/_app.invoices'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppHomeServicesRouteImport } from './routes/_app.home-services'
 import { Route as AppHallsRouteImport } from './routes/_app.halls'
+import { Route as AppHallEnquiriesRouteImport } from './routes/_app.hall-enquiries'
 import { Route as AppHallBookingsRouteImport } from './routes/_app.hall-bookings'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCustomerLevelsRouteImport } from './routes/_app.customer-levels'
@@ -163,6 +164,11 @@ const AppHallsRoute = AppHallsRouteImport.update({
   path: '/halls',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHallEnquiriesRoute = AppHallEnquiriesRouteImport.update({
+  id: '/hall-enquiries',
+  path: '/hall-enquiries',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppHallBookingsRoute = AppHallBookingsRouteImport.update({
   id: '/hall-bookings',
   path: '/hall-bookings',
@@ -261,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/hall-bookings': typeof AppHallBookingsRoute
+  '/hall-enquiries': typeof AppHallEnquiriesRoute
   '/halls': typeof AppHallsRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/customer-levels': typeof AppCustomerLevelsRoute
   '/customers': typeof AppCustomersRoute
   '/hall-bookings': typeof AppHallBookingsRoute
+  '/hall-enquiries': typeof AppHallEnquiriesRoute
   '/halls': typeof AppHallsRoute
   '/home-services': typeof AppHomeServicesRoute
   '/inventory': typeof AppInventoryRoute
@@ -342,6 +350,7 @@ export interface FileRoutesById {
   '/_app/customer-levels': typeof AppCustomerLevelsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/hall-bookings': typeof AppHallBookingsRoute
+  '/_app/hall-enquiries': typeof AppHallEnquiriesRoute
   '/_app/halls': typeof AppHallsRoute
   '/_app/home-services': typeof AppHomeServicesRoute
   '/_app/inventory': typeof AppInventoryRoute
@@ -385,6 +394,7 @@ export interface FileRouteTypes {
     | '/customer-levels'
     | '/customers'
     | '/hall-bookings'
+    | '/hall-enquiries'
     | '/halls'
     | '/home-services'
     | '/inventory'
@@ -424,6 +434,7 @@ export interface FileRouteTypes {
     | '/customer-levels'
     | '/customers'
     | '/hall-bookings'
+    | '/hall-enquiries'
     | '/halls'
     | '/home-services'
     | '/inventory'
@@ -465,6 +476,7 @@ export interface FileRouteTypes {
     | '/_app/customer-levels'
     | '/_app/customers'
     | '/_app/hall-bookings'
+    | '/_app/hall-enquiries'
     | '/_app/halls'
     | '/_app/home-services'
     | '/_app/inventory'
@@ -665,6 +677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHallsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/hall-enquiries': {
+      id: '/_app/hall-enquiries'
+      path: '/hall-enquiries'
+      fullPath: '/hall-enquiries'
+      preLoaderRoute: typeof AppHallEnquiriesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/hall-bookings': {
       id: '/_app/hall-bookings'
       path: '/hall-bookings'
@@ -788,6 +807,7 @@ interface AppRouteChildren {
   AppCustomerLevelsRoute: typeof AppCustomerLevelsRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppHallBookingsRoute: typeof AppHallBookingsRoute
+  AppHallEnquiriesRoute: typeof AppHallEnquiriesRoute
   AppHallsRoute: typeof AppHallsRoute
   AppHomeServicesRoute: typeof AppHomeServicesRoute
   AppInventoryRoute: typeof AppInventoryRoute
@@ -824,6 +844,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCustomerLevelsRoute: AppCustomerLevelsRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppHallBookingsRoute: AppHallBookingsRoute,
+  AppHallEnquiriesRoute: AppHallEnquiriesRoute,
   AppHallsRoute: AppHallsRoute,
   AppHomeServicesRoute: AppHomeServicesRoute,
   AppInventoryRoute: AppInventoryRoute,

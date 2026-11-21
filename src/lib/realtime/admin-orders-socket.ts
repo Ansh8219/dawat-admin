@@ -28,6 +28,13 @@ export type InventoryStockAlertEvent = {
   at: string;
 };
 
+/** `hall_enquiry.created` message on the same admin socket. */
+export type HallEnquiryCreatedEvent = {
+  type: "hall_enquiry.created";
+  enquiry_public_id?: string;
+  [key: string]: unknown;
+};
+
 export const ADMIN_ORDERS_WS_CLOSE = {
   unauthorized: 4401,
   forbidden: 4403,
@@ -68,7 +75,13 @@ function isInventoryStockAlertEvent(value: unknown): value is InventoryStockAler
   );
 }
 
+function isHallEnquiryCreatedEvent(value: unknown): value is HallEnquiryCreatedEvent {
+  if (!value || typeof value !== "object") return false;
+  return (value as Record<string, unknown>).type === "hall_enquiry.created";
+}
+
 export type AdminOrdersSocketHandlers = {
+  onHallEnquiryCreated?: (event: HallEnquiryCreatedEvent) => void;
   onEvent: (event: AdminOrderWsEvent) => void;
   onStockAlert?: (event: InventoryStockAlertEvent) => void;
   onOpen?: () => void;
@@ -164,6 +177,8 @@ export class AdminOrdersSocket {
         this.handlers.onEvent(parsed);
       } else if (isInventoryStockAlertEvent(parsed)) {
         this.handlers.onStockAlert?.(parsed);
+      } else if (isHallEnquiryCreatedEvent(parsed)) {
+        this.handlers.onHallEnquiryCreated?.(parsed);
       }
     };
 

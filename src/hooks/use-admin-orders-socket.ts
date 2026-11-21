@@ -7,6 +7,7 @@ import type { AdminOrderListData } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { adminNotificationsKeys } from "@/lib/api/notifications";
 import { useInventoryAlerts } from "@/lib/inventory-alerts";
+import { useHallEnquiryAlerts } from "@/lib/hall-enquiry-alerts";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import {
   ADMIN_ORDERS_WS_CLOSE,
@@ -48,6 +49,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   const markCancelled = useKitchenAlerts((s) => s.markCancelled);
   const resetAlerts = useKitchenAlerts((s) => s.reset);
   const bumpInventory = useInventoryAlerts((s) => s.bump);
+  const bumpHallEnquiry = useHallEnquiryAlerts((s) => s.bump);
   const resetInventoryAlerts = useInventoryAlerts((s) => s.reset);
 
   const playSoundRef = useRef(playSoundOnCreate);
@@ -210,6 +212,22 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     socket = new AdminOrdersSocket(accessToken, {
       onEvent: handleEvent,
       onStockAlert: handleStockAlert,
+      onHallEnquiryCreated: () => {
+        if (playSoundRef.current) playAlertTone();
+        // Hall Enquiries page (if mounted) refetches and bumps its New badge.
+        bumpHallEnquiry();
+        if (pathnameRef.current !== "/hall-enquiries") {
+          toast.message("New hall enquiry", {
+            duration: 8_000,
+            action: {
+              label: "View",
+              onClick: () => {
+                void navigateRef.current({ to: "/hall-enquiries" });
+              },
+            },
+          });
+        }
+      },
       onReconnected: () => {
         void invalidateQueries(null);
         // Catch-up refetch only when kitchen board is open.
@@ -235,5 +253,6 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     tickBoard,
     markCancelled,
     bumpInventory,
+    bumpHallEnquiry,
   ]);
 }

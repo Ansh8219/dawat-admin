@@ -231,6 +231,8 @@ function humanizeErrorCode(code: string): string {
       return "This hall has bookings. Deactivate it instead.";
     case "hall_slot_in_use":
       return "This slot has bookings. Deactivate it instead.";
+    case "hall_enquiry_not_found":
+      return "Enquiry not found.";
     case "hall_booking_not_found":
       return "Booking not found.";
     case "hall_booking_invalid_transition":

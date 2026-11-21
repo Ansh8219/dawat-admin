@@ -64,6 +64,7 @@ const ROUTE_RULES: Record<string, RouteRule> = {
   "/bookings": mod((panel) => (panel === "banquet" ? "halls" : "tables")),
   "/halls": mod("halls"),
   "/hall-bookings": mod("halls"),
+  "/hall-enquiries": mod("halls"),
   "/table-qr": mod("tables"),
   "/customers": mod("customers"),
   "/customer-levels": mod("rewards"),

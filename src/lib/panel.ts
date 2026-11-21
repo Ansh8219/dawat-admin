@@ -191,6 +191,7 @@ export const PANEL_META: Record<Panel, PanelMeta> = {
     routes: [
       "/",
       "/hall-bookings",
+      "/hall-enquiries",
       "/halls",
       "/customers",
       "/customer-levels",
