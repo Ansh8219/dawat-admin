@@ -285,7 +285,7 @@ function POSCounter({ businessId }: { businessId: string }) {
   async function submitCode() {
     if (lookingUp) return;
     const codes = code
-      .split("+")
+      .split("*")
       .map((s) => s.trim())
       .filter(Boolean);
     if (codes.length === 0) return;
@@ -484,7 +484,7 @@ function POSCounter({ businessId }: { businessId: string }) {
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Enter code: 22+67"
+              placeholder="Enter code: 22*67"
               maxLength={80}
               onKeyDown={(e) => e.key === "Enter" && void submitCode()}
               disabled={lookingUp}
