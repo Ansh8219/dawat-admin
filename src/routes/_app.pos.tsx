@@ -177,6 +177,7 @@ function POSCounter({ businessId }: { businessId: string }) {
   const [discountPct, setDiscountPct] = useState(0);
   const [pay, setPay] = useState<PosPaymentMethod>("upi");
   const [pickQueue, setPickQueue] = useState<PosMenuItem[]>([]);
+  const pickQty = useRef(new Map<string, number>());
   const [lookingUp, setLookingUp] = useState(false);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -255,7 +256,12 @@ function POSCounter({ businessId }: { businessId: string }) {
     [categories],
   );
 
-  function addLine(item: PosMenuItem, variant: string, addons: { name: string; price: number }[]) {
+  function addLine(
+    item: PosMenuItem,
+    variant: string,
+    addons: { name: string; price: number }[],
+    addQty = 1,
+  ) {
     const base = item.variants.find((v) => v.name === variant)?.price ?? item.price;
     const unit = round2(base + addons.reduce((s, a) => s + a.price, 0));
     const key = lineKey(
@@ -265,9 +271,9 @@ function POSCounter({ businessId }: { businessId: string }) {
     );
     setCart((prev) => {
       if (prev.some((l) => l.key === key)) {
-        return prev.map((l) => (l.key === key ? { ...l, qty: Math.min(99, l.qty + 1) } : l));
+        return prev.map((l) => (l.key === key ? { ...l, qty: Math.min(99, l.qty + addQty) } : l));
       }
-      return [...prev, { key, item, variant, addons, unit, qty: 1 }];
+      return [...prev, { key, item, variant, addons, unit, qty: Math.min(99, addQty) }];
     });
   }
 
@@ -284,10 +290,16 @@ function POSCounter({ businessId }: { businessId: string }) {
 
   async function submitCode() {
     if (lookingUp) return;
-    const codes = code
-      .split("*")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // Format: "22*2+67" -> item 22 x2, item 67 x1. "+" separates items, "*" sets quantity.
+    const entries = code
+      .split("+")
+      .map((part) => {
+        const [c, q] = part.split("*").map((x) => x.trim());
+        const n = Math.floor(Number(q));
+        return { code: c ?? "", qty: q && Number.isFinite(n) && n > 0 ? Math.min(99, n) : 1 };
+      })
+      .filter((e) => e.code);
+    const codes = entries.map((e) => e.code);
     if (codes.length === 0) return;
     setLookingUp(true);
     try {
@@ -308,14 +320,16 @@ function POSCounter({ businessId }: { businessId: string }) {
         }),
       );
       const queue: PosMenuItem[] = [];
-      for (const c of codes) {
+      for (const { code: c, qty } of entries) {
         const item = found.get(c.slice(0, 16));
         if (!item) {
           if (found.has(c.slice(0, 16))) toast.error(`Item code ${c} not found`);
           continue;
         }
-        if (needsChoice(item)) queue.push(item);
-        else addLine(item, "", []);
+        if (needsChoice(item)) {
+          queue.push(item);
+          pickQty.current.set(item.public_id, qty);
+        } else addLine(item, "", [], qty);
       }
       if (queue.length) setPickQueue(queue);
       setCode("");
@@ -484,7 +498,7 @@ function POSCounter({ businessId }: { businessId: string }) {
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Enter code: 22*67"
+              placeholder="Code*Qty, e.g. 22*2+67*3"
               maxLength={80}
               onKeyDown={(e) => e.key === "Enter" && void submitCode()}
               disabled={lookingUp}
@@ -640,7 +654,8 @@ function POSCounter({ businessId }: { businessId: string }) {
         item={pickQueue[0] ?? null}
         onClose={() => setPickQueue([])}
         onConfirm={(item, variant, addons) => {
-          addLine(item, variant, addons);
+          addLine(item, variant, addons, pickQty.current.get(item.public_id) ?? 1);
+          pickQty.current.delete(item.public_id);
           setPickQueue((prev) => prev.slice(1));
         }}
       />
