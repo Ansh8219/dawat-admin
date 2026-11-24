@@ -197,7 +197,25 @@ export function isCancelledStatus(status: string | undefined): boolean {
 export function isAutoRefundPayment(method: string | null | undefined): boolean {
   const key = method?.trim().toLowerCase();
   if (!key) return false;
-  return key !== "cod" && key !== "cash";
+  return key !== "cod" && key !== "cash" && key !== "pay_at_counter";
+}
+
+/** QR dine-in order the guest will pay for at the counter after handover. */
+export function isPayAtCounterUnpaid(order: {
+  payment_method?: string | null;
+  payment_status?: string | null;
+}): boolean {
+  return (
+    order.payment_method?.trim().toLowerCase() === "pay_at_counter" &&
+    order.payment_status?.trim().toLowerCase() === "unpaid"
+  );
+}
+
+/** "table01" → "Table 01". */
+export function tableLabel(tableNumber: string | null | undefined): string {
+  const raw = tableNumber?.trim();
+  if (!raw) return "Table —";
+  return raw.replace(/^table[\s_-]*/i, "Table ").replace(/^(?!Table )/, "Table ");
 }
 
 /** Staff action raced a customer cancel (or another status change). */
@@ -335,6 +353,7 @@ export function paymentLabel(method: string | null | undefined): string {
     upi: "UPI",
     card: "Card",
     cash: "Cash",
+    pay_at_counter: "Pay at counter",
   };
   return known[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { PageHeader } from "@/components/app/page-header";
+import { CounterPayments } from "@/components/app/counter-payments";
+import { useCounterPaymentAlerts } from "@/lib/counter-payment-alerts";
 import { InvoiceDocument } from "@/components/app/invoice-document";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,11 +51,21 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 
+const POS_TABS = ["new", "history", "counter"] as const;
+type PosTab = (typeof POS_TABS)[number];
+
+const posSearchSchema = z.object({
+  /** Initial tab; "counter" is opened from pay-at-counter toasts. */
+  tab: z.enum(POS_TABS).optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/_app/pos")({
   component: POSPage,
+  validateSearch: posSearchSchema,
   head: () => ({ meta: [{ title: "POS & Billing — Daawat Baker's" }] }),
 });
 
@@ -114,6 +127,15 @@ function errMessage(err: unknown, fallback: string) {
 function POSPage() {
   const { canView } = useAccess();
   const business = useAuth((s) => s.business);
+  const { tab: tabParam } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const tab: PosTab = tabParam ?? "new";
+  const counterAlerts = useCounterPaymentAlerts((s) => s.pendingAlerts);
+  const setTab = (next: string) =>
+    void navigate({
+      search: next === "new" ? {} : { tab: next as PosTab },
+      replace: true,
+    });
 
   if (!canView("pos")) {
     return (
@@ -135,11 +157,19 @@ function POSPage() {
       />
       <div className="p-4 sm:p-6 lg:p-8">
         {business ? (
-          <Tabs defaultValue="new" key={business.publicId}>
+          <Tabs value={tab} onValueChange={setTab} key={business.publicId}>
             <TabsList className="rounded-xl">
               <TabsTrigger value="new">New Bill</TabsTrigger>
               <TabsTrigger value="history">
                 <History className="mr-1.5 h-3.5 w-3.5" /> Bill History
+              </TabsTrigger>
+              <TabsTrigger value="counter">
+                <HandCoins className="mr-1.5 h-3.5 w-3.5" /> Counter Payments
+                {counterAlerts > 0 && tab !== "counter" && (
+                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[10px] font-bold text-warning-foreground">
+                    {counterAlerts > 9 ? "9+" : counterAlerts}
+                  </span>
+                )}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="new" className="mt-4">
@@ -147,6 +177,9 @@ function POSPage() {
             </TabsContent>
             <TabsContent value="history" className="mt-4">
               <BillHistory businessId={business.publicId} />
+            </TabsContent>
+            <TabsContent value="counter" className="mt-4">
+              <CounterPayments />
             </TabsContent>
           </Tabs>
         ) : (

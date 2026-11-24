@@ -2,7 +2,14 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
-import { isCancelledStatus, orderDisplayCode } from "@/lib/api/orders";
+import {
+  formatOrderMoney,
+  isCancelledStatus,
+  orderDisplayCode,
+  tableLabel,
+} from "@/lib/api/orders";
+import { can } from "@/lib/access";
+import { useCounterPaymentAlerts } from "@/lib/counter-payment-alerts";
 import type { AdminOrderListData } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { adminNotificationsKeys } from "@/lib/api/notifications";
@@ -15,7 +22,11 @@ import {
   type AdminOrderWsEvent,
   type InventoryStockAlertEvent,
 } from "@/lib/realtime/admin-orders-socket";
-import { installAudioUnlock, playAlertTone, playNewOrderChime } from "@/lib/realtime/new-order-chime";
+import {
+  installAudioUnlock,
+  playAlertTone,
+  playNewOrderChime,
+} from "@/lib/realtime/new-order-chime";
 import { toast } from "sonner";
 
 export type UseAdminOrdersSocketOptions = {
@@ -51,6 +62,9 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   const bumpInventory = useInventoryAlerts((s) => s.bump);
   const bumpHallEnquiry = useHallEnquiryAlerts((s) => s.bump);
   const resetInventoryAlerts = useInventoryAlerts((s) => s.reset);
+  const bumpCounterPending = useCounterPaymentAlerts((s) => s.bumpPending);
+  const markCounterPaid = useCounterPaymentAlerts((s) => s.markPaid);
+  const resetCounterAlerts = useCounterPaymentAlerts((s) => s.reset);
 
   const playSoundRef = useRef(playSoundOnCreate);
   const pathnameRef = useRef(pathname);
@@ -74,8 +88,9 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     if (!accessToken) {
       resetAlerts();
       resetInventoryAlerts();
+      resetCounterAlerts();
     }
-  }, [accessToken, resetAlerts, resetInventoryAlerts]);
+  }, [accessToken, resetAlerts, resetInventoryAlerts, resetCounterAlerts]);
 
   useEffect(() => {
     if (!enabled || !accessToken || typeof window === "undefined") return;
@@ -212,6 +227,33 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     socket = new AdminOrdersSocket(accessToken, {
       onEvent: handleEvent,
       onStockAlert: handleStockAlert,
+      onCounterPayment: (event) => {
+        const key = `${event.type}:${event.order_public_id}:${event.at}`;
+        if (seenEvents.has(key)) return;
+        seenEvents.set(key, Date.now());
+
+        if (event.type === "order.payment_received") {
+          markCounterPaid(event.order_public_id);
+          return;
+        }
+        bumpCounterPending();
+        if (playSoundRef.current) playAlertTone();
+        const amount = Number(event.total);
+        const total = Number.isFinite(amount) ? formatOrderMoney(amount) : `₹${event.total}`;
+        const canOpenPos = can("pos:view");
+        toast.warning(`${tableLabel(event.table_number)} – ${total} payment pending at counter`, {
+          duration: 10_000,
+          action:
+            canOpenPos && pathnameRef.current !== "/pos"
+              ? {
+                  label: "Open POS",
+                  onClick: () => {
+                    void navigateRef.current({ to: "/pos", search: { tab: "counter" } });
+                  },
+                }
+              : undefined,
+        });
+      },
       onHallEnquiryCreated: () => {
         if (playSoundRef.current) playAlertTone();
         // Hall Enquiries page (if mounted) refetches and bumps its New badge.
@@ -254,5 +296,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     markCancelled,
     bumpInventory,
     bumpHallEnquiry,
+    bumpCounterPending,
+    markCounterPaid,
   ]);
 }

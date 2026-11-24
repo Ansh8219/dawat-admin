@@ -1,5 +1,9 @@
 import { apiRequest } from "./client";
 import type {
+  CounterOrderListData,
+  CounterOrderSettled,
+  CounterOrderStatusFilter,
+  PosPaymentMethod,
   PosBill,
   PosBillListData,
   PosBillListParams,
@@ -48,6 +52,37 @@ export function listPosBills(
     accessToken,
     signal,
   });
+}
+
+/** GET /api/admin/pos/counter-orders/ — pay-at-counter orders (needs pos:view). */
+export function listCounterOrders(
+  accessToken: string,
+  params: { status: CounterOrderStatusFilter; page?: number; page_size?: number },
+  signal?: AbortSignal,
+) {
+  const qs = new URLSearchParams({ status: params.status });
+  if (params.page != null) qs.set("page", String(params.page));
+  if (params.page_size != null) qs.set("page_size", String(params.page_size));
+  return apiRequest<CounterOrderListData>(`/api/admin/pos/counter-orders/?${qs}`, {
+    method: "GET",
+    accessToken,
+    signal,
+  });
+}
+
+/**
+ * POST /api/admin/pos/counter-orders/{public_id}/settle/ (needs pos:manage).
+ * Records the counter payment; creates the GST invoice(s). Never use createPosBill for these.
+ */
+export function settleCounterOrder(
+  accessToken: string,
+  publicId: string,
+  paymentMethod: PosPaymentMethod,
+) {
+  return apiRequest<CounterOrderSettled>(
+    `/api/admin/pos/counter-orders/${encodeURIComponent(publicId)}/settle/`,
+    { method: "POST", body: { payment_method: paymentMethod }, accessToken },
+  );
 }
 
 /** GET /api/admin/pos/bills/{public_id}/ */

@@ -32,6 +32,7 @@ import {
   orderStatusLabel,
   paymentLabel,
   paymentStatusLabel,
+  isPayAtCounterUnpaid,
   rejectAdminOrder,
   showsSincePlacedClock,
   isOrderLate,
@@ -942,6 +943,22 @@ function OrdersPage() {
   );
 }
 
+/** Payment method · status; pay-at-counter orders not yet settled get a warning badge. */
+function PaymentChip({ order }: { order: AdminOrder }) {
+  if (isPayAtCounterUnpaid(order)) {
+    return (
+      <span className="rounded-md border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] font-semibold text-warning">
+        Unpaid · Pay at counter
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+      {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
+    </span>
+  );
+}
+
 function OrderCharges({ order }: { order: AdminOrder }) {
   const discount = order.discount_amount ?? 0;
   const tip = order.tip_amount ?? 0;
@@ -972,8 +989,15 @@ function OrderCharges({ order }: { order: AdminOrder }) {
         </div>
       )}
       <div className="flex items-center justify-between border-t border-primary/15 pt-2">
-        <span>
-          Total · {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
+        <span className="flex flex-wrap items-center gap-1.5">
+          Total ·{" "}
+          {isPayAtCounterUnpaid(order) ? (
+            <PaymentChip order={order} />
+          ) : (
+            <>
+              {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
+            </>
+          )}
         </span>
         <span className="text-lg font-bold text-primary">
           {formatOrderMoney(orderBillTotal(order))}
@@ -1141,9 +1165,7 @@ function OrderTicket({
         </div>
 
         <div className="mt-auto flex flex-wrap items-end justify-between gap-2 border-t border-border/60 pt-3">
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {paymentLabel(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
-          </span>
+          <PaymentChip order={order} />
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
             <div className="text-lg font-bold">{formatOrderMoney(orderBillTotal(order))}</div>

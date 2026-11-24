@@ -1844,6 +1844,48 @@ export interface PosBillListData {
 }
 
 // ---------------------------------------------------------------------------
+// Counter payments (QR dine-in "Pay at Counter") — /api/admin/pos/counter-orders/
+// ---------------------------------------------------------------------------
+
+export type CounterOrderStatusFilter = "pending" | "paid";
+
+export interface CounterOrder {
+  public_id: string;
+  table_number: string;
+  customer: { name: string | null; phone: string | null } | null;
+  created_at: string;
+  handed_over_at: string | null;
+  payment_method: "pay_at_counter" | PosPaymentMethod | string;
+  payment_status: "unpaid" | "paid" | string;
+  item_count: number;
+  items: PosBill["items"];
+  subtotal: number;
+  discount_amount: number;
+  total: number;
+  paid_at: string | null;
+  paid_by: { role: "super_admin" | "manager" | string; name: string } | null;
+}
+
+/** GET /api/admin/pos/counter-orders/ */
+export interface CounterOrderListData {
+  count: number;
+  page: number;
+  page_size: number;
+  results: CounterOrder[];
+}
+
+/** POST /api/admin/pos/counter-orders/{public_id}/settle/ */
+export interface CounterOrderSettled extends CounterOrder {
+  invoices: {
+    public_id: string;
+    invoice_number: string;
+    seller_name: string;
+    total_tax: number;
+    total_amount: number;
+  }[];
+}
+
+// ---------------------------------------------------------------------------
 // Campaigns (promotions) — /api/admin/campaigns/ (super admin only)
 // ---------------------------------------------------------------------------
 

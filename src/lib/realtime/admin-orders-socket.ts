@@ -35,6 +35,25 @@ export type HallEnquiryCreatedEvent = {
   [key: string]: unknown;
 };
 
+/** Pay-at-counter events: `payment_pending` on handover, `payment_received` on settle. */
+export type CounterPaymentEvent = {
+  type: "order.payment_pending" | "order.payment_received";
+  order_public_id: string;
+  table_number: string;
+  /** Decimal string, e.g. "300.00". */
+  total: string;
+  at: string;
+};
+
+function isCounterPaymentEvent(value: unknown): value is CounterPaymentEvent {
+  if (!value || typeof value !== "object") return false;
+  const event = value as Record<string, unknown>;
+  return (
+    (event.type === "order.payment_pending" || event.type === "order.payment_received") &&
+    typeof event.order_public_id === "string"
+  );
+}
+
 export const ADMIN_ORDERS_WS_CLOSE = {
   unauthorized: 4401,
   forbidden: 4403,
@@ -84,6 +103,7 @@ export type AdminOrdersSocketHandlers = {
   onHallEnquiryCreated?: (event: HallEnquiryCreatedEvent) => void;
   onEvent: (event: AdminOrderWsEvent) => void;
   onStockAlert?: (event: InventoryStockAlertEvent) => void;
+  onCounterPayment?: (event: CounterPaymentEvent) => void;
   onOpen?: () => void;
   onReconnected?: () => void;
   /** Called when the socket should stop (auth/forbidden) or needs a fresh token. */
@@ -177,6 +197,8 @@ export class AdminOrdersSocket {
         this.handlers.onEvent(parsed);
       } else if (isInventoryStockAlertEvent(parsed)) {
         this.handlers.onStockAlert?.(parsed);
+      } else if (isCounterPaymentEvent(parsed)) {
+        this.handlers.onCounterPayment?.(parsed);
       } else if (isHallEnquiryCreatedEvent(parsed)) {
         this.handlers.onHallEnquiryCreated?.(parsed);
       }
