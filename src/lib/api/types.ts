@@ -1849,6 +1849,31 @@ export interface PosBillListData {
 
 export type CounterOrderStatusFilter = "pending" | "paid";
 
+export interface CounterStaffRef {
+  role: "super_admin" | "manager" | string;
+  name: string;
+}
+
+export interface CounterOrderItem {
+  public_id: string;
+  name: string;
+  item_code: string | null;
+  variant_name: string | null;
+  addons: { name: string; price: number }[];
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  /** Added by staff at the counter; only these lines can be changed or removed. */
+  is_extra: boolean;
+  added_at: string | null;
+  added_by: CounterStaffRef | null;
+}
+
+/** POST /api/admin/pos/counter-orders/{public_id}/items/ — same line format as POS bills. */
+export interface CounterOrderItemsPayload {
+  items: PosBillPayload["items"];
+}
+
 export interface CounterOrder {
   public_id: string;
   table_number: string;
@@ -1858,12 +1883,12 @@ export interface CounterOrder {
   payment_method: "pay_at_counter" | PosPaymentMethod | string;
   payment_status: "unpaid" | "paid" | string;
   item_count: number;
-  items: PosBill["items"];
+  items: CounterOrderItem[];
   subtotal: number;
   discount_amount: number;
   total: number;
   paid_at: string | null;
-  paid_by: { role: "super_admin" | "manager" | string; name: string } | null;
+  paid_by: CounterStaffRef | null;
 }
 
 /** GET /api/admin/pos/counter-orders/ */

@@ -62,8 +62,8 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
   const bumpInventory = useInventoryAlerts((s) => s.bump);
   const bumpHallEnquiry = useHallEnquiryAlerts((s) => s.bump);
   const resetInventoryAlerts = useInventoryAlerts((s) => s.reset);
-  const bumpCounterPending = useCounterPaymentAlerts((s) => s.bumpPending);
-  const markCounterPaid = useCounterPaymentAlerts((s) => s.markPaid);
+  const counterPaymentPending = useCounterPaymentAlerts((s) => s.paymentPending);
+  const counterPaymentReceived = useCounterPaymentAlerts((s) => s.paymentReceived);
   const resetCounterAlerts = useCounterPaymentAlerts((s) => s.reset);
 
   const playSoundRef = useRef(playSoundOnCreate);
@@ -233,10 +233,11 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
         seenEvents.set(key, Date.now());
 
         if (event.type === "order.payment_received") {
-          markCounterPaid(event.order_public_id);
+          counterPaymentReceived(event.order_public_id);
           return;
         }
-        bumpCounterPending();
+        // Repeats (extras added/changed/removed) only update the total; no toast.
+        if (!counterPaymentPending(event.order_public_id, event.total)) return;
         if (playSoundRef.current) playAlertTone();
         const amount = Number(event.total);
         const total = Number.isFinite(amount) ? formatOrderMoney(amount) : `₹${event.total}`;
@@ -296,7 +297,7 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
     markCancelled,
     bumpInventory,
     bumpHallEnquiry,
-    bumpCounterPending,
-    markCounterPaid,
+    counterPaymentPending,
+    counterPaymentReceived,
   ]);
 }

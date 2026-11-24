@@ -1,5 +1,7 @@
 import { apiRequest } from "./client";
 import type {
+  CounterOrder,
+  CounterOrderItemsPayload,
   CounterOrderListData,
   CounterOrderSettled,
   CounterOrderStatusFilter,
@@ -54,6 +56,9 @@ export function listPosBills(
   });
 }
 
+const counterOrderPath = (publicId: string) =>
+  `/api/admin/pos/counter-orders/${encodeURIComponent(publicId)}`;
+
 /** GET /api/admin/pos/counter-orders/ — pay-at-counter orders (needs pos:view). */
 export function listCounterOrders(
   accessToken: string,
@@ -79,10 +84,11 @@ export function settleCounterOrder(
   publicId: string,
   paymentMethod: PosPaymentMethod,
 ) {
-  return apiRequest<CounterOrderSettled>(
-    `/api/admin/pos/counter-orders/${encodeURIComponent(publicId)}/settle/`,
-    { method: "POST", body: { payment_method: paymentMethod }, accessToken },
-  );
+  return apiRequest<CounterOrderSettled>(`${counterOrderPath(publicId)}/settle/`, {
+    method: "POST",
+    body: { payment_method: paymentMethod },
+    accessToken,
+  });
 }
 
 /** GET /api/admin/pos/bills/{public_id}/ */
@@ -91,4 +97,42 @@ export function getPosBill(accessToken: string, publicId: string) {
     method: "GET",
     accessToken,
   });
+}
+
+/** POST …/counter-orders/{id}/items/ — add extras (1–50 lines). Returns the updated order. */
+export function addCounterOrderItems(
+  accessToken: string,
+  publicId: string,
+  body: CounterOrderItemsPayload,
+) {
+  return apiRequest<CounterOrder>(`${counterOrderPath(publicId)}/items/`, {
+    method: "POST",
+    body,
+    accessToken,
+  });
+}
+
+/** PATCH …/counter-orders/{id}/items/{item_id}/ — change an extra's quantity (1–99). */
+export function updateCounterOrderItem(
+  accessToken: string,
+  publicId: string,
+  itemPublicId: string,
+  quantity: number,
+) {
+  return apiRequest<CounterOrder>(
+    `${counterOrderPath(publicId)}/items/${encodeURIComponent(itemPublicId)}/`,
+    { method: "PATCH", body: { quantity }, accessToken },
+  );
+}
+
+/** DELETE …/counter-orders/{id}/items/{item_id}/ — remove an extra. */
+export function removeCounterOrderItem(
+  accessToken: string,
+  publicId: string,
+  itemPublicId: string,
+) {
+  return apiRequest<CounterOrder>(
+    `${counterOrderPath(publicId)}/items/${encodeURIComponent(itemPublicId)}/`,
+    { method: "DELETE", accessToken },
+  );
 }
