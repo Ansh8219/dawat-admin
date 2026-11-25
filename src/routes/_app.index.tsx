@@ -23,6 +23,7 @@ import type {
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
+import { useBusinessScope } from "@/lib/access";
 import { HallDashboard } from "@/components/app/hall-dashboard";
 import { businessTypeToPanel } from "@/lib/panel";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
@@ -189,6 +190,7 @@ function FoodDashboard() {
   const meta = usePanelMeta();
   const authBusiness = useAuth((s) => s.business);
   const selectBusiness = useAuth((s) => s.selectBusiness);
+  const scope = useBusinessScope();
 
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -217,7 +219,7 @@ function FoodDashboard() {
     try {
       const list = await withAuthRetry((token) => listBusinesses(token));
       const orderable = list
-        .filter((b) => ORDERABLE_TYPES.has(String(b.type)))
+        .filter((b) => ORDERABLE_TYPES.has(String(b.type)) && scope.allows(b.type))
         .map((b) => ({ ...b, is_accepting_orders: Boolean(b.is_accepting_orders) }))
         .sort(sortOrderable);
       setBusinesses(orderable);
@@ -235,7 +237,7 @@ function FoodDashboard() {
     } finally {
       setLoadingList(false);
     }
-  }, [authBusiness?.publicId, handleAuthError]);
+  }, [authBusiness?.publicId, handleAuthError, scope]);
 
   const loadDashboard = useCallback(
     async (businessPublicId: string, options?: { silent?: boolean }) => {
@@ -404,7 +406,13 @@ function FoodDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded-full border bg-card p-1">
+            {/* One-business managers have nothing to toggle between. */}
+            <div
+              className={cn(
+                "flex rounded-full border bg-card p-1",
+                businesses.length < 2 && "hidden",
+              )}
+            >
               {businesses.map((biz) => {
                 const active = biz.public_id === selectedId;
                 return (

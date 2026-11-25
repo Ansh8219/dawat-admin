@@ -31,6 +31,8 @@ import { ApiError } from "@/lib/api/types";
 import type { Business, InvoiceListData } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
+import { useBusinessScope } from "@/lib/access";
+import { BUSINESS_TYPE_LABELS } from "@/lib/business-scope";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -38,6 +40,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Lock,
   RefreshCw,
   Search,
   X,
@@ -95,6 +98,9 @@ function InvoicesPage() {
   const page = search.page ?? 1;
   const [qInput, setQInput] = useState(search.q ?? "");
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const scope = useBusinessScope();
+  // One-business manager: ignore any ?business= in the URL; the backend returns only theirs.
+  const businessFilter = scope.single ? undefined : search.business;
   const [data, setData] = useState<InvoiceListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -149,7 +155,9 @@ function InvoicesPage() {
     withAuthRetry((token) => listBusinesses(token))
       .then((list) => {
         if (cancelled) return;
-        setBusinesses(list.filter((b) => INVOICE_BUSINESS_TYPES.has(b.type)));
+        setBusinesses(
+          list.filter((b) => INVOICE_BUSINESS_TYPES.has(b.type) && scope.allows(b.type)),
+        );
       })
       .catch((err) => {
         if (!cancelled) handleAuthError(err);
@@ -157,7 +165,7 @@ function InvoicesPage() {
     return () => {
       cancelled = true;
     };
-  }, [handleAuthError]);
+  }, [handleAuthError, scope]);
 
   const load = useCallback(async () => {
     if (rangeError) {
@@ -169,7 +177,7 @@ function InvoicesPage() {
     try {
       const result = await withAuthRetry((token) =>
         listInvoices(token, {
-          business_public_id: search.business,
+          business_public_id: businessFilter,
           date_from: search.from,
           date_to: search.to,
           search: search.q,
@@ -188,7 +196,7 @@ function InvoicesPage() {
       setLoading(false);
     }
   }, [
-    search.business,
+    businessFilter,
     search.from,
     search.to,
     search.q,
@@ -217,7 +225,7 @@ function InvoicesPage() {
     try {
       const { rows, totals: allTotals } = await withAuthRetry((token) =>
         fetchAllInvoices(token, {
-          business_public_id: search.business,
+          business_public_id: businessFilter,
           date_from: search.from,
           date_to: search.to,
           search: search.q,
@@ -230,7 +238,9 @@ function InvoicesPage() {
       if (kind === "csv") downloadInvoicesCsv(rows);
       else {
         const biz =
-          businesses.find((b) => b.public_id === search.business)?.name ?? "All businesses";
+          businesses.find((b) =>
+            scope.single ? b.type === scope.single : b.public_id === businessFilter,
+          )?.name ?? (scope.single ? BUSINESS_TYPE_LABELS[scope.single] : "All businesses");
         const range =
           search.from || search.to ? `${search.from ?? "…"} to ${search.to ?? "…"}` : "All dates";
         printInvoicesPdf(rows, allTotals, `${biz} · ${range}`);
@@ -250,7 +260,7 @@ function InvoicesPage() {
   const safePage = Math.min(page, totalPages);
   const rangeStart = count === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(safePage * PAGE_SIZE, count);
-  const hasFilters = !!(search.business || search.from || search.to || search.q);
+  const hasFilters = !!(businessFilter || search.from || search.to || search.q);
 
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
@@ -310,24 +320,32 @@ function InvoicesPage() {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Business</Label>
-              <Select
-                value={search.business ?? ALL}
-                onValueChange={(value) =>
-                  setSearch({ business: value === ALL ? undefined : value })
-                }
-              >
-                <SelectTrigger className="mt-1 h-10 rounded-xl">
-                  <SelectValue placeholder="All businesses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All businesses</SelectItem>
-                  {businesses.map((b) => (
-                    <SelectItem key={b.public_id} value={b.public_id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {scope.single ? (
+                <div className="mt-1 flex h-10 items-center gap-2 rounded-xl border bg-muted/30 px-3 text-sm">
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                  {businesses.find((b) => b.type === scope.single)?.name ??
+                    BUSINESS_TYPE_LABELS[scope.single]}
+                </div>
+              ) : (
+                <Select
+                  value={search.business ?? ALL}
+                  onValueChange={(value) =>
+                    setSearch({ business: value === ALL ? undefined : value })
+                  }
+                >
+                  <SelectTrigger className="mt-1 h-10 rounded-xl">
+                    <SelectValue placeholder="All businesses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All businesses</SelectItem>
+                    {businesses.map((b) => (
+                      <SelectItem key={b.public_id} value={b.public_id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">From (IST)</Label>

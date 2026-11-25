@@ -2,15 +2,20 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { adminOrdersKeys } from "@/lib/api/admin-orders-keys";
+import { listBusinesses } from "@/lib/api/businesses";
 import {
   formatOrderMoney,
   isCancelledStatus,
+  listAdminOrders,
   orderDisplayCode,
   tableLabel,
 } from "@/lib/api/orders";
+import { listCounterOrders } from "@/lib/api/pos";
+import { withAuthRetry } from "@/lib/api/with-auth";
+import { isBusinessTypeAllowed, singleBusinessType } from "@/lib/business-scope";
 import { can } from "@/lib/access";
 import { useCounterPaymentAlerts } from "@/lib/counter-payment-alerts";
-import type { AdminOrderListData } from "@/lib/api/types";
+import type { AdminOrderListData, AdminOrderTab } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { adminNotificationsKeys } from "@/lib/api/notifications";
 import { useInventoryAlerts } from "@/lib/inventory-alerts";
@@ -136,6 +141,59 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       return false;
     };
 
+    // Events go to every admin user. A one-business manager only hears about orders that are
+    // in their (backend-filtered) lists, so refetch the list and look for the order there.
+    const isOneBusiness = () => {
+      const { access, user } = useAuth.getState();
+      return singleBusinessType(access, user?.role) !== null;
+    };
+    /** Orders already found outside this manager's lists (skip refetching for repeats). */
+    const outOfScope = new Set<string>();
+    const checkInScope = async (id: string, inList: () => Promise<boolean>) => {
+      if (!isOneBusiness()) return true;
+      if (outOfScope.has(id)) return false;
+      try {
+        const found = await inList();
+        if (!found) outOfScope.add(id);
+        return found;
+      } catch {
+        return true; // can't tell (network / permission): keep the old behaviour
+      }
+    };
+    const orderInMyList = (id: string, tab: AdminOrderTab) =>
+      checkInScope(id, async () => {
+        const data = await withAuthRetry((t) =>
+          listAdminOrders(t, { tab, page: 1, page_size: 50 }),
+        );
+        return data.results.some((o) => o.public_id === id);
+      });
+    const counterOrderInMyList = (id: string) =>
+      checkInScope(id, async () => {
+        const data = await withAuthRetry((t) =>
+          listCounterOrders(t, { status: "pending", page: 1, page_size: 100 }),
+        );
+        return data.results.some((o) => o.public_id === id);
+      });
+    /** Restaurant/Bakery business ids this user may see (loaded once per socket). */
+    let allowedBusinessIds: Promise<Set<string>> | null = null;
+    const businessInScope = async (businessId: string | undefined) => {
+      if (!businessId || !isOneBusiness()) return true;
+      allowedBusinessIds ??= withAuthRetry((t) => listBusinesses(t)).then((list) => {
+        const { access, user } = useAuth.getState();
+        return new Set(
+          list
+            .filter((b) => isBusinessTypeAllowed(access, user?.role, b.type))
+            .map((b) => b.public_id),
+        );
+      });
+      try {
+        return (await allowedBusinessIds).has(businessId);
+      } catch {
+        allowedBusinessIds = null;
+        return true;
+      }
+    };
+
     const handleEvent = (event: AdminOrderWsEvent) => {
       if (isDuplicateEvent(event)) return;
 
@@ -143,25 +201,18 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       void invalidateQueries(event);
 
       if (event.type === "order.updated" && isCancelledStatus(event.status)) {
-        if (playSoundRef.current) playAlertTone();
-        toast.warning(`Order ${code} cancelled by customer`, { duration: 8_000 });
-        if (isOrdersPath(pathnameRef.current)) markCancelled(event.order_public_id);
+        void orderInMyList(event.order_public_id, event.tab).then((inScope) => {
+          if (!inScope || stopped) return;
+          if (playSoundRef.current) playAlertTone();
+          toast.warning(`Order ${code} cancelled by customer`, { duration: 8_000 });
+          if (isOrdersPath(pathnameRef.current)) markCancelled(event.order_public_id);
+        });
         return;
       }
 
       if (event.type === "order.created") {
-        if (playSoundRef.current) playNewOrderChime();
-        // Bumps badge + boardTick + pending highlight for a mounted Orders page.
-        bumpNewOrder(event.order_public_id);
-        toast.message("New order", {
-          description: `#${shortId(event.order_public_id)} · tap to open kitchen board`,
-          duration: 8_000,
-          action: {
-            label: "Open Orders",
-            onClick: () => {
-              void navigateRef.current({ to: "/orders" });
-            },
-          },
+        void orderInMyList(event.order_public_id, event.tab).then((inScope) => {
+          if (inScope && !stopped) announceNewOrder(event);
         });
         return;
       }
@@ -170,11 +221,33 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
       refreshBoardIfActive();
     };
 
+    const announceNewOrder = (event: AdminOrderWsEvent) => {
+      if (playSoundRef.current) playNewOrderChime();
+      // Bumps badge + boardTick + pending highlight for a mounted Orders page.
+      bumpNewOrder(event.order_public_id);
+      toast.message("New order", {
+        description: `#${shortId(event.order_public_id)} · tap to open kitchen board`,
+        duration: 8_000,
+        action: {
+          label: "Open Orders",
+          onClick: () => {
+            void navigateRef.current({ to: "/orders" });
+          },
+        },
+      });
+    };
+
     /** De-dupe identical stock-alert toasts within a few seconds. */
     const seenStockAlerts = new Map<string, number>();
     const STOCK_DEDUP_TTL_MS = 5_000;
 
     const handleStockAlert = (event: InventoryStockAlertEvent) => {
+      void businessInScope(event.business_public_id).then((inScope) => {
+        if (inScope && !stopped) showStockAlert(event);
+      });
+    };
+
+    const showStockAlert = (event: InventoryStockAlertEvent) => {
       const key = `${event.inventory_item_public_id}:${event.stock_status}:${event.at}`;
       const now = Date.now();
       for (const [k, t] of seenStockAlerts) {
@@ -236,23 +309,26 @@ export function useAdminOrdersSocket(options: UseAdminOrdersSocketOptions = {}) 
           counterPaymentReceived(event.order_public_id);
           return;
         }
-        // Repeats (extras added/changed/removed) only update the total; no toast.
-        if (!counterPaymentPending(event.order_public_id, event.total)) return;
-        if (playSoundRef.current) playAlertTone();
-        const amount = Number(event.total);
-        const total = Number.isFinite(amount) ? formatOrderMoney(amount) : `₹${event.total}`;
-        const canOpenPos = can("pos:view");
-        toast.warning(`${tableLabel(event.table_number)} – ${total} payment pending at counter`, {
-          duration: 10_000,
-          action:
-            canOpenPos && pathnameRef.current !== "/pos"
-              ? {
-                  label: "Open POS",
-                  onClick: () => {
-                    void navigateRef.current({ to: "/pos", search: { tab: "counter" } });
-                  },
-                }
-              : undefined,
+        void counterOrderInMyList(event.order_public_id).then((inScope) => {
+          if (!inScope || stopped) return;
+          // Repeats (extras added/changed/removed) only update the total; no toast.
+          if (!counterPaymentPending(event.order_public_id, event.total)) return;
+          if (playSoundRef.current) playAlertTone();
+          const amount = Number(event.total);
+          const total = Number.isFinite(amount) ? formatOrderMoney(amount) : `₹${event.total}`;
+          const canOpenPos = can("pos:view");
+          toast.warning(`${tableLabel(event.table_number)} – ${total} payment pending at counter`, {
+            duration: 10_000,
+            action:
+              canOpenPos && pathnameRef.current !== "/pos"
+                ? {
+                    label: "Open POS",
+                    onClick: () => {
+                      void navigateRef.current({ to: "/pos", search: { tab: "counter" } });
+                    },
+                  }
+                : undefined,
+          });
         });
       },
       onHallEnquiryCreated: () => {

@@ -26,12 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   createHomeService,
   deleteHomeService,
@@ -116,8 +111,7 @@ function HomeServicesPage() {
       try {
         const data = await withAuthRetry((token) =>
           listHomeServices(token, {
-            is_active:
-              activeFilter === "all" ? undefined : activeFilter === "active",
+            is_active: activeFilter === "all" ? undefined : activeFilter === "active",
           }),
         );
         setResults(data.results ?? []);
@@ -150,10 +144,7 @@ function HomeServicesPage() {
     };
   }, [imagePreview]);
 
-  const sorted = useMemo(
-    () => [...results].sort((a, b) => a.sort_order - b.sort_order),
-    [results],
-  );
+  const sorted = useMemo(() => [...results].sort((a, b) => a.sort_order - b.sort_order), [results]);
 
   const atServiceLimit = totalCount >= MAX_HOME_SERVICES;
 
@@ -347,12 +338,7 @@ function HomeServicesPage() {
               </Tooltip>
             </TooltipProvider>
           ) : (
-            <Button
-              type="button"
-              onClick={openCreate}
-              className="rounded-xl"
-              disabled={loading}
-            >
+            <Button type="button" onClick={openCreate} className="rounded-xl" disabled={loading}>
               <Plus className="mr-1.5 h-4 w-4" />
               Add service
             </Button>
@@ -362,10 +348,7 @@ function HomeServicesPage() {
 
       <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Select
-            value={activeFilter}
-            onValueChange={(v) => setActiveFilter(v as ActiveFilter)}
-          >
+          <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as ActiveFilter)}>
             <SelectTrigger className="h-9 w-[180px] rounded-xl bg-card">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
@@ -377,7 +360,9 @@ function HomeServicesPage() {
           </Select>
           <p className="text-sm text-muted-foreground">
             {count} service{count === 1 ? "" : "s"}
-            {atServiceLimit ? ` · max ${MAX_HOME_SERVICES}` : ` · ${totalCount}/${MAX_HOME_SERVICES}`}
+            {atServiceLimit
+              ? ` · max ${MAX_HOME_SERVICES}`
+              : ` · ${totalCount}/${MAX_HOME_SERVICES}`}
           </p>
         </div>
 
@@ -559,9 +544,7 @@ function HomeServicesPage() {
                 <div className="flex h-9 items-center gap-2 rounded-xl border border-input px-3">
                   <Switch
                     checked={form.is_active}
-                    onCheckedChange={(checked) =>
-                      setForm((f) => ({ ...f, is_active: checked }))
-                    }
+                    onCheckedChange={(checked) => setForm((f) => ({ ...f, is_active: checked }))}
                   />
                   <span className="text-sm text-muted-foreground">
                     {form.is_active ? "Visible" : "Hidden"}
@@ -572,7 +555,10 @@ function HomeServicesPage() {
 
             <div className="space-y-1.5">
               <Label>
-                Image {editing ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
+                Image{" "}
+                {editing ? (
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                ) : null}
               </Label>
               <button
                 type="button"
@@ -590,7 +576,8 @@ function HomeServicesPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium">
-                    {imageFile?.name ?? (editing ? "Replace image" : "Upload JPEG, PNG, WebP, or SVG")}
+                    {imageFile?.name ??
+                      (editing ? "Replace image" : "Upload JPEG, PNG, WebP, or SVG")}
                   </div>
                   <div className="text-xs text-muted-foreground">Click to choose a file</div>
                 </div>
@@ -615,7 +602,12 @@ function HomeServicesPage() {
             >
               Cancel
             </Button>
-            <Button type="button" className="rounded-xl" disabled={saving} onClick={() => void saveForm()}>
+            <Button
+              type="button"
+              className="rounded-xl"
+              disabled={saving}
+              onClick={() => void saveForm()}
+            >
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

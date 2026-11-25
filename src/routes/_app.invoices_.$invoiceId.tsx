@@ -9,7 +9,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { downloadInvoiceDetailCsv } from "@/lib/invoice-export";
+import { toast } from "sonner";
 import { getInvoice } from "@/lib/api/invoices";
+import { BUSINESS_ACCESS_DENIED_MESSAGE } from "@/lib/api/client";
+import { isBusinessAccessDenied } from "@/lib/business-scope";
 import { ApiError } from "@/lib/api/types";
 import type { InvoiceDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
@@ -41,6 +44,11 @@ function InvoiceDetailPage() {
       if (err instanceof ApiError && err.status === 401) {
         useAuth.getState().logout();
         void navigate({ to: "/login" });
+        return;
+      }
+      if (isBusinessAccessDenied(err)) {
+        toast.error(BUSINESS_ACCESS_DENIED_MESSAGE);
+        void navigate({ to: "/invoices", replace: true });
         return;
       }
       setError(err instanceof ApiError ? err.message : "Unable to load invoice.");

@@ -2379,7 +2379,10 @@ function MenuPage() {
                           ?.options ?? [];
 
                       return (
-                        <div key={line.id} className="min-w-0 space-y-2 rounded-xl border bg-muted/20 p-3">
+                        <div
+                          key={line.id}
+                          className="min-w-0 space-y-2 rounded-xl border bg-muted/20 p-3"
+                        >
                           <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             <span className="rounded-full border bg-background px-2 py-0.5">
                               {line.scope === "variant"

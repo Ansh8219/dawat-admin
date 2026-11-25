@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, Menu, Moon, Sun, LogOut, UserCircle, ArrowLeftRight } from "lucide-react";
+import { Search, Menu, Moon, Sun, LogOut, UserCircle, ArrowLeftRight, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,6 +23,7 @@ import {
 import { useApp } from "@/lib/store";
 import { formatRoleLabel, useAuth } from "@/lib/auth";
 import { usePanelMeta } from "@/lib/use-panel";
+import { useBusinessScope } from "@/lib/access";
 import { NotificationsBell } from "./notifications-bell";
 import { SoundStatus } from "./sound-status";
 import { OutletToggle } from "./outlet-toggle";
@@ -44,6 +45,8 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
   const logout = useAuth((s) => s.logout);
   const clearPanel = useAuth((s) => s.clearPanel);
   const meta = usePanelMeta();
+  // One-business manager without a hall panel: nothing to switch to, so the switcher is locked.
+  const { canSwitchPanel } = useBusinessScope();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const displayName = user?.name ?? "Admin";
@@ -91,25 +94,39 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
               <div className="text-xs font-semibold leading-tight">{meta.label}</div>
               <div className="font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
             </div>
+            {canSwitchPanel ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 rounded-lg px-2 text-xs"
+                onClick={switchPanel}
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Switch
+              </Button>
+            ) : (
+              <Lock
+                className="h-3.5 w-3.5 text-muted-foreground"
+                aria-label="Limited to this business"
+              />
+            )}
+          </div>
+          {canSwitchPanel ? (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 gap-1 rounded-lg px-2 text-xs"
+              className="rounded-xl gap-1.5 sm:hidden"
               onClick={switchPanel}
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
-              Switch
+              {meta.label}
             </Button>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl gap-1.5 sm:hidden"
-            onClick={switchPanel}
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            {meta.label}
-          </Button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 px-2.5 py-1 text-xs font-medium sm:hidden">
+              <Lock className="h-3 w-3 text-muted-foreground" />
+              {meta.label}
+            </span>
+          )}
 
           <Button variant="ghost" size="icon" onClick={toggleDark} title="Toggle theme">
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -136,9 +153,11 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
               <DropdownMenuItem onSelect={() => void navigate({ to: "/settings" })}>
                 <UserCircle className="mr-2 h-4 w-4" /> My Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={switchPanel}>
-                <ArrowLeftRight className="mr-2 h-4 w-4" /> Switch panel
-              </DropdownMenuItem>
+              {canSwitchPanel && (
+                <DropdownMenuItem onSelect={switchPanel}>
+                  <ArrowLeftRight className="mr-2 h-4 w-4" /> Switch panel
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onSelect={(e) => {

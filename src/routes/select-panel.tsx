@@ -37,6 +37,7 @@ import {
   mustChangePassword,
   useAuth,
 } from "@/lib/auth";
+import { businessScopeWith } from "@/lib/access";
 import { PANEL_META, businessTypeToPanel, type Panel } from "@/lib/panel";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,9 @@ function SelectPanelPage() {
       setLoading(true);
       setError("");
 
+      // Fresh business_types decide which cards are shown (the super admin may have changed them).
+      await useAuth.getState().loadAccess();
+
       const fetchList = (token: string) => listBusinesses(token);
 
       try {
@@ -165,7 +169,18 @@ function SelectPanelPage() {
           }
         }
         if (cancelled) return;
-        setBusinesses(data);
+        const { access, user: currentUser } = useAuth.getState();
+        const scope = businessScopeWith(access, currentUser?.role);
+        const choices = scope.panelChoices(data);
+        // One-business manager with nothing else to pick: skip the picker.
+        if (scope.single && choices.length === 1) {
+          const result = useAuth.getState().selectBusiness(choices[0]);
+          if (result.ok) {
+            void navigate({ to: "/", replace: true });
+            return;
+          }
+        }
+        setBusinesses(choices);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.code === "staff_access_denied") {

@@ -30,6 +30,21 @@ export function onPasswordChangeRequired(handler: () => void) {
   passwordChangeRequiredHandler = handler;
 }
 
+let businessAccessDeniedHandler: (() => void) | null = null;
+
+/** Registered by the auth store; fired on 403 `business_access_denied` (never logs out). */
+export function onBusinessAccessDenied(handler: () => void) {
+  businessAccessDeniedHandler = handler;
+}
+
+export const BUSINESS_ACCESS_DENIED_MESSAGE = "You don't have access to this business";
+
+/** Code-level side effects shared by both error body shapes. */
+function notifyErrorCode(code: string) {
+  if (code === "password_change_required") passwordChangeRequiredHandler?.();
+  if (code === "business_access_denied") businessAccessDeniedHandler?.();
+}
+
 function isFastApiDetailBody(raw: unknown): raw is { detail: unknown } {
   return Boolean(raw && typeof raw === "object" && !("success" in raw) && "detail" in raw);
 }
@@ -54,8 +69,13 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
         : formatValidationDetails(detail) || `Unexpected response (${response.status}).`;
     const rawCode = (raw as { code?: unknown }).code;
     const code = typeof rawCode === "string" && rawCode ? rawCode : "validation_error";
-    if (code === "password_change_required") passwordChangeRequiredHandler?.();
-    throw new ApiError(response.status, code, message, detail);
+    notifyErrorCode(code);
+    throw new ApiError(
+      response.status,
+      code,
+      code === "business_access_denied" ? BUSINESS_ACCESS_DENIED_MESSAGE : message,
+      detail,
+    );
   }
 
   const envelope = raw as ApiEnvelope<T>;
@@ -65,10 +85,11 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
   }
 
   const code = envelope.error?.code ?? "request_failed";
-  if (code === "password_change_required") passwordChangeRequiredHandler?.();
+  notifyErrorCode(code);
   const fromDetails = formatValidationDetails(envelope.error?.details);
   const apiMessage = envelope.message?.trim();
   const message =
+    (code === "business_access_denied" && BUSINESS_ACCESS_DENIED_MESSAGE) ||
     (code === "validation_error" && fromDetails) ||
     (apiMessage && apiMessage.toLowerCase() !== "success" ? apiMessage : "") ||
     humanizeErrorCode(code) ||
@@ -91,6 +112,10 @@ function humanizeErrorCode(code: string): string {
       return "This account does not have admin access.";
     case "permission_denied":
       return "You do not have permission to do this.";
+    case "business_access_denied":
+      return BUSINESS_ACCESS_DENIED_MESSAGE;
+    case "manager_not_found":
+      return "Manager not found.";
     case "password_change_required":
       return "You must change your temporary password before continuing.";
     case "account_inactive":

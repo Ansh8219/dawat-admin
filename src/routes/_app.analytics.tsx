@@ -49,7 +49,9 @@ import type {
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { canCheckPersistedAuth, isSuperAdmin, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Download, Info, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Download, Info, Loader2, Lock, RefreshCw } from "lucide-react";
+import { useBusinessScope } from "@/lib/access";
+import { BUSINESS_TYPE_LABELS } from "@/lib/business-scope";
 import { toast } from "sonner";
 import {
   Area,
@@ -176,6 +178,7 @@ function AnalyticsPage() {
   const search = Route.useSearch();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [exporting, setExporting] = useState(false);
+  const scope = useBusinessScope();
 
   const range = useMemo(() => {
     const fallback = defaultRange();
@@ -187,7 +190,13 @@ function AnalyticsPage() {
 
   const tab: AnalyticsTab = search.tab ?? "sales";
   const groupBy: AnalyticsGroupBy = search.group_by ?? "day";
-  const businessId = search.business && search.business !== "all" ? search.business : undefined;
+  // One-business manager: never send another business (403). Omitting it makes the backend
+  // return only their own business.
+  const businessId = scope.single
+    ? undefined
+    : search.business && search.business !== "all"
+      ? search.business
+      : undefined;
 
   const filters = useMemo(
     () => ({
@@ -231,7 +240,7 @@ function AnalyticsPage() {
     let cancelled = false;
     withAuthRetry((token) => listBusinesses(token))
       .then((list) => {
-        if (!cancelled) setBusinesses(list);
+        if (!cancelled) setBusinesses(scope.filter(list));
       })
       .catch(() => {
         if (!cancelled) setBusinesses([]);
@@ -239,7 +248,7 @@ function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scope]);
 
   const activePreset = useMemo((): PresetId | "custom" => {
     for (const p of PRESETS) {
@@ -332,24 +341,32 @@ function AnalyticsPage() {
 
           <div className="min-w-[12rem] flex-1">
             <Label className="text-xs text-muted-foreground">Business</Label>
-            <Select
-              value={businessId ?? "all"}
-              onValueChange={(value) =>
-                setSearch({ business: value === "all" ? undefined : value })
-              }
-            >
-              <SelectTrigger className="mt-1 rounded-xl">
-                <SelectValue placeholder="All businesses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All businesses</SelectItem>
-                {businesses.map((b) => (
-                  <SelectItem key={b.public_id} value={b.public_id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {scope.single ? (
+              <div className="mt-1 flex h-10 items-center gap-2 rounded-xl border bg-muted/30 px-3 text-sm">
+                <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                {businesses.find((b) => b.type === scope.single)?.name ??
+                  BUSINESS_TYPE_LABELS[scope.single]}
+              </div>
+            ) : (
+              <Select
+                value={businessId ?? "all"}
+                onValueChange={(value) =>
+                  setSearch({ business: value === "all" ? undefined : value })
+                }
+              >
+                <SelectTrigger className="mt-1 rounded-xl">
+                  <SelectValue placeholder="All businesses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All businesses</SelectItem>
+                  {businesses.map((b) => (
+                    <SelectItem key={b.public_id} value={b.public_id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
@@ -525,6 +542,7 @@ function SalesTab({
   });
 
   const data = query.data as AnalyticsSalesData | undefined;
+  const { single: singleBusiness } = useBusinessScope();
   const hourly = useMemo(() => fillHourlySales(data?.hourly ?? []), [data?.hourly]);
   const trend = useMemo(
     () =>
@@ -683,32 +701,34 @@ function SalesTab({
             />
           </div>
 
-          {!filters.business_public_id && (data.by_business?.length ?? 0) > 0 && (
-            <ChartCard title="By business">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">Business</th>
-                      <th className="px-3 py-2 text-right font-medium">Sales</th>
-                      <th className="px-3 py-2 text-right font-medium">Orders</th>
-                      <th className="px-3 py-2 text-right font-medium">Share</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.by_business!.map((row) => (
-                      <tr key={`${row.business_public_id}-${row.name}`} className="border-b">
-                        <td className="px-3 py-2 font-medium">{row.name}</td>
-                        <td className="px-3 py-2 text-right">{formatOrderMoney(row.sales)}</td>
-                        <td className="px-3 py-2 text-right">{row.orders}</td>
-                        <td className="px-3 py-2 text-right">{formatSharePct(row.share_pct)}</td>
+          {!filters.business_public_id &&
+            !singleBusiness &&
+            (data.by_business?.length ?? 0) > 0 && (
+              <ChartCard title="By business">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Business</th>
+                        <th className="px-3 py-2 text-right font-medium">Sales</th>
+                        <th className="px-3 py-2 text-right font-medium">Orders</th>
+                        <th className="px-3 py-2 text-right font-medium">Share</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </ChartCard>
-          )}
+                    </thead>
+                    <tbody>
+                      {data.by_business!.map((row) => (
+                        <tr key={`${row.business_public_id}-${row.name}`} className="border-b">
+                          <td className="px-3 py-2 font-medium">{row.name}</td>
+                          <td className="px-3 py-2 text-right">{formatOrderMoney(row.sales)}</td>
+                          <td className="px-3 py-2 text-right">{row.orders}</td>
+                          <td className="px-3 py-2 text-right">{formatSharePct(row.share_pct)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </ChartCard>
+            )}
         </div>
       ) : null}
     </QueryState>

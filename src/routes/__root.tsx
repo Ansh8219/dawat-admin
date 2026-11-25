@@ -77,10 +77,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Daawat Baker's — Admin Panel" },
-      { name: "description", content: "Premium restaurant, bakery, and banquet management dashboard for Daawat Baker's." },
+      {
+        name: "description",
+        content: "Premium restaurant, bakery, and banquet management dashboard for Daawat Baker's.",
+      },
       { name: "author", content: "Daawat Baker's" },
       { property: "og:title", content: "Daawat Baker's — Admin Panel" },
-      { property: "og:description", content: "Manage orders, POS billing, inventory, bookings, staff, and finance in one place." },
+      {
+        property: "og:description",
+        content:
+          "Manage orders, POS billing, inventory, bookings, staff, and finance in one place.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

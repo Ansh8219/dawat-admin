@@ -34,13 +34,10 @@ export function listStoreKeepers(accessToken: string, params: StoreKeeperListPar
   if (params.page != null) qs.set("page", String(params.page));
   if (params.page_size != null) qs.set("page_size", String(params.page_size));
   const query = qs.toString();
-  return apiRequest<StoreKeeperListData>(
-    `/api/admin/store-keepers/${query ? `?${query}` : ""}`,
-    {
-      method: "GET",
-      accessToken,
-    },
-  );
+  return apiRequest<StoreKeeperListData>(`/api/admin/store-keepers/${query ? `?${query}` : ""}`, {
+    method: "GET",
+    accessToken,
+  });
 }
 
 const EMPTY_DOCUMENTS: StoreKeeperDocuments = {

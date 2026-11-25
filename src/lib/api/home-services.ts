@@ -20,13 +20,10 @@ export function listHomeServices(accessToken: string, params: HomeServiceListPar
   const qs = new URLSearchParams();
   if (params.is_active !== undefined) qs.set("is_active", String(params.is_active));
   const query = qs.toString();
-  return apiRequest<HomeServiceListData>(
-    `/api/admin/home-services/${query ? `?${query}` : ""}`,
-    {
-      method: "GET",
-      accessToken,
-    },
-  );
+  return apiRequest<HomeServiceListData>(`/api/admin/home-services/${query ? `?${query}` : ""}`, {
+    method: "GET",
+    accessToken,
+  });
 }
 
 export function createHomeService(

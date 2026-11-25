@@ -1,5 +1,11 @@
+import { useMemo } from "react";
 import { useAuth } from "./auth";
-import type { AdminAccess } from "./api/types";
+import type { AdminAccess, ScopedBusinessType } from "./api/types";
+import {
+  allowedBusinessTypes,
+  isBusinessTypeAllowed,
+  isScopedBusinessType,
+} from "./business-scope";
 import type { Panel } from "./panel";
 
 /**
@@ -34,6 +40,47 @@ export function useAccess() {
     canManage: (module: string) => canWith(access, role, `${module}:manage`),
     canView: (module: string) => canWith(access, role, `${module}:view`),
   };
+}
+
+export interface BusinessScope {
+  /** Restaurant / Bakery types the user may see (both for super admin). */
+  types: ScopedBusinessType[];
+  /** Set when the manager is limited to one business; null when they have both. */
+  single: ScopedBusinessType | null;
+  /** Whether a business of this type should be shown (banquet hall is never limited). */
+  allows: (type: string | null | undefined) => boolean;
+  /** Drops businesses the user cannot access. */
+  filter: <T extends { type: string }>(list: T[]) => T[];
+  /**
+   * Whether the panel switcher has anything to switch to. A one-business manager only
+   * keeps it when they can also open the Banquet Hall panel.
+   */
+  canSwitchPanel: boolean;
+  /** Businesses offered on the panel picker (drops Banquet Hall when it can't be used). */
+  panelChoices: <T extends { type: string }>(list: T[]) => T[];
+}
+
+export function businessScopeWith(access: AdminAccess | null, role?: string): BusinessScope {
+  const types = allowedBusinessTypes(access, role);
+  const single = types.length === 1 ? types[0] : null;
+  const allows = (type: string | null | undefined) => isBusinessTypeAllowed(access, role, type);
+  const hallsUsable = single === null || canWith(access, role, "halls:view");
+  return {
+    types,
+    single,
+    allows,
+    filter: (list) => list.filter((b) => allows(b.type)),
+    canSwitchPanel: hallsUsable,
+    panelChoices: (list) =>
+      list.filter((b) => allows(b.type) && (hallsUsable || isScopedBusinessType(b.type))),
+  };
+}
+
+/** Reactive business scope (Restaurant / Bakery access) of the signed-in user. */
+export function useBusinessScope(): BusinessScope {
+  const access = useAuth((s) => s.access);
+  const role = useAuth((s) => s.user?.role);
+  return useMemo(() => businessScopeWith(access, role), [access, role]);
 }
 
 type RouteRule =

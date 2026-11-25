@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { onPasswordChangeRequired } from "./api/client";
+import { onBusinessAccessDenied, onPasswordChangeRequired } from "./api/client";
 import {
   adminLogin,
   changePassword as changePasswordApi,
@@ -12,6 +12,7 @@ import {
 } from "./api/auth";
 import { ApiError } from "./api/types";
 import type { AdminAccess, AuthUser as ApiAuthUser, Business } from "./api/types";
+import { isBusinessTypeAllowed } from "./business-scope";
 import { businessTypeToPanel, type Panel } from "./panel";
 
 export interface AuthUser {
@@ -182,7 +183,13 @@ export const useAuth = create<AuthState>()(
             if (!token) return false;
             access = await getMyAccess(token);
           }
-          set({ access });
+          // A super admin may have narrowed this manager's businesses since the panel was picked.
+          const { business, user } = get();
+          if (business && !isBusinessTypeAllowed(access, user?.role, business.type)) {
+            set({ access, panel: null, business: null });
+          } else {
+            set({ access });
+          }
           return true;
         } catch {
           return false;
@@ -239,6 +246,9 @@ export const useAuth = create<AuthState>()(
         const panel = businessTypeToPanel(biz.type);
         if (!panel) {
           return { ok: false, error: `Unsupported business type: ${biz.type}` };
+        }
+        if (!isBusinessTypeAllowed(get().access, get().user?.role, biz.type)) {
+          return { ok: false, error: "You don't have access to this business" };
         }
         set({
           panel,
@@ -392,6 +402,23 @@ onPasswordChangeRequired(() => {
   if (window.location.pathname !== "/change-password") {
     window.location.assign("/change-password");
   }
+});
+
+// Global guard: 403 `business_access_denied` never logs out. Re-read access (the super admin
+// may have changed it); if the open panel is no longer allowed, go back to the picker.
+let lastAccessRecheck = 0;
+onBusinessAccessDenied(() => {
+  if (!isBrowser() || !useAuth.getState().user) return;
+  const now = Date.now();
+  if (now - lastAccessRecheck < 5_000) return;
+  lastAccessRecheck = now;
+  void useAuth
+    .getState()
+    .loadAccess()
+    .then((ok) => {
+      if (!ok || useAuth.getState().business) return;
+      if (window.location.pathname !== "/select-panel") window.location.assign("/select-panel");
+    });
 });
 
 /** True when the persisted user still has a temporary password. */

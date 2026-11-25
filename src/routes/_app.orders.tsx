@@ -49,6 +49,8 @@ import {
 import { ApiError } from "@/lib/api/types";
 import type { AdminOrder, AdminOrderTab } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
+import { BUSINESS_ACCESS_DENIED_MESSAGE } from "@/lib/api/client";
+import { isBusinessAccessDenied } from "@/lib/business-scope";
 import { useAuth } from "@/lib/auth";
 import { useKitchenAlerts } from "@/lib/kitchen-alerts";
 import { usePanelMeta } from "@/lib/use-panel";
@@ -260,6 +262,10 @@ function OrdersPage() {
       })
       .catch((err) => {
         if (cancelled || handleAuthError(err)) return;
+        if (isBusinessAccessDenied(err)) {
+          toast.error(BUSINESS_ACCESS_DENIED_MESSAGE);
+          return;
+        }
         toast.error(
           `Couldn't open order ${orderParam.slice(0, 8)} directly. Look for it under Past Orders.`,
         );
@@ -349,7 +355,8 @@ function OrdersPage() {
 
   function handleActionError(err: unknown, fallback: string) {
     if (handleAuthError(err)) return;
-    if (isOrderStatusConflict(err)) {
+    // Other business's order: close it and go back to the (filtered) list.
+    if (isOrderStatusConflict(err) || isBusinessAccessDenied(err)) {
       toast.error(err instanceof ApiError ? err.message : fallback);
       setAcceptTarget(null);
       setRejectTarget(null);

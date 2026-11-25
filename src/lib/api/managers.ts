@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { ApiError } from "./types";
+import { ApiError, type ScopedBusinessType } from "./types";
 
 /**
  * Permission modules. Backend's list may change — edit only this constant.
@@ -40,8 +40,10 @@ export interface CreateManagerPayload {
   name: string;
   country_code: string;
   phone_number: string;
-  /** Applies to every business. */
+  /** Applies to every business in `business_types`. */
   permissions: string[];
+  /** Omitted → both. */
+  business_types?: ScopedBusinessType[];
 }
 
 export interface CreatedManager {
@@ -51,6 +53,7 @@ export interface CreatedManager {
   country_code: string;
   phone_number: string;
   permissions: string[];
+  business_types?: string[];
   invite_sent: boolean;
 }
 
@@ -69,6 +72,7 @@ export interface ManagerFormErrors {
   country_code?: string;
   phone_number?: string;
   permissions?: string;
+  business_types?: string;
   /** Anything that could not be tied to a field. */
   general?: string;
 }
@@ -105,6 +109,8 @@ export function mapCreateManagerError(err: unknown): ManagerFormErrors {
       out[head] ??= message;
     } else if (head === "permissions") {
       out.permissions ??= message;
+    } else if (head === "business_types") {
+      out.business_types ??= message;
     } else {
       general.push(message);
     }
@@ -160,6 +166,7 @@ export interface ManagerFormValues {
   countryCode: string;
   phone: string;
   permissions: string[];
+  businessTypes: string[];
 }
 
 /** Client-side checks only; the backend is the final authority. */
@@ -173,12 +180,19 @@ export function validateManagerForm(v: ManagerFormValues): ManagerFormErrors {
   if (!digits) e.phone_number = "Phone number is required.";
   else if (!/^\d{6,15}$/.test(digits)) e.phone_number = "Enter a valid phone number.";
   if (v.permissions.length === 0) e.permissions = "Select at least one permission.";
+  if (v.businessTypes.length === 0) e.business_types = BUSINESS_TYPES_REQUIRED;
   return e;
 }
 
 export function hasManagerFormErrors(e: ManagerFormErrors): boolean {
   return Boolean(
-    e.name || e.email || e.country_code || e.phone_number || e.permissions || e.general,
+    e.name ||
+    e.email ||
+    e.country_code ||
+    e.phone_number ||
+    e.permissions ||
+    e.business_types ||
+    e.general,
   );
 }
 
@@ -195,6 +209,8 @@ export interface ManagerListItem {
   last_login: string | null;
   created_at: string;
   permissions: string[];
+  /** Sorted, e.g. ["bakery", "restaurant"]. Missing on older backends → both. */
+  business_types?: string[];
 }
 
 export interface ManagerListResponse {
@@ -252,4 +268,33 @@ export function summarizeManagerModules(permissions: string[], max = 2) {
   const shown = modules.slice(0, max).join(", ");
   const rest = modules.length - max;
   return rest > 0 ? `${shown} +${rest}` : shown;
+}
+
+export const BUSINESS_TYPES_REQUIRED = "Select at least one business.";
+
+export interface UpdateManagerAccessPayload {
+  permissions?: string[];
+  business_types?: ScopedBusinessType[];
+}
+
+export interface ManagerAccess {
+  public_id: string;
+  permissions: string[];
+  business_types: string[];
+}
+
+/**
+ * PATCH /api/admin/managers/{public_id}/access/ (super_admin only). Send only what changed.
+ * Takes effect on the manager's next request; no re-login needed.
+ */
+export function updateManagerAccess(
+  accessToken: string,
+  publicId: string,
+  payload: UpdateManagerAccessPayload,
+) {
+  return apiRequest<ManagerAccess>(`/api/admin/managers/${encodeURIComponent(publicId)}/access/`, {
+    method: "PATCH",
+    accessToken,
+    body: payload,
+  });
 }

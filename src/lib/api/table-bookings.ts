@@ -9,13 +9,10 @@ export function listTableBookings(accessToken: string, params: TableBookingListP
   if (params.page != null) qs.set("page", String(params.page));
   if (params.page_size != null) qs.set("page_size", String(params.page_size));
   const query = qs.toString();
-  return apiRequest<TableBookingListData>(
-    `/api/admin/table-bookings/${query ? `?${query}` : ""}`,
-    {
-      method: "GET",
-      accessToken,
-    },
-  );
+  return apiRequest<TableBookingListData>(`/api/admin/table-bookings/${query ? `?${query}` : ""}`, {
+    method: "GET",
+    accessToken,
+  });
 }
 
 export function getTableBooking(accessToken: string, publicId: string) {

@@ -27,9 +27,14 @@ export interface AuthUser {
 export interface AdminAccess {
   role: AdminRole | string;
   is_super_admin: boolean;
-  /** Applies to every business. */
+  /** Applies to every business the user can access. */
   permissions: string[];
+  /** Businesses a manager may see: ["restaurant"], ["bakery"] or both (sorted). Super admin: both. */
+  business_types?: string[];
 }
+
+/** Business types a manager can be limited to. Shared areas (halls, tables, …) are not limited. */
+export type ScopedBusinessType = "restaurant" | "bakery";
 
 export interface LoginData {
   access: string;

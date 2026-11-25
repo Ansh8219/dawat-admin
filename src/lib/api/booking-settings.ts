@@ -8,10 +8,7 @@ export function getBookingSettings(accessToken: string) {
   });
 }
 
-export function updateBookingSettings(
-  accessToken: string,
-  payload: UpdateBookingSettingsPayload,
-) {
+export function updateBookingSettings(accessToken: string, payload: UpdateBookingSettingsPayload) {
   return apiRequest<BookingSettings>("/api/admin/booking-settings/", {
     method: "PATCH",
     accessToken,
@@ -20,8 +17,7 @@ export function updateBookingSettings(
 }
 
 type RatePatchResult =
-  | { ok: true; payload: UpdateBookingSettingsPayload }
-  | { ok: false; error: string };
+  { ok: true; payload: UpdateBookingSettingsPayload } | { ok: false; error: string };
 
 /** Validates a decimal string (>= 0, at most 2 places) and skips an unchanged rate. */
 export function buildPerGuestRatePatch(input: string, original: string): RatePatchResult {

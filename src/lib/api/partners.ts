@@ -144,7 +144,9 @@ export function receivePartnerCash(accessToken: string, publicId: string) {
 export function formatRupees(amount: number | null | undefined): string {
   const n = Number(amount ?? 0);
   const value = Number.isFinite(n) ? n : 0;
-  return "₹" + value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    "₹" + value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
 }
 
 export function formatPartnerPhone(p: {

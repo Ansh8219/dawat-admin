@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { GlobalProgress } from "@/components/app/global-progress";
 import { BootSplash } from "@/components/app/boot-splash";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth";
 import { isRouteAllowed } from "@/lib/panel";
 import { isRouteVisible } from "@/lib/access";
+import { isBusinessTypeAllowed } from "@/lib/business-scope";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -35,7 +36,12 @@ export const Route = createFileRoute("/_app")({
     if (!useAuth.getState().access) {
       await useAuth.getState().loadAccess();
     }
-    const { access, user } = useAuth.getState();
+    const { access, user, business } = useAuth.getState();
+    // Panel picked before the manager's business access was narrowed (or forged in storage).
+    if (business && !isBusinessTypeAllowed(access, user?.role, business.type)) {
+      useAuth.getState().clearPanel();
+      throw redirect({ to: "/select-panel" });
+    }
     const allowed =
       isRouteAllowed(panel, location.pathname) &&
       isRouteVisible(location.pathname, panel, {
@@ -70,6 +76,32 @@ function AppLayout() {
       alive = false;
     };
   }, []);
+
+  // Access (permissions + business_types) can be changed by a super admin at any time. Re-read
+  // it on load and when the tab regains focus; a lost panel sends the user to the picker.
+  const navigate = useNavigate();
+  const businessId = useAuth((s) => s.business?.publicId ?? null);
+  const signedIn = useAuth((s) => Boolean(s.user));
+  useEffect(() => {
+    let last = 0;
+    const recheck = () => {
+      const now = Date.now();
+      if (now - last < 60_000) return;
+      last = now;
+      void useAuth.getState().loadAccess();
+    };
+    recheck();
+    const onVisible = () => document.visibilityState === "visible" && recheck();
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+  useEffect(() => {
+    if (ready && signedIn && !businessId) void navigate({ to: "/select-panel" });
+  }, [ready, signedIn, businessId, navigate]);
 
   // Zomato-style: keep kitchen WS alive across all admin pages while authenticated.
   useAdminOrdersSocket({ enabled: true });

@@ -41,7 +41,8 @@ import {
   type PosPaymentMethod,
 } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
-import { useAccess } from "@/lib/access";
+import { useAccess, useBusinessScope } from "@/lib/access";
+import { BUSINESS_ACCESS_DENIED_MESSAGE } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 import { useCounterPaymentAlerts } from "@/lib/counter-payment-alerts";
 import { printInvoicePdf } from "@/lib/invoice-export";
@@ -96,6 +97,11 @@ function handleCounterError(err: unknown, hooks: ErrorHooks, fallback: string) {
   const code = err instanceof ApiError ? err.code : "";
   const status = err instanceof ApiError ? err.status : 0;
   switch (code) {
+    case "business_access_denied":
+      // Item or order from a business this manager can't access; the refetched list is filtered.
+      toast.error(BUSINESS_ACCESS_DENIED_MESSAGE);
+      hooks.refresh();
+      return;
     case "order_already_paid":
       toast.info("Already paid");
       hooks.close();
@@ -791,6 +797,7 @@ function MenuPicker({
   onAdd: (lines: CounterOrderItemsPayload["items"]) => Promise<boolean>;
 }) {
   const current = useAuth((s) => s.business);
+  const scope = useBusinessScope();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [bizId, setBizId] = useState<string>("");
   const [q, setQ] = useState("");
@@ -816,7 +823,8 @@ function MenuPicker({
     withAuthRetry((t) => listBusinesses(t))
       .then((list) => {
         if (cancelled) return;
-        const usable = list.filter((b) => MENU_BUSINESS_TYPES.has(b.type));
+        // One-business manager: only their own business's menu (others answer 403).
+        const usable = list.filter((b) => MENU_BUSINESS_TYPES.has(b.type) && scope.allows(b.type));
         setBusinesses(usable);
         setBizId((prev) =>
           usable.some((b) => b.public_id === prev)
@@ -827,14 +835,16 @@ function MenuPicker({
       })
       .catch((err) => {
         if (cancelled) return;
-        // Fall back to the selected business only.
-        if (current) setBizId(current.publicId);
+        // Fall back to the selected business only (if it has a menu this user may use).
+        if (current && MENU_BUSINESS_TYPES.has(current.type) && scope.allows(current.type)) {
+          setBizId(current.publicId);
+        }
         toast.error(errMessage(err, "Unable to load businesses."));
       });
     return () => {
       cancelled = true;
     };
-  }, [open, current]);
+  }, [open, current, scope]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(q.trim()), 300);

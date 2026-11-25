@@ -4,6 +4,8 @@ import {
   MANAGER_PERMISSION_MODULES,
   permissionKey,
 } from "@/lib/api/managers";
+import type { ScopedBusinessType } from "@/lib/api/types";
+import { BUSINESS_TYPE_LABELS, SCOPED_BUSINESS_TYPES } from "@/lib/business-scope";
 
 interface Props {
   value: string[];
@@ -87,6 +89,44 @@ export function ManagerPermissions({ value, onChange, idPrefix }: Props) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+interface BusinessTypesProps {
+  value: string[];
+  onChange: (next: ScopedBusinessType[]) => void;
+  idPrefix: string;
+}
+
+/** Restaurant / Bakery access. At least one must stay ticked (checked by the form). */
+export function ManagerBusinessTypes({ value, onChange, idPrefix }: BusinessTypesProps) {
+  const set = new Set(value);
+  const toggle = (type: ScopedBusinessType, checked: boolean) => {
+    const next = new Set(set);
+    if (checked) next.add(type);
+    else next.delete(type);
+    onChange(SCOPED_BUSINESS_TYPES.filter((t) => next.has(t)));
+  };
+  return (
+    <div className="flex flex-wrap gap-2">
+      {SCOPED_BUSINESS_TYPES.map((type) => {
+        const id = `${idPrefix}-${type}`;
+        return (
+          <label
+            key={type}
+            htmlFor={id}
+            className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/70 px-3 py-2 text-sm has-[button[data-state=checked]]:border-primary/50 has-[button[data-state=checked]]:bg-primary/5"
+          >
+            <Checkbox
+              id={id}
+              checked={set.has(type)}
+              onCheckedChange={(c) => toggle(type, c === true)}
+            />
+            {BUSINESS_TYPE_LABELS[type]}
+          </label>
+        );
+      })}
     </div>
   );
 }

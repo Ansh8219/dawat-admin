@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { ManagerPermissions } from "@/components/app/manager-permissions";
+import { ManagerBusinessTypes, ManagerPermissions } from "@/components/app/manager-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,11 @@ import {
   validateManagerForm,
   type ManagerFormErrors,
 } from "@/lib/api/managers";
+import type { ScopedBusinessType } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 
 const EMPTY_ERRORS: ManagerFormErrors = {};
+const BOTH_BUSINESSES: ScopedBusinessType[] = ["restaurant", "bakery"];
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -31,6 +33,7 @@ export function ManagerCreateForm({ onCreated }: { onCreated?: () => void }) {
   const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [businessTypes, setBusinessTypes] = useState<ScopedBusinessType[]>(BOTH_BUSINESSES);
   const [errors, setErrors] = useState<ManagerFormErrors>(EMPTY_ERRORS);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,12 +43,13 @@ export function ManagerCreateForm({ onCreated }: { onCreated?: () => void }) {
     setCountryCode("+91");
     setPhone("");
     setPermissions([]);
+    setBusinessTypes(BOTH_BUSINESSES);
     setErrors(EMPTY_ERRORS);
   };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const values = { name, email, countryCode, phone, permissions };
+    const values = { name, email, countryCode, phone, permissions, businessTypes };
     const clientErrors = validateManagerForm(values);
     setErrors(clientErrors);
     if (hasManagerFormErrors(clientErrors)) return;
@@ -56,6 +60,7 @@ export function ManagerCreateForm({ onCreated }: { onCreated?: () => void }) {
       country_code: countryCode.trim(),
       phone_number: phone.replace(/[\s-]/g, ""),
       permissions,
+      business_types: businessTypes,
     };
 
     setSubmitting(true);
@@ -137,9 +142,28 @@ export function ManagerCreateForm({ onCreated }: { onCreated?: () => void }) {
 
         <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
           <div>
+            <h2 className="text-base font-semibold">Business access</h2>
+            <p className="text-xs text-muted-foreground">
+              Menu, inventory, POS, orders, invoices and reports of these businesses. Tables, halls,
+              rewards, customers, offers and refunds are shared and follow permissions only.
+            </p>
+          </div>
+          <ManagerBusinessTypes
+            idPrefix="biz"
+            value={businessTypes}
+            onChange={(next) => {
+              setBusinessTypes(next);
+              if (next.length) setErrors((e) => ({ ...e, business_types: undefined }));
+            }}
+          />
+          <FieldError message={errors.business_types} />
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
+          <div>
             <h2 className="text-base font-semibold">Permissions</h2>
             <p className="text-xs text-muted-foreground">
-              Applies to all businesses. Manage includes View.
+              Applies to the businesses above. Manage includes View.
             </p>
           </div>
           <ManagerPermissions idPrefix="perm" value={permissions} onChange={setPermissions} />

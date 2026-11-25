@@ -7,6 +7,7 @@ import {
   InactiveBadge,
   useIsSuperAdmin,
 } from "@/components/app/account-status-toggle";
+import { ManagerAccessDialog } from "@/components/app/manager-access-dialog";
 import { RowActions } from "@/components/app/row-actions";
 import {
   AlertDialog,
@@ -46,6 +47,7 @@ import {
 } from "@/lib/api/account-status";
 import { ApiError } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
+import { describeBusinessTypes } from "@/lib/business-scope";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZES = [10, 20, 50] as const;
@@ -86,6 +88,18 @@ function PermissionSummary({ permissions }: { permissions: string[] }) {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  );
+}
+
+/** "Restaurant", "Bakery" or "Restaurant + Bakery" (missing field on older backends → both). */
+function BusinessBadge({ types }: { types?: string[] }) {
+  return (
+    <Badge
+      variant="outline"
+      className="whitespace-nowrap border-primary/30 bg-primary/10 text-primary"
+    >
+      {describeBusinessTypes(types ?? ["restaurant", "bakery"])}
+    </Badge>
   );
 }
 
@@ -137,6 +151,7 @@ export function ManagersList({
   const [deleteTarget, setDeleteTarget] = useState<ManagerListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [inUse, setInUse] = useState(false);
+  const [accessTarget, setAccessTarget] = useState<ManagerListItem | null>(null);
 
   const setActiveLocal = useCallback((id: string, isActive: boolean) => {
     setItems((prev) => prev.map((x) => (x.public_id === id ? { ...x, is_active: isActive } : x)));
@@ -209,6 +224,8 @@ export function ManagersList({
         />
         <RowActions
           items={[
+            { label: "Edit access", onClick: () => setAccessTarget(m) },
+            { label: "", onClick: () => {}, separator: true },
             {
               label: "Delete manager",
               destructive: true,
@@ -309,6 +326,7 @@ export function ManagersList({
             <tr>
               <th className="px-4 py-3 text-left font-medium">Manager</th>
               <th className="px-4 py-3 text-left font-medium">Phone</th>
+              <th className="px-4 py-3 text-left font-medium">Business</th>
               <th className="px-4 py-3 text-left font-medium">Permissions</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Last login</th>
@@ -325,6 +343,9 @@ export function ManagersList({
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                   {formatManagerPhone(m)}
+                </td>
+                <td className="px-4 py-3">
+                  <BusinessBadge types={m.business_types} />
                 </td>
                 <td className="px-4 py-3">
                   <PermissionSummary permissions={m.permissions ?? []} />
@@ -361,7 +382,10 @@ export function ManagersList({
               </div>
               <StatusBadges m={m} />
             </div>
-            <PermissionSummary permissions={m.permissions ?? []} />
+            <div className="flex flex-wrap items-center gap-2">
+              <BusinessBadge types={m.business_types} />
+              <PermissionSummary permissions={m.permissions ?? []} />
+            </div>
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Last login: {relativeTime(m.last_login)}</span>
               <span>Created {formatDate(m.created_at)}</span>
@@ -421,6 +445,24 @@ export function ManagersList({
           </Button>
         </div>
       </div>
+      <ManagerAccessDialog
+        manager={accessTarget}
+        onClose={() => setAccessTarget(null)}
+        onSaved={(updated) => {
+          setItems((prev) =>
+            prev.map((x) =>
+              x.public_id === updated.public_id
+                ? { ...x, permissions: updated.permissions, business_types: updated.business_types }
+                : x,
+            ),
+          );
+          setAccessTarget(null);
+        }}
+        onNotFound={() => {
+          setAccessTarget(null);
+          setReloadTick((t) => t + 1);
+        }}
+      />
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={(o) => !o && !deleting && closeDelete()}
