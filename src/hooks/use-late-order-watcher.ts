@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +7,8 @@ import { isOrderLate, listAdminOrders, orderDisplayCode } from "@/lib/api/orders
 import type { AdminOrder, AdminOrderTab } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { playLateOrderAlert } from "@/lib/realtime/new-order-chime";
+import { isOtherBusiness, useGoToBusiness, withBusinessTag } from "@/lib/business-nav";
+import { showDesktopAlert } from "@/lib/realtime/attention";
 
 const WATCHED_TABS: AdminOrderTab[] = ["new", "preparing"];
 const POLL_MS = 60_000;
@@ -37,11 +38,11 @@ async function fetchAllOrders(tab: AdminOrderTab): Promise<AdminOrder[]> {
  */
 export function useLateOrderWatcher() {
   const canView = useAccess().canView("orders");
-  const navigate = useNavigate();
-  const navigateRef = useRef(navigate);
+  const goTo = useGoToBusiness();
+  const goToRef = useRef(goTo);
   useEffect(() => {
-    navigateRef.current = navigate;
-  }, [navigate]);
+    goToRef.current = goTo;
+  }, [goTo]);
 
   const queries = WATCHED_TABS.map((tab) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fixed-length constant list
@@ -83,15 +84,24 @@ export function useLateOrderWatcher() {
       alerted.current.add(order.public_id);
       const code = orderDisplayCode(order);
       playLateOrderAlert(code);
-      toast.error(`Order ${code} is getting late`, {
-        description: tab === "new" ? "Not accepted yet" : "Preparation time exceeded",
+      const biz = order.businesses?.[0];
+      const dest = { businessPublicId: biz?.public_id, businessType: biz?.type, to: "/orders" };
+      const title = withBusinessTag(biz?.type, `Order ${code} is getting late`);
+      const description = tab === "new" ? "Not accepted yet" : "Preparation time exceeded";
+      toast.error(title, {
+        description,
         duration: 15_000,
         action: {
-          label: "Open Orders",
-          onClick: () => {
-            void navigateRef.current({ to: "/orders" });
-          },
+          label: isOtherBusiness(dest) ? "Switch & open" : "Open Orders",
+          onClick: () => void goToRef.current(dest),
         },
+      });
+      showDesktopAlert({
+        title,
+        body: description,
+        tag: `late:${order.public_id}`,
+        sticky: true,
+        onClick: () => void goToRef.current(dest),
       });
       break; // one announcement per check; the rest follow on the next tick
     }

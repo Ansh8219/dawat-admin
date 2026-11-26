@@ -1,10 +1,5 @@
 import { format } from "date-fns";
-import type {
-  CampaignAudienceType,
-  CampaignChannel,
-  CampaignOfferRef,
-  CampaignStatus,
-} from "@/lib/api/types";
+import type { CampaignAudienceType, CampaignOfferRef, CampaignStatus } from "@/lib/api/types";
 
 export const AUDIENCE_OPTIONS: {
   value: CampaignAudienceType;
@@ -37,11 +32,6 @@ export const AUDIENCE_OPTIONS: {
     needsDays: true,
   },
 ];
-
-export const CHANNEL_LABELS: Record<CampaignChannel, string> = {
-  push: "Push",
-  whatsapp: "WhatsApp",
-};
 
 export const STATUS_LABELS: Record<CampaignStatus, string> = {
   scheduled: "Scheduled",
@@ -77,16 +67,9 @@ export function recipientErrorLabel(error: string | null): string {
       return "Push (FCM) not configured";
     case "push_failed":
       return "Push delivery failed";
-    case "whatsapp_not_configured":
-      return "WhatsApp account not connected yet";
-    case "no_phone":
-      return "Customer has no phone number";
-    case "whatsapp_network_error":
-      return "WhatsApp network error";
     default:
-      if (error.startsWith("whatsapp_")) {
-        return `Rejected by WhatsApp (code ${error.slice("whatsapp_".length)})`;
-      }
+      // Historical rows from before campaigns became push only.
+      if (error === "no_phone" || error.startsWith("whatsapp_")) return "Old WhatsApp delivery";
       return error;
   }
 }

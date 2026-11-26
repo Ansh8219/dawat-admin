@@ -35,7 +35,7 @@ export function previewCampaignAudience(
   });
 }
 
-/** Multipart body: repeated keys for `channels` and `whatsapp_template_params`. */
+/** Multipart body. Campaigns are push only (in-app notification + push). */
 function buildCampaignForm(payload: CampaignPayload, image?: File | null) {
   const form = new FormData();
   form.append("name", payload.name);
@@ -43,17 +43,7 @@ function buildCampaignForm(payload: CampaignPayload, image?: File | null) {
   form.append("body", payload.body);
   form.append("audience_type", payload.audience_type);
   if (payload.audience_days != null) form.append("audience_days", String(payload.audience_days));
-  for (const ch of payload.channels) form.append("channels", ch);
   if (payload.offer_id) form.append("offer_id", payload.offer_id);
-  if (payload.whatsapp_template_name) {
-    form.append("whatsapp_template_name", payload.whatsapp_template_name);
-  }
-  if (payload.whatsapp_template_language) {
-    form.append("whatsapp_template_language", payload.whatsapp_template_language);
-  }
-  for (const p of payload.whatsapp_template_params ?? []) {
-    form.append("whatsapp_template_params", p);
-  }
   if (payload.scheduled_at) form.append("scheduled_at", payload.scheduled_at);
   if (image) form.append("image", image);
   else if (payload.remove_image) form.append("remove_image", "true");
@@ -101,7 +91,7 @@ export function cancelCampaign(accessToken: string, id: string) {
   return apiRequest<Campaign>(`${BASE}/${id}/cancel/`, { method: "POST", accessToken });
 }
 
-/** GET /api/admin/campaigns/{id}/recipients/?status=&channel=&page=&page_size= */
+/** GET /api/admin/campaigns/{id}/recipients/?status=&page=&page_size= */
 export function listCampaignRecipients(
   accessToken: string,
   id: string,
@@ -110,7 +100,6 @@ export function listCampaignRecipients(
   return apiRequest<CampaignRecipientListData>(
     `${BASE}/${id}/recipients/${qs({
       status: params.status,
-      channel: params.channel,
       page: params.page,
       page_size: params.page_size,
     })}`,

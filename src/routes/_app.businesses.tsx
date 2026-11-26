@@ -2,13 +2,16 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
+import { OrderingControls, OrderingStatusBadges } from "@/components/app/ordering-controls";
 import { Button } from "@/components/ui/button";
 import { listBusinesses } from "@/lib/api/businesses";
 import { invoiceFieldLabel } from "@/lib/api/invoices";
-import { ApiError, type Business } from "@/lib/api/types";
+import { ApiError, type Business, type BusinessOrderingCard } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
+import { closedChannels, normalizeOrdering, outletOrderingQueryKey } from "@/lib/order-channels";
 import { businessTypeToPanel, getPanelMeta } from "@/lib/panel";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -77,6 +80,7 @@ function formatRating(rating: number | null | undefined): string {
 
 function BusinessesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -99,10 +103,12 @@ function BusinessesPage() {
     try {
       const data = await withAuthRetry((token) => listBusinesses(token));
       setBusinesses(
-        [...data].sort(
-          (a, b) =>
-            typeRank(String(a.type)) - typeRank(String(b.type)) || a.name.localeCompare(b.name),
-        ),
+        data
+          .map((b) => ({ ...b, ...normalizeOrdering(b) }))
+          .sort(
+            (a, b) =>
+              typeRank(String(a.type)) - typeRank(String(b.type)) || a.name.localeCompare(b.name),
+          ),
       );
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -117,11 +123,25 @@ function BusinessesPage() {
     void load();
   }, [load]);
 
+  const applyOrdering = useCallback(
+    (card: BusinessOrderingCard) => {
+      const next = normalizeOrdering(card);
+      setBusinesses((prev) =>
+        prev.map((b) => (b.public_id === card.public_id ? { ...b, ...next } : b)),
+      );
+      void queryClient.invalidateQueries({ queryKey: outletOrderingQueryKey(card.public_id) });
+    },
+    [queryClient],
+  );
+
   const summary = useMemo(() => {
     const open = businesses.filter((b) => b.is_accepting_orders).length;
+    const partial = businesses.filter(
+      (b) => b.is_accepting_orders && closedChannels(b, String(b.type)).length > 0,
+    ).length;
     const invoiceReady = businesses.filter((b) => b.is_invoice_ready).length;
     const menuItems = businesses.reduce((sum, b) => sum + (b.menu_items_count ?? 0), 0);
-    return { total: businesses.length, open, invoiceReady, menuItems };
+    return { total: businesses.length, open, partial, invoiceReady, menuItems };
   }, [businesses]);
 
   return (
@@ -171,7 +191,13 @@ function BusinessesPage() {
               <SummaryStat
                 label="Accepting orders"
                 value={`${summary.open}/${summary.total}`}
-                hint={summary.open === summary.total ? "All open" : "Some closed"}
+                hint={
+                  summary.open !== summary.total
+                    ? "Some closed"
+                    : summary.partial > 0
+                      ? `${summary.partial} with channels closed`
+                      : "All open"
+                }
                 icon={<CircleDot className="h-4 w-4" />}
                 tone={summary.open > 0 ? "success" : "muted"}
               />
@@ -192,7 +218,11 @@ function BusinessesPage() {
 
             <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {businesses.map((biz) => (
-                <BusinessOverviewCard key={biz.public_id} business={biz} />
+                <BusinessOverviewCard
+                  key={biz.public_id}
+                  business={biz}
+                  onOrderingUpdated={applyOrdering}
+                />
               ))}
             </div>
           </>
@@ -240,7 +270,13 @@ function SummaryStat({
   );
 }
 
-function BusinessOverviewCard({ business }: { business: Business }) {
+function BusinessOverviewCard({
+  business,
+  onOrderingUpdated,
+}: {
+  business: Business;
+  onOrderingUpdated: (card: BusinessOrderingCard) => void;
+}) {
   const theme = themeFor(String(business.type));
   const label = typeLabel(String(business.type));
   const open = business.is_accepting_orders;
@@ -286,6 +322,7 @@ function BusinessOverviewCard({ business }: { business: Business }) {
             <div className="mt-0.5 text-xs capitalize text-muted-foreground">{label}</div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <StatusBadge status={open ? "Active" : "Inactive"} />
+              <OrderingStatusBadges business={{ ...business, type: String(business.type) }} />
               {ready ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
                   <CheckCircle2 className="h-3 w-3" /> Invoice ready
@@ -324,6 +361,14 @@ function BusinessOverviewCard({ business }: { business: Business }) {
               items available
             </div>
           </div>
+        )}
+
+        {!banquet && (
+          <OrderingControls
+            business={{ ...business, type: String(business.type) }}
+            onUpdated={onOrderingUpdated}
+            className="rounded-2xl border bg-background/70 p-3"
+          />
         )}
 
         <div className="rounded-2xl border bg-background/70 p-3">

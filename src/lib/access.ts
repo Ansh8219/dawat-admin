@@ -117,7 +117,7 @@ const ROUTE_RULES: Record<string, RouteRule> = {
   "/customer-levels": mod("rewards"),
   "/rewards": mod("rewards"),
   "/marketing": mod("offers"),
-  "/campaigns": superAdmin, // push / WhatsApp promotions
+  "/campaigns": superAdmin, // push promotions
   "/refunds": mod("refunds"),
   "/invoices": mod("invoices"),
   "/analytics": mod("analytics"),

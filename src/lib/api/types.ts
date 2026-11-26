@@ -65,8 +65,12 @@ export interface Business {
   type: BusinessType | string;
   name: string;
   image: string | null;
-  /** When false, customers cannot place new orders for this business. */
+  /** Master switch. When false, customers cannot place new orders on any channel. */
   is_accepting_orders: boolean;
+  /** Channel switches; a channel is open only when it and the master switch are on. */
+  is_delivery_open: boolean;
+  is_takeaway_open: boolean;
+  is_dine_in_open: boolean;
   /** Managers only: this manager's permissions for the business. */
   permissions?: string[];
   /** Average customer rating; null when there are no reviews yet. */
@@ -99,6 +103,25 @@ export interface DashboardBusiness {
   type: BusinessType | string;
   name: string;
   is_accepting_orders: boolean;
+  is_delivery_open: boolean;
+  is_takeaway_open: boolean;
+  is_dine_in_open: boolean;
+}
+
+/** The four ordering switches of a business (master + per channel). */
+export interface BusinessOrderingSwitches {
+  is_accepting_orders: boolean;
+  is_delivery_open: boolean;
+  is_takeaway_open: boolean;
+  is_dine_in_open: boolean;
+}
+
+/** PATCH /api/admin/businesses/{public_id}/accepting-orders/ response (business card). */
+export interface BusinessOrderingCard extends BusinessOrderingSwitches {
+  public_id: string;
+  type: BusinessType | string;
+  name: string;
+  image: string | null;
 }
 
 export interface DashboardCounts {
@@ -1661,7 +1684,34 @@ export interface AnalyticsFilterParams {
 }
 
 /** Admin inbox — GET/POST /api/admin/notifications/ */
-export type AdminNotificationType = "stock" | "purchase" | "account" | "system" | "wallet" | string;
+export type AdminNotificationType =
+  | "order_new"
+  | "order_cancelled"
+  | "counter_payment"
+  | "hall_enquiry"
+  | "hall_booking"
+  | "stock"
+  | "purchase"
+  | "account"
+  | "system"
+  | "wallet"
+  | string;
+
+/** What a notification points at, for deep links. */
+export type AdminNotificationEntityType =
+  "order" | "hall_enquiry" | "hall_booking" | "inventory_item" | string;
+
+export interface AdminNotificationData {
+  entity_type?: AdminNotificationEntityType;
+  entity_id?: string;
+  order_code?: string;
+  table_number?: string | null;
+  total?: string;
+  [key: string]: unknown;
+}
+
+/** Unread counts per business the user can access (0 where there are none). */
+export type UnreadByBusinessType = Partial<Record<BusinessType, number>>;
 
 export interface AdminNotification {
   public_id: string;
@@ -1670,37 +1720,64 @@ export interface AdminNotification {
   message: string;
   is_read: boolean;
   created_at: string | null;
-  /** Free-form metadata for future deep-links; keys are not fixed yet. */
-  data: Record<string, unknown> | null;
+  /** Null on older notifications and on wallet / system ones. */
+  business_public_id?: string | null;
+  business_type?: BusinessType | null;
+  business_name?: string | null;
+  data: AdminNotificationData | null;
 }
 
 export interface AdminNotificationListParams {
   is_read?: boolean;
   page?: number;
   page_size?: number;
+  business_type?: BusinessType;
 }
 
-export interface AdminNotificationListData {
-  count: number;
+/** Unread totals returned by every notification endpoint. */
+export interface AdminNotificationUnreadCountData {
   unread_count: number;
+  by_business_type?: UnreadByBusinessType;
+}
+
+export interface AdminNotificationListData extends AdminNotificationUnreadCountData {
+  count: number;
   page: number;
   page_size: number;
   results: AdminNotification[];
 }
 
-export interface AdminNotificationUnreadCountData {
-  unread_count: number;
-}
-
 /** POST /api/admin/notifications/{public_id}/read/ */
 export interface AdminNotificationReadData extends AdminNotification {
   unread_count: number;
+  by_business_type?: UnreadByBusinessType;
 }
 
 /** POST /api/admin/notifications/read-all/ */
-export interface AdminNotificationReadAllData {
+export interface AdminNotificationReadAllData extends AdminNotificationUnreadCountData {
   marked_read: number;
-  unread_count: number;
+}
+
+/** GET /api/admin/pending-summary/ — open work per business. */
+export interface PendingSummaryBusiness {
+  business_public_id: string;
+  business_type: BusinessType;
+  business_name: string;
+  /** Orders on the "new" tab (waiting to be accepted). */
+  new_orders: number;
+  oldest_new_order_at: string | null;
+  /** Pay-at-counter orders handed over and not settled. */
+  counter_payments_pending: number;
+  oldest_counter_payment_at: string | null;
+  /** Non-zero only on the banquet_hall row. */
+  new_hall_enquiries: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
+}
+
+export interface PendingSummaryData {
+  businesses: PendingSummaryBusiness[];
+  at: string;
 }
 
 export class ApiError extends Error {
@@ -1922,8 +1999,6 @@ export interface CounterOrderSettled extends CounterOrder {
 export type CampaignAudienceType =
   "all_customers" | "ordered_within_days" | "inactive_for_days" | "new_within_days";
 
-export type CampaignChannel = "push" | "whatsapp";
-
 export type CampaignStatus = "scheduled" | "sending" | "completed" | "failed" | "cancelled";
 
 export type CampaignRecipientStatus = "sent" | "failed" | "skipped";
@@ -1943,10 +2018,6 @@ export interface Campaign {
   offer: CampaignOfferRef | null;
   audience_type: CampaignAudienceType;
   audience_days: number | null;
-  channels: CampaignChannel[];
-  whatsapp_template_name: string | null;
-  whatsapp_template_language: string;
-  whatsapp_template_params: string[];
   scheduled_at: string;
   status: CampaignStatus;
   started_at: string | null;
@@ -1966,10 +2037,6 @@ export interface CampaignPayload {
   offer_id?: string;
   audience_type: CampaignAudienceType;
   audience_days?: number;
-  channels: CampaignChannel[];
-  whatsapp_template_name?: string;
-  whatsapp_template_language?: string;
-  whatsapp_template_params?: string[];
   /** ISO-8601 with timezone. Omit to send immediately. */
   scheduled_at?: string;
   /** PATCH only: delete the existing image (ignored when a new image file is sent). */
@@ -2000,7 +2067,8 @@ export interface CampaignAudiencePreviewData {
 
 export interface CampaignRecipient {
   user_id: string | number;
-  channel: CampaignChannel;
+  /** Always "push" for new deliveries; old campaigns may still have historical rows. Not shown. */
+  channel: string;
   status: CampaignRecipientStatus;
   error: string | null;
   sent_at: string | null;
@@ -2008,7 +2076,6 @@ export interface CampaignRecipient {
 
 export interface CampaignRecipientListParams {
   status?: CampaignRecipientStatus;
-  channel?: CampaignChannel;
   page?: number;
   page_size?: number;
 }

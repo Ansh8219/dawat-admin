@@ -14,9 +14,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { listCampaignRecipients } from "@/lib/api/campaigns";
 import { ApiError } from "@/lib/api/types";
-import type { CampaignChannel, CampaignRecipient, CampaignRecipientStatus } from "@/lib/api/types";
+import type { CampaignRecipient, CampaignRecipientStatus } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
-import { CHANNEL_LABELS, formatDateTime, recipientErrorLabel } from "@/lib/campaigns";
+import { formatDateTime, recipientErrorLabel } from "@/lib/campaigns";
 
 const PAGE_SIZE = 25;
 
@@ -38,7 +38,6 @@ export function CampaignRecipients({
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<"all" | CampaignRecipientStatus>("all");
-  const [channel, setChannel] = useState<"all" | CampaignChannel>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -52,7 +51,6 @@ export function CampaignRecipients({
         const data = await withAuthRetry((t) =>
           listCampaignRecipients(t, campaignId, {
             status: status === "all" ? undefined : status,
-            channel: channel === "all" ? undefined : channel,
             page,
             page_size: PAGE_SIZE,
           }),
@@ -67,7 +65,7 @@ export function CampaignRecipients({
         if (!silent) setLoading(false);
       }
     },
-    [campaignId, status, channel, page],
+    [campaignId, status, page],
   );
 
   useEffect(() => {
@@ -85,22 +83,6 @@ export function CampaignRecipients({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
-        <Select
-          value={channel}
-          onValueChange={(v) => {
-            setChannel(v as typeof channel);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-40 rounded-xl" aria-label="Filter by channel">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All channels</SelectItem>
-            <SelectItem value="push">{CHANNEL_LABELS.push}</SelectItem>
-            <SelectItem value="whatsapp">{CHANNEL_LABELS.whatsapp}</SelectItem>
-          </SelectContent>
-        </Select>
         <Select
           value={status}
           onValueChange={(v) => {
@@ -151,7 +133,6 @@ export function CampaignRecipients({
                 <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Customer</th>
-                    <th className="px-4 py-3 font-medium">Channel</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Detail</th>
                     <th className="px-4 py-3 font-medium">Sent at</th>
@@ -161,7 +142,6 @@ export function CampaignRecipients({
                   {rows.map((r, i) => (
                     <tr key={`${r.user_id}-${r.channel}-${i}`}>
                       <td className="px-4 py-2.5 font-mono text-xs">{String(r.user_id)}</td>
-                      <td className="px-4 py-2.5">{CHANNEL_LABELS[r.channel] ?? r.channel}</td>
                       <td className="px-4 py-2.5">
                         <StatusBadge
                           status={r.status.charAt(0).toUpperCase() + r.status.slice(1)}

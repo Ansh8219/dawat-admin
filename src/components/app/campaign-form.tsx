@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, Info, Loader2, Plus, Smartphone, Trash2, Users } from "lucide-react";
+import { ImagePlus, Info, Loader2, Smartphone, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -31,7 +30,6 @@ import { ApiError } from "@/lib/api/types";
 import type {
   Campaign,
   CampaignAudienceType,
-  CampaignChannel,
   CampaignOfferRef,
   CampaignPayload,
 } from "@/lib/api/types";
@@ -39,14 +37,12 @@ import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import {
   AUDIENCE_OPTIONS,
-  CHANNEL_LABELS,
   isoToLocalInput,
   localInputToIso,
   renderPlaceholders,
 } from "@/lib/campaigns";
 import { cn } from "@/lib/utils";
 
-const MAX_PARAMS = 10;
 const NO_OFFER = "__none__";
 
 type FormState = {
@@ -56,10 +52,6 @@ type FormState = {
   offer_id: string;
   audience_type: CampaignAudienceType;
   audience_days: string;
-  channels: CampaignChannel[];
-  whatsapp_template_name: string;
-  whatsapp_template_language: string;
-  whatsapp_template_params: string[];
   mode: "now" | "schedule";
   scheduled_at: string;
 };
@@ -73,10 +65,6 @@ function initialState(c?: Campaign): FormState {
       offer_id: "",
       audience_type: "all_customers",
       audience_days: "30",
-      channels: ["push"],
-      whatsapp_template_name: "",
-      whatsapp_template_language: "en",
-      whatsapp_template_params: [],
       mode: "now",
       scheduled_at: "",
     };
@@ -88,10 +76,6 @@ function initialState(c?: Campaign): FormState {
     offer_id: c.offer?.id ?? "",
     audience_type: c.audience_type,
     audience_days: c.audience_days != null ? String(c.audience_days) : "30",
-    channels: c.channels,
-    whatsapp_template_name: c.whatsapp_template_name ?? "",
-    whatsapp_template_language: c.whatsapp_template_language || "en",
-    whatsapp_template_params: c.whatsapp_template_params ?? [],
     mode: "schedule",
     scheduled_at: isoToLocalInput(c.scheduled_at),
   };
@@ -230,15 +214,6 @@ export function CampaignForm({
     };
   }, [form.audience_type, daysNum, audienceReady, audienceOpt.needsDays]);
 
-  const hasWhatsapp = form.channels.includes("whatsapp");
-
-  function toggleChannel(ch: CampaignChannel) {
-    set(
-      "channels",
-      form.channels.includes(ch) ? form.channels.filter((c) => c !== ch) : [...form.channels, ch],
-    );
-  }
-
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Name is required";
@@ -249,15 +224,6 @@ export function CampaignForm({
     else if (form.body.length > 2000) e.body = "Max 2000 characters";
     if (audienceOpt.needsDays && !daysValid)
       e.audience_days = "Enter a whole number from 1 to 3650";
-    if (form.channels.length === 0) e.channels = "Select at least one channel";
-    if (hasWhatsapp) {
-      if (!form.whatsapp_template_name.trim()) {
-        e.whatsapp_template_name = "Template name is required for WhatsApp";
-      }
-      if (form.whatsapp_template_params.length > MAX_PARAMS) {
-        e.whatsapp_template_params = `Max ${MAX_PARAMS} parameters`;
-      }
-    }
     if (form.mode === "schedule") {
       const iso = localInputToIso(form.scheduled_at);
       if (!iso) e.scheduled_at = "Pick a date and time";
@@ -272,16 +238,10 @@ export function CampaignForm({
       title: form.title.trim(),
       body: form.body.trim(),
       audience_type: form.audience_type,
-      channels: form.channels,
     };
     if (removeImage && !imageFile) payload.remove_image = true;
     if (form.offer_id) payload.offer_id = form.offer_id;
     if (audienceOpt.needsDays) payload.audience_days = daysNum;
-    if (hasWhatsapp) {
-      payload.whatsapp_template_name = form.whatsapp_template_name.trim();
-      payload.whatsapp_template_language = form.whatsapp_template_language.trim() || "en";
-      payload.whatsapp_template_params = form.whatsapp_template_params.map((p) => p.trim());
-    }
     if (form.mode === "schedule") {
       const iso = localInputToIso(form.scheduled_at);
       if (iso) payload.scheduled_at = iso;
@@ -425,10 +385,7 @@ export function CampaignForm({
                 onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
               />
             </div>
-            <Hint>
-              Used as the WhatsApp header image — set it only if the approved template has an image
-              header.
-            </Hint>
+            <Hint>Shown with the in-app notification and push.</Hint>
           </Field>
           <Field label="Linked offer (optional)" error={errors.offer_id}>
             <Select
@@ -514,103 +471,10 @@ export function CampaignForm({
           </p>
         </Section>
 
-        <Section title="Channels">
-          <div className="flex flex-wrap gap-4">
-            {(["push", "whatsapp"] as CampaignChannel[]).map((ch) => (
-              <label key={ch} className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={form.channels.includes(ch)}
-                  onCheckedChange={() => toggleChannel(ch)}
-                />
-                {CHANNEL_LABELS[ch]}
-              </label>
-            ))}
-          </div>
-          {errors.channels && <p className="text-xs text-destructive">{errors.channels}</p>}
-
-          {hasWhatsapp && (
-            <div className="space-y-4 rounded-xl border border-border p-4">
-              <div className="text-sm font-medium">WhatsApp template</div>
-              <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-                <Field label="Template name" error={errors.whatsapp_template_name} htmlFor="c-tpl">
-                  <Input
-                    id="c-tpl"
-                    value={form.whatsapp_template_name}
-                    onChange={(e) => set("whatsapp_template_name", e.target.value)}
-                    placeholder="promo_offer"
-                    className="rounded-xl"
-                  />
-                </Field>
-                <Field label="Language" error={errors.whatsapp_template_language} htmlFor="c-lang">
-                  <Input
-                    id="c-lang"
-                    value={form.whatsapp_template_language}
-                    onChange={(e) => set("whatsapp_template_language", e.target.value)}
-                    placeholder="en"
-                    className="rounded-xl"
-                  />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                <Label>Template parameters</Label>
-                <Hint>
-                  Filled into {"{{1}}"}, {"{{2}}"}… in order. Placeholders are supported.
-                </Hint>
-                {form.whatsapp_template_params.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-10 shrink-0 text-xs text-muted-foreground">{`{{${i + 1}}}`}</span>
-                    <Input
-                      value={p}
-                      aria-label={`Parameter ${i + 1}`}
-                      onChange={(e) =>
-                        set(
-                          "whatsapp_template_params",
-                          form.whatsapp_template_params.map((x, j) =>
-                            j === i ? e.target.value : x,
-                          ),
-                        )
-                      }
-                      placeholder="{name}"
-                      className="rounded-xl"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove parameter ${i + 1}`}
-                      onClick={() =>
-                        set(
-                          "whatsapp_template_params",
-                          form.whatsapp_template_params.filter((_, j) => j !== i),
-                        )
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                {errors.whatsapp_template_params && (
-                  <p className="text-xs text-destructive">{errors.whatsapp_template_params}</p>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={form.whatsapp_template_params.length >= MAX_PARAMS}
-                  onClick={() =>
-                    set("whatsapp_template_params", [...form.whatsapp_template_params, ""])
-                  }
-                >
-                  <Plus className="mr-1.5 h-4 w-4" /> Add parameter
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                WhatsApp deliveries show as skipped (“WhatsApp account not connected yet”) until the
-                business WhatsApp account is connected. That is expected.
-              </p>
-            </div>
-          )}
-        </Section>
+        <p className="flex items-start gap-1.5 rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Sent as an in-app notification and push to the customer app.
+        </p>
 
         <Section title="When to send">
           <div className="inline-flex rounded-xl border border-border p-1" role="radiogroup">

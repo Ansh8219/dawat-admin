@@ -38,6 +38,7 @@ import {
   useAuth,
 } from "@/lib/auth";
 import { businessScopeWith } from "@/lib/access";
+import { closedChannels } from "@/lib/order-channels";
 import { PANEL_META, businessTypeToPanel, type Panel } from "@/lib/panel";
 import { cn } from "@/lib/utils";
 
@@ -359,6 +360,15 @@ function SelectPanelPage() {
                           <CircleDot className={cn("h-3 w-3", open && "animate-pulse")} />
                           {open ? "Accepting orders" : "Closed"}
                         </span>
+                        {open &&
+                          closedChannels(biz, String(biz.type)).map((c) => (
+                            <span
+                              key={c.field}
+                              className="inline-flex items-center rounded-full bg-amber-400/95 px-2.5 py-1 text-[11px] font-semibold text-amber-950"
+                            >
+                              {c.label} closed
+                            </span>
+                          ))}
                         {invoiceReady ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> Invoice ready

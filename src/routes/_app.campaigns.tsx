@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Lock, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
-import { CampaignStatusBadge, ChannelIcons } from "@/components/app/campaign-badges";
+import { CampaignStatusBadge } from "@/components/app/campaign-badges";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
@@ -106,7 +106,7 @@ function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         crumbs={["Growth", "Campaigns"]}
-        description="Send push and WhatsApp promotions to customer segments."
+        description="Send push notifications and in-app promotions to customer segments."
         action={newButton}
       />
       <div className="space-y-4 p-4 sm:p-6 lg:p-8">
@@ -164,7 +164,6 @@ function CampaignsPage() {
                   <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
-                      <th className="px-4 py-3 font-medium">Channels</th>
                       <th className="px-4 py-3 font-medium">Audience</th>
                       <th className="px-4 py-3 font-medium">Scheduled</th>
                       <th className="px-4 py-3 font-medium">Status</th>
@@ -185,9 +184,6 @@ function CampaignsPage() {
                             {c.name}
                           </Link>
                           <div className="truncate text-xs text-muted-foreground">{c.title}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ChannelIcons channels={c.channels} />
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           {audienceLabel(c.audience_type, c.audience_days)}

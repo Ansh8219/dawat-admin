@@ -3,6 +3,8 @@ import type {
   Business,
   BusinessInvoiceDetails,
   BusinessInvoiceDetailsPayload,
+  BusinessOrderingCard,
+  BusinessOrderingSwitches,
   BusinessProfile,
 } from "./types";
 
@@ -35,16 +37,19 @@ export function listBusinesses(accessToken: string) {
   });
 }
 
-/** PATCH /api/admin/businesses/{public_id}/accepting-orders/ */
-export function setBusinessAcceptingOrders(
+/**
+ * PATCH /api/admin/businesses/{public_id}/accepting-orders/
+ * Send only the switches that changed (at least one); returns the updated business card.
+ */
+export function updateBusinessOrdering(
   accessToken: string,
   publicId: string,
-  isAcceptingOrders: boolean,
+  patch: Partial<BusinessOrderingSwitches>,
 ) {
-  return apiRequest<Business>(`/api/admin/businesses/${publicId}/accepting-orders/`, {
+  return apiRequest<BusinessOrderingCard>(`/api/admin/businesses/${publicId}/accepting-orders/`, {
     method: "PATCH",
     accessToken,
-    body: { is_accepting_orders: isAcceptingOrders },
+    body: patch,
   });
 }
 

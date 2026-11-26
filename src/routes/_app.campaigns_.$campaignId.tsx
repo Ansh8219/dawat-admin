@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Lock, Pencil, Send, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { CampaignRecipients } from "@/components/app/campaign-recipients";
-import { CampaignStatusBadge, ChannelIcons } from "@/components/app/campaign-badges";
+import { CampaignStatusBadge } from "@/components/app/campaign-badges";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import {
@@ -227,7 +227,6 @@ function Overview({ campaign: c }: { campaign: Campaign }) {
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center gap-3">
           <CampaignStatusBadge status={c.status} />
-          <ChannelIcons channels={c.channels} />
         </div>
         <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
           <Item label="Audience" value={audienceLabel(c.audience_type, c.audience_days)} />
@@ -235,23 +234,7 @@ function Overview({ campaign: c }: { campaign: Campaign }) {
           <Item label="Started" value={formatDateTime(c.started_at)} />
           <Item label="Completed" value={formatDateTime(c.completed_at)} />
           <Item label="Offer" value={c.offer ? `${c.offer.code} — ${c.offer.title}` : "None"} />
-          {c.channels.includes("whatsapp") && (
-            <Item
-              label="WhatsApp template"
-              value={`${c.whatsapp_template_name ?? "—"} (${c.whatsapp_template_language})`}
-            />
-          )}
         </dl>
-        {c.whatsapp_template_params.length > 0 && (
-          <div className="mt-3 text-sm">
-            <span className="text-muted-foreground">Template params: </span>
-            {c.whatsapp_template_params.map((p, i) => (
-              <code key={i} className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs">
-                {`{{${i + 1}}}`} = {p}
-              </code>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -272,12 +255,6 @@ function Overview({ campaign: c }: { campaign: Campaign }) {
         {c.status === "scheduled" && c.total_recipients === 0 && (
           <p className="mt-4 text-xs text-muted-foreground">
             Not started yet. Counters appear once sending begins.
-          </p>
-        )}
-        {c.skipped_count > 0 && c.channels.includes("whatsapp") && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            WhatsApp deliveries are skipped until the business WhatsApp account is connected — this
-            is expected. See the Recipients tab for details.
           </p>
         )}
       </div>

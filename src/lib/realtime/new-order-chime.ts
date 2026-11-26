@@ -32,9 +32,30 @@ function getAudioContext(): AudioContext | null {
   return sharedCtx;
 }
 
-function dualToneBurst(ctx: AudioContext, startAt: number, duration: number, volume: number) {
-  // Classic ring pair (~440 + 480 Hz)
-  for (const freq of [440, 480]) {
+/**
+ * Each business rings in its own pitch so staff can tell them apart without looking:
+ * Restaurant = classic phone ring, Bakery = higher and brighter, Hall = soft two-note chime.
+ */
+export type SoundVariant = "restaurant" | "bakery" | "banquet_hall";
+
+const TONES: Record<SoundVariant, readonly [number, number]> = {
+  restaurant: [440, 480],
+  bakery: [660, 720],
+  banquet_hall: [523, 659],
+};
+
+function tonesFor(variant: string | null | undefined): readonly [number, number] {
+  return variant && variant in TONES ? TONES[variant as SoundVariant] : TONES.restaurant;
+}
+
+function dualToneBurst(
+  ctx: AudioContext,
+  startAt: number,
+  duration: number,
+  volume: number,
+  freqs: readonly number[] = TONES.restaurant,
+) {
+  for (const freq of freqs) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -72,21 +93,22 @@ export function installAudioUnlock(): () => void {
 }
 
 /** Shorter two-pulse alert for cancellations / stock alerts. */
-export function playAlertTone() {
+export function playAlertTone(variant?: string | null) {
   const ctx = getAudioContext();
   if (!ctx) return;
   try {
     if (ctx.state === "suspended") void ctx.resume();
     const now = ctx.currentTime;
-    dualToneBurst(ctx, now, 0.3, 0.2);
-    dualToneBurst(ctx, now + 0.45, 0.3, 0.2);
+    const freqs = tonesFor(variant);
+    dualToneBurst(ctx, now, 0.3, 0.2, freqs);
+    dualToneBurst(ctx, now + 0.45, 0.3, 0.2, freqs);
   } catch {
     // Autoplay blocked — toast still notifies.
   }
 }
 
 /** Loud repeating ring when a new order arrives. */
-export function playNewOrderChime() {
+export function playNewOrderChime(variant?: string | null) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -106,12 +128,13 @@ export function playNewOrderChime() {
     const pause = 0.55; // silence between ring cycles
     const cycles = 4; // how many "rinng-rinng" groups
     const volume = 0.22;
+    const freqs = tonesFor(variant);
 
     let t = now;
     for (let cycle = 0; cycle < cycles; cycle++) {
-      dualToneBurst(ctx, t, burst, volume);
+      dualToneBurst(ctx, t, burst, volume, freqs);
       t += burst + gap;
-      dualToneBurst(ctx, t, burst, volume);
+      dualToneBurst(ctx, t, burst, volume, freqs);
       t += burst + pause;
     }
 

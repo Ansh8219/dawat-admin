@@ -8,11 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { listBusinesses, setBusinessAcceptingOrders } from "@/lib/api/businesses";
+import { useQueryClient } from "@tanstack/react-query";
+import { listBusinesses } from "@/lib/api/businesses";
 import { getAdminDashboard } from "@/lib/api/dashboard";
 import { formatOrderMoney } from "@/lib/api/orders";
-import { ApiError } from "@/lib/api/types";
+import { ApiError, type BusinessOrderingCard } from "@/lib/api/types";
 import type {
   AdminDashboardData,
   Business,
@@ -25,6 +25,8 @@ import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { useBusinessScope } from "@/lib/access";
 import { HallDashboard } from "@/components/app/hall-dashboard";
+import { OrderingStatusBadges, OrderingStatusPill } from "@/components/app/ordering-controls";
+import { normalizeOrdering, outletOrderingQueryKey } from "@/lib/order-channels";
 import { businessTypeToPanel } from "@/lib/panel";
 import { usePanel, usePanelMeta } from "@/lib/use-panel";
 import { cn } from "@/lib/utils";
@@ -39,7 +41,6 @@ import {
   ChefHat,
   CheckCircle2,
   Star,
-  CircleDot,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -199,7 +200,7 @@ function FoodDashboard() {
   const [loadingDash, setLoadingDash] = useState(false);
   const [listError, setListError] = useState("");
   const [dashError, setDashError] = useState("");
-  const [toggling, setToggling] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -220,7 +221,7 @@ function FoodDashboard() {
       const list = await withAuthRetry((token) => listBusinesses(token));
       const orderable = list
         .filter((b) => ORDERABLE_TYPES.has(String(b.type)) && scope.allows(b.type))
-        .map((b) => ({ ...b, is_accepting_orders: Boolean(b.is_accepting_orders) }))
+        .map((b) => ({ ...b, ...normalizeOrdering(b) }))
         .sort(sortOrderable);
       setBusinesses(orderable);
 
@@ -247,7 +248,7 @@ function FoodDashboard() {
       }
       try {
         const dash = await withAuthRetry((token) => getAdminDashboard(token, businessPublicId));
-        setData(dash);
+        setData({ ...dash, business: { ...dash.business, ...normalizeOrdering(dash.business) } });
         setDashError("");
       } catch (err) {
         if (handleAuthError(err)) return;
@@ -288,53 +289,24 @@ function FoodDashboard() {
     }
   }
 
-  async function toggleAccepting(next: boolean) {
-    if (!data?.business) return;
-    const biz = data.business;
-    const previous = biz.is_accepting_orders;
-    setToggling(true);
+  /** Apply the server's ordering state (PATCH response) to the dashboard and business list. */
+  function applyOrdering(card: BusinessOrderingCard) {
+    const next = normalizeOrdering(card);
     setData((prev) =>
-      prev ? { ...prev, business: { ...prev.business, is_accepting_orders: next } } : prev,
+      prev && prev.business.public_id === card.public_id
+        ? {
+            ...prev,
+            business: { ...prev.business, ...next, name: card.name || prev.business.name },
+          }
+        : prev,
     );
     setBusinesses((prev) =>
-      prev.map((b) => (b.public_id === biz.public_id ? { ...b, is_accepting_orders: next } : b)),
+      prev.map((b) => (b.public_id === card.public_id ? { ...b, ...next } : b)),
     );
-    try {
-      const updated = await withAuthRetry((token) =>
-        setBusinessAcceptingOrders(token, biz.public_id, next),
-      );
-      setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              business: {
-                ...prev.business,
-                is_accepting_orders: updated.is_accepting_orders,
-                name: updated.name || prev.business.name,
-              },
-            }
-          : prev,
-      );
-      const label = typeLabel(updated.type || biz.type);
-      toast.success(next ? `${label} — Accepting orders` : `${label} — Closed`);
-    } catch (err) {
-      setData((prev) =>
-        prev ? { ...prev, business: { ...prev.business, is_accepting_orders: previous } } : prev,
-      );
-      setBusinesses((prev) =>
-        prev.map((b) =>
-          b.public_id === biz.public_id ? { ...b, is_accepting_orders: previous } : b,
-        ),
-      );
-      if (handleAuthError(err)) return;
-      toast.error(err instanceof ApiError ? err.message : "Unable to update accepting orders");
-    } finally {
-      setToggling(false);
-    }
+    void queryClient.invalidateQueries({ queryKey: outletOrderingQueryKey(card.public_id) });
   }
 
   const title = data?.business.name || meta.label;
-  const accepting = data?.business.is_accepting_orders ?? false;
 
   const salesTrend = useMemo(
     () => (data?.sales_trend ?? []).map((p) => ({ ...p, label: formatTrendDate(p.date) })),
@@ -395,6 +367,11 @@ function FoodDashboard() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{title} Home</h1>
+              {data && (
+                <OrderingStatusBadges
+                  business={{ ...data.business, type: String(data.business.type) }}
+                />
+              )}
               {data && data.counts.new > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
                   <Bell className="h-3 w-3 animate-pulse" />
@@ -434,27 +411,10 @@ function FoodDashboard() {
             </div>
 
             {data && (
-              <label
-                className={cn(
-                  "flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-medium",
-                  accepting ? "border-success/40" : "border-border",
-                )}
-              >
-                <CircleDot
-                  className={cn(
-                    "h-3 w-3 shrink-0",
-                    accepting ? "animate-pulse text-success" : "text-muted-foreground",
-                  )}
-                />
-                <span className="whitespace-nowrap">
-                  {accepting ? "Accepting orders" : "Closed"}
-                </span>
-                <Switch
-                  checked={accepting}
-                  disabled={toggling}
-                  onCheckedChange={(checked) => void toggleAccepting(checked)}
-                />
-              </label>
+              <OrderingStatusPill
+                business={{ ...data.business, type: String(data.business.type) }}
+                onUpdated={applyOrdering}
+              />
             )}
 
             <Button

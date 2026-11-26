@@ -4,10 +4,13 @@ import { GlobalProgress } from "@/components/app/global-progress";
 import { BootSplash } from "@/components/app/boot-splash";
 import { AppSidebar } from "@/components/app/sidebar";
 import { TopBar } from "@/components/app/topbar";
+import { CrossBusinessStrip } from "@/components/app/cross-business-strip";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
 import { useAdminOrdersSocket } from "@/hooks/use-admin-orders-socket";
 import { useLateOrderWatcher } from "@/hooks/use-late-order-watcher";
+import { usePendingReminder, useUnreadCounts } from "@/hooks/use-cross-business";
+import { useTabAttention } from "@/lib/realtime/attention";
 import {
   useAuth,
   canCheckPersistedAuth,
@@ -107,6 +110,11 @@ function AppLayout() {
   useAdminOrdersSocket({ enabled: true });
   // Late-order sound + toast on every page (not only Orders).
   useLateOrderWatcher();
+  // Rings again while orders / counter payments wait too long, in any business.
+  usePendingReminder();
+  // "(3) Daawat…" in the tab title + red dot on the favicon while notifications are unread.
+  const unreadTotal = useUnreadCounts().data?.unread_count ?? 0;
+  useTabAttention(unreadTotal);
 
   if (!ready) return <BootSplash />;
 
@@ -124,6 +132,7 @@ function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col print:block">
         <div className="print:hidden">
           <TopBar onMenu={() => setMobileOpen(true)} />
+          <CrossBusinessStrip />
         </div>
         <main className="flex-1 overflow-y-auto print:overflow-visible">
           <Outlet />

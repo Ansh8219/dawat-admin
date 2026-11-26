@@ -27,6 +27,7 @@ import { useBusinessScope } from "@/lib/access";
 import { NotificationsBell } from "./notifications-bell";
 import { SoundStatus } from "./sound-status";
 import { OutletToggle } from "./outlet-toggle";
+import { PanelSwitcher } from "./panel-switcher";
 import { toast } from "sonner";
 
 function initials(name: string) {
@@ -89,43 +90,25 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <OutletToggle />
-          <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-3 py-1.5 sm:flex">
-            <div>
-              <div className="text-xs font-semibold leading-tight">{meta.label}</div>
-              <div className="font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
-            </div>
-            {canSwitchPanel ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1 rounded-lg px-2 text-xs"
-                onClick={switchPanel}
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-                Switch
-              </Button>
-            ) : (
-              <Lock
-                className="h-3.5 w-3.5 text-muted-foreground"
-                aria-label="Limited to this business"
-              />
-            )}
-          </div>
           {canSwitchPanel ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl gap-1.5 sm:hidden"
-              onClick={switchPanel}
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-              {meta.label}
-            </Button>
+            <PanelSwitcher label={meta.label} gst={meta.gst} />
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 px-2.5 py-1 text-xs font-medium sm:hidden">
-              <Lock className="h-3 w-3 text-muted-foreground" />
-              {meta.label}
-            </span>
+            <>
+              <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-3 py-1.5 sm:flex">
+                <div>
+                  <div className="text-xs font-semibold leading-tight">{meta.label}</div>
+                  <div className="font-mono text-[9px] text-muted-foreground">GST · {meta.gst}</div>
+                </div>
+                <Lock
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-label="Limited to this business"
+                />
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 px-2.5 py-1 text-xs font-medium sm:hidden">
+                <Lock className="h-3 w-3 text-muted-foreground" />
+                {meta.label}
+              </span>
+            </>
           )}
 
           <Button variant="ghost" size="icon" onClick={toggleDark} title="Toggle theme">

@@ -1,11 +1,30 @@
 import { getApiBaseUrl } from "@/lib/api/client";
-import type { AdminOrderTab } from "@/lib/api/types";
+import type {
+  AdminNotification,
+  AdminOrderTab,
+  BusinessType,
+  UnreadByBusinessType,
+} from "@/lib/api/types";
+
+/**
+ * Sent on every business event. The server only sends events for businesses the user can
+ * access. A mixed order arrives once, under the first business the user can access.
+ */
+export type WsBusinessFields = {
+  business_public_id?: string | null;
+  business_type?: BusinessType | null;
+  business_name?: string | null;
+  /** Every business in a mixed order. */
+  business_types?: BusinessType[];
+};
 
 export type AdminOrderWsEventType = "order.created" | "order.updated";
 
-export type AdminOrderWsEvent = {
+export type AdminOrderWsEvent = WsBusinessFields & {
   type: AdminOrderWsEventType;
   order_public_id: string;
+  /** Existing ORD{id} code. */
+  order_code?: string;
   status: string;
   tab: AdminOrderTab;
   at: string;
@@ -14,10 +33,8 @@ export type AdminOrderWsEvent = {
 export type InventoryStockStatus = "low_stock" | "out_of_stock";
 
 /** `inventory.stock_alert` message on the same admin socket. */
-export type InventoryStockAlertEvent = {
+export type InventoryStockAlertEvent = WsBusinessFields & {
   type: "inventory.stock_alert";
-  business_public_id?: string;
-  business_name?: string;
   inventory_item_public_id: string;
   item_name: string;
   unit?: string;
@@ -29,16 +46,49 @@ export type InventoryStockAlertEvent = {
 };
 
 /** `hall_enquiry.created` message on the same admin socket. */
-export type HallEnquiryCreatedEvent = {
+export type HallEnquiryCreatedEvent = WsBusinessFields & {
   type: "hall_enquiry.created";
   enquiry_public_id?: string;
+  customer_name?: string;
+  hall_name?: string;
+  event_date?: string | null;
+  guests?: number | null;
+  at?: string;
   [key: string]: unknown;
 };
 
+/** `hall_booking.pending_approval`: a paid booking waiting for an admin to approve it. */
+export type HallBookingPendingEvent = WsBusinessFields & {
+  type: "hall_booking.pending_approval";
+  at?: string;
+  [key: string]: unknown;
+};
+
+/** `notification.created`: a saved inbox notification for this user, with fresh counts. */
+export type NotificationCreatedEvent = {
+  type: "notification.created";
+  notification: AdminNotification;
+  unread_count: number;
+  by_business_type?: UnreadByBusinessType;
+  at: string;
+};
+
+/** `notification.read`: sent after a read / read-all so other tabs and devices stay in sync. */
+export type NotificationReadEvent = {
+  type: "notification.read";
+  notification_public_id: string | null;
+  business_type: BusinessType | null;
+  marked_read: number;
+  unread_count: number;
+  by_business_type?: UnreadByBusinessType;
+  at: string;
+};
+
 /** Pay-at-counter events: `payment_pending` on handover, `payment_received` on settle. */
-export type CounterPaymentEvent = {
+export type CounterPaymentEvent = WsBusinessFields & {
   type: "order.payment_pending" | "order.payment_received";
   order_public_id: string;
+  order_code?: string;
   table_number: string;
   /** Decimal string, e.g. "300.00". */
   total: string;
@@ -94,13 +144,38 @@ function isInventoryStockAlertEvent(value: unknown): value is InventoryStockAler
   );
 }
 
+function hasType(value: unknown, type: string): boolean {
+  return Boolean(value) && typeof value === "object" && (value as { type?: unknown }).type === type;
+}
+
 function isHallEnquiryCreatedEvent(value: unknown): value is HallEnquiryCreatedEvent {
-  if (!value || typeof value !== "object") return false;
-  return (value as Record<string, unknown>).type === "hall_enquiry.created";
+  return hasType(value, "hall_enquiry.created");
+}
+
+function isHallBookingPendingEvent(value: unknown): value is HallBookingPendingEvent {
+  return hasType(value, "hall_booking.pending_approval");
+}
+
+function isNotificationCreatedEvent(value: unknown): value is NotificationCreatedEvent {
+  return (
+    hasType(value, "notification.created") &&
+    typeof (value as { notification?: unknown }).notification === "object" &&
+    typeof (value as { unread_count?: unknown }).unread_count === "number"
+  );
+}
+
+function isNotificationReadEvent(value: unknown): value is NotificationReadEvent {
+  return (
+    hasType(value, "notification.read") &&
+    typeof (value as { unread_count?: unknown }).unread_count === "number"
+  );
 }
 
 export type AdminOrdersSocketHandlers = {
   onHallEnquiryCreated?: (event: HallEnquiryCreatedEvent) => void;
+  onHallBookingPending?: (event: HallBookingPendingEvent) => void;
+  onNotificationCreated?: (event: NotificationCreatedEvent) => void;
+  onNotificationRead?: (event: NotificationReadEvent) => void;
   onEvent: (event: AdminOrderWsEvent) => void;
   onStockAlert?: (event: InventoryStockAlertEvent) => void;
   onCounterPayment?: (event: CounterPaymentEvent) => void;
@@ -201,6 +276,12 @@ export class AdminOrdersSocket {
         this.handlers.onCounterPayment?.(parsed);
       } else if (isHallEnquiryCreatedEvent(parsed)) {
         this.handlers.onHallEnquiryCreated?.(parsed);
+      } else if (isHallBookingPendingEvent(parsed)) {
+        this.handlers.onHallBookingPending?.(parsed);
+      } else if (isNotificationCreatedEvent(parsed)) {
+        this.handlers.onNotificationCreated?.(parsed);
+      } else if (isNotificationReadEvent(parsed)) {
+        this.handlers.onNotificationRead?.(parsed);
       }
     };
 
