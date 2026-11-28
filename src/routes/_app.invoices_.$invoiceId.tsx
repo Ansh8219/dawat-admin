@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { InvoiceDocument } from "@/components/app/invoice-document";
+import { InvoiceEditHistory } from "@/components/app/invoice-edit-history";
+import { InvoiceEditor } from "@/components/app/invoice-editor";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { downloadInvoiceDetailCsv } from "@/lib/invoice-export";
 import { toast } from "sonner";
-import { getInvoice } from "@/lib/api/invoices";
+import { formatInvoiceDateTime, getInvoice } from "@/lib/api/invoices";
+import { useAccess } from "@/lib/access";
+import { invoiceSettingsQueryKey, useInvoiceEditingEnabled } from "@/lib/invoice-settings";
+import { useQueryClient } from "@tanstack/react-query";
 import { BUSINESS_ACCESS_DENIED_MESSAGE } from "@/lib/api/client";
 import { isBusinessAccessDenied } from "@/lib/business-scope";
 import { ApiError } from "@/lib/api/types";
@@ -18,7 +23,7 @@ import type { InvoiceDetail } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
 import { z } from "zod";
-import { ArrowLeft, Download, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, History, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/_app/invoices_/$invoiceId")({
   component: InvoiceDetailPage,
@@ -33,6 +38,16 @@ function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const superAdmin = useAccess().isSuperAdmin;
+  const editingEnabled = useInvoiceEditingEnabled();
+  const queryClient = useQueryClient();
+  // Super admin + cash invoice + global switch on. The Edit button is hidden (not disabled)
+  // when the switch is off. Backend enforces all three; this only hides the action.
+  const canEdit = superAdmin && invoice?.is_editable === true && editingEnabled === true;
+  // History ("Edited on …") is also hidden while the switch is off.
+  const canSeeHistory = superAdmin && editingEnabled === true;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +94,11 @@ function InvoiceDetailPage() {
     return () => window.clearTimeout(t);
   }, [autoPrint, invoice]);
 
+  function handleUnauthorized() {
+    useAuth.getState().logout();
+    void navigate({ to: "/login" });
+  }
+
   function goBack() {
     if (window.history.length > 1) router.history.back();
     else void navigate({ to: "/invoices" });
@@ -90,7 +110,22 @@ function InvoiceDetailPage() {
         <Button variant="ghost" className="gap-2 rounded-xl" onClick={goBack}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {invoice && canSeeHistory && invoice.last_edited_at && (
+            <Button
+              variant="ghost"
+              className="gap-2 rounded-xl text-muted-foreground"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-4 w-4" />
+              Edited on {formatInvoiceDateTime(invoice.last_edited_at)}
+            </Button>
+          )}
+          {canEdit && !editing && (
+            <Button variant="outline" className="gap-2 rounded-xl" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Button>
+          )}
           {invoice && (
             <Button asChild variant="outline" className="gap-2 rounded-xl">
               <Link to="/orders" search={{ order: invoice.order.public_id }}>
@@ -134,7 +169,38 @@ function InvoiceDetailPage() {
             </div>
           </div>
         ) : (
-          <InvoiceDocument invoice={invoice} />
+          <>
+            {editing && canEdit && (
+              <InvoiceEditor
+                // Remount after each save: positions are renumbered by the backend.
+                key={invoice.last_edited_at ?? invoice.public_id}
+                invoice={invoice}
+                onCancel={() => setEditing(false)}
+                onUnauthorized={handleUnauthorized}
+                onEditingDisabled={() => {
+                  setEditing(false);
+                  void queryClient.invalidateQueries({ queryKey: invoiceSettingsQueryKey });
+                }}
+                onSaved={(updated) => {
+                  setInvoice(updated);
+                  setEditing(false);
+                }}
+              />
+            )}
+            {/* Printing always uses the saved invoice, even while editing. */}
+            <div className={editing && canEdit ? "hidden print:block" : undefined}>
+              <InvoiceDocument invoice={invoice} />
+            </div>
+            {canSeeHistory && (
+              <InvoiceEditHistory
+                invoicePublicId={invoice.public_id}
+                invoiceNumber={invoice.invoice_number}
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+                refreshKey={invoice.last_edited_at}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

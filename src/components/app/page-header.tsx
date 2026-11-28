@@ -9,9 +9,18 @@ interface Props {
   description?: string;
   /** When set, `action` is shown only if the user can `<module>:manage` here. */
   actionModule?: string;
+  /** Optional click handler on the title (no visual change). */
+  onTitleClick?: () => void;
 }
 
-export function PageHeader({ title, crumbs = [], action, description, actionModule }: Props) {
+export function PageHeader({
+  title,
+  crumbs = [],
+  action,
+  description,
+  actionModule,
+  onTitleClick,
+}: Props) {
   const { canManage } = useAccess();
   const showAction = action && (!actionModule || canManage(actionModule));
   return (
@@ -27,7 +36,12 @@ export function PageHeader({ title, crumbs = [], action, description, actionModu
             ))}
           </nav>
         )}
-        <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        <h1
+          className={`truncate text-2xl font-semibold tracking-tight sm:text-3xl${onTitleClick ? " select-none" : ""}`}
+          onClick={onTitleClick}
+        >
+          {title}
+        </h1>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       {showAction && <div className="shrink-0">{action}</div>}

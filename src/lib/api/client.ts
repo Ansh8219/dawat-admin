@@ -100,7 +100,9 @@ async function parseEnvelope<T>(response: Response): Promise<T> {
     envelope.status_code || response.status,
     code,
     message,
-    envelope.error?.details ?? null,
+    // Endpoints that send `error.detail` (a string) instead of `details` keep it as { detail }.
+    envelope.error?.details ??
+      (envelope.error?.detail != null ? { detail: envelope.error.detail } : null),
   );
 }
 
@@ -226,6 +228,12 @@ function humanizeErrorCode(code: string): string {
       return "Date range cannot exceed 366 days.";
     case "super_admin_required":
       return "Only a super admin can access this.";
+    case "invoice_editing_disabled":
+      return "Invoice editing was turned off";
+    case "invoice_not_editable":
+      return "Only cash invoices can be edited.";
+    case "invalid_invoice_edit":
+      return "These changes can't be applied to the invoice.";
     case "invoice_prefix_locked":
       return "Invoices have already been issued with this prefix, so it can't be changed.";
     case "gst_number_taken":

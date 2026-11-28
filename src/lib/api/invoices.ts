@@ -1,8 +1,14 @@
 import { apiRequest } from "./client";
+import { ApiError } from "./types";
 import type {
   BusinessInvoiceDetails,
   BusinessInvoiceDetailsPayload,
   InvoiceDetail,
+  InvoiceEditHistory,
+  InvoiceEditPayload,
+  InvoiceEditSnapshot,
+  InvoiceLine,
+  InvoiceSettings,
   InvoiceListData,
   InvoiceListParams,
   OrderInvoicesData,
@@ -33,12 +39,113 @@ export function getInvoice(accessToken: string, publicId: string) {
   });
 }
 
+/**
+ * PATCH /api/admin/invoices/{public_id}/ (super_admin, cash invoices only).
+ * Returns the full recalculated invoice; line positions are renumbered after a removal.
+ */
+export function updateInvoice(accessToken: string, publicId: string, payload: InvoiceEditPayload) {
+  return apiRequest<InvoiceDetail>(`/api/admin/invoices/${publicId}/`, {
+    method: "PATCH",
+    body: payload,
+    accessToken,
+  });
+}
+
+/** GET /api/admin/invoices/{public_id}/edits/ (super_admin only, newest first) */
+export function listInvoiceEdits(accessToken: string, publicId: string) {
+  return apiRequest<InvoiceEditHistory>(`/api/admin/invoices/${publicId}/edits/`, {
+    method: "GET",
+    accessToken,
+  });
+}
+
+/** GET /api/admin/invoice-settings/ (super_admin only) */
+export function getInvoiceSettings(accessToken: string) {
+  return apiRequest<InvoiceSettings>("/api/admin/invoice-settings/", {
+    method: "GET",
+    accessToken,
+  });
+}
+
+/** PATCH /api/admin/invoice-settings/ (super_admin only) */
+export function updateInvoiceSettings(accessToken: string, payload: InvoiceSettings) {
+  return apiRequest<InvoiceSettings>("/api/admin/invoice-settings/", {
+    method: "PATCH",
+    body: payload,
+    accessToken,
+  });
+}
+
 /** GET /api/admin/orders/{public_id}/invoices/ — one invoice per business on the order. */
 export function listOrderInvoices(accessToken: string, orderPublicId: string) {
   return apiRequest<OrderInvoicesData>(`/api/admin/orders/${orderPublicId}/invoices/`, {
     method: "GET",
     accessToken,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+
+export const INVOICE_QTY_MAX = 1000;
+
+/** Prefers the backend's `error.detail`, then the client's readable message. */
+export function invoiceEditErrorMessage(
+  err: unknown,
+  fallback = "Unable to update invoice.",
+): string {
+  if (!(err instanceof ApiError)) return fallback;
+  const details = err.details;
+  if (err.code !== "validation_error" && details && typeof details === "object") {
+    const detail = (details as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail.trim()) return detail.trim();
+  }
+  if (typeof details === "string" && details.trim()) return details.trim();
+  return err.message || fallback;
+}
+
+export function lineTax(line: Pick<InvoiceLine, "cgst_amount" | "sgst_amount" | "igst_amount">) {
+  return (line.cgst_amount ?? 0) + (line.sgst_amount ?? 0) + (line.igst_amount ?? 0);
+}
+
+export type InvoiceLineDiff =
+  | { kind: "changed" | "unchanged"; before: InvoiceLine; after: InvoiceLine }
+  | { kind: "removed"; before: InvoiceLine; after: null }
+  | { kind: "added"; before: null; after: InvoiceLine };
+
+const sameLine = (a: InvoiceLine, b: InvoiceLine) =>
+  a.line_type === b.line_type && a.description === b.description && a.unit_price === b.unit_price;
+
+export const invoiceAmountsDiffer = (a: number | undefined, b: number | undefined) =>
+  Math.abs((a ?? 0) - (b ?? 0)) >= 0.005;
+
+/**
+ * Pairs `before` and `after` lines. Positions are renumbered after a removal, so lines are
+ * matched in order by type, description and rate; an unmatched `before` line was removed.
+ */
+export function diffInvoiceLines(
+  before: InvoiceEditSnapshot,
+  after: InvoiceEditSnapshot,
+): InvoiceLineDiff[] {
+  const remaining = [...(after.lines ?? [])];
+  const out: InvoiceLineDiff[] = [];
+  for (const b of before.lines ?? []) {
+    const idx = remaining.findIndex((a) => sameLine(b, a));
+    if (idx === -1) {
+      out.push({ kind: "removed", before: b, after: null });
+      continue;
+    }
+    const [a] = remaining.splice(idx, 1);
+    const changed =
+      a.quantity !== b.quantity ||
+      invoiceAmountsDiffer(a.discount_amount, b.discount_amount) ||
+      invoiceAmountsDiffer(lineTax(a), lineTax(b)) ||
+      invoiceAmountsDiffer(a.total_amount, b.total_amount);
+    out.push({ kind: changed ? "changed" : "unchanged", before: b, after: a });
+  }
+  for (const a of remaining) out.push({ kind: "added", before: null, after: a });
+  return out;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { InvoiceEditingSwitch } from "@/components/app/invoice-editing-switch";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ import { ApiError } from "@/lib/api/types";
 import type { Business, InvoiceListData } from "@/lib/api/types";
 import { withAuthRetry } from "@/lib/api/with-auth";
 import { useAuth } from "@/lib/auth";
-import { useBusinessScope } from "@/lib/access";
+import { useAccess, useBusinessScope } from "@/lib/access";
 import { BUSINESS_TYPE_LABELS } from "@/lib/business-scope";
 import { cn } from "@/lib/utils";
 import {
@@ -93,6 +94,19 @@ function presetRange(preset: "today" | "this_month" | "last_month"): { from: str
 }
 
 function InvoicesPage() {
+  // Hidden super-admin switch: tap the page title 5 times within ~2s.
+  const superAdmin = useAccess().isSuperAdmin;
+  const [secretOpen, setSecretOpen] = useState(false);
+  const taps = useRef<number[]>([]);
+  function onTitleTap() {
+    if (!superAdmin) return;
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 2000), now];
+    if (taps.current.length >= 5) {
+      taps.current = [];
+      setSecretOpen(true);
+    }
+  }
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const page = search.page ?? 1;
@@ -264,8 +278,10 @@ function InvoicesPage() {
 
   return (
     <div className="flex min-h-full flex-col bg-muted/20">
+      {superAdmin && <InvoiceEditingSwitch open={secretOpen} onOpenChange={setSecretOpen} />}
       <PageHeader
         title="Invoices"
+        onTitleClick={onTitleTap}
         crumbs={["Admin", "Invoices"]}
         description="GST tax invoices issued automatically when food orders are completed. Invoices can't be edited once issued."
         action={

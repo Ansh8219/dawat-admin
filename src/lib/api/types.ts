@@ -2,6 +2,8 @@
 export interface ApiErrorBody {
   code: string;
   details: unknown;
+  /** Human-readable message some endpoints send instead of `details`. */
+  detail?: unknown;
 }
 
 export interface ApiEnvelope<T> {
@@ -1542,6 +1544,43 @@ export interface InvoiceDetail {
   igst_amount: number;
   total_tax: number;
   total_amount: number;
+  /** True only for cash invoices; editing also needs a super admin. */
+  is_editable?: boolean;
+  /** ISO datetime of the last edit, null when never edited. */
+  last_edited_at?: string | null;
+}
+
+/** GET/PATCH /api/admin/invoice-settings/ (super_admin only). Applies to all businesses. */
+export interface InvoiceSettings {
+  editing_enabled: boolean;
+}
+
+/** PATCH /api/admin/invoices/{public_id}/ — only the changed lines; quantity 0 removes an item. */
+export interface InvoiceEditPayload {
+  lines: { position: number; quantity: number }[];
+}
+
+/** Invoice state stored before/after an edit. */
+export interface InvoiceEditSnapshot {
+  lines: InvoiceLine[];
+  total_amount: number;
+  discount_amount: number;
+  total_tax: number;
+  taxable_amount?: number;
+  [key: string]: unknown;
+}
+
+export interface InvoiceEditEntry {
+  edited_at: string;
+  edited_by: { public_id: string; email: string } | null;
+  before: InvoiceEditSnapshot;
+  after: InvoiceEditSnapshot;
+}
+
+/** GET /api/admin/invoices/{public_id}/edits/ (super_admin only, newest first) */
+export interface InvoiceEditHistory {
+  invoice_public_id: string;
+  results: InvoiceEditEntry[];
 }
 
 /** GET /api/admin/orders/{public_id}/invoices/ */
